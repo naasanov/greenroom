@@ -72,7 +72,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - On clicking the invite, the app checks whether the person already has an account. If yes, add them to the band; if not, they sign up and then land in the band. One link handles both cases.
 - Signup does NOT auto-create or auto-join a band. Signing up just creates the account. From there, two paths: (a) create a band, or (b) join an existing band via an invite link. The invite link is what signals which path you're on — an invited member (e.g. a new bassist) is never forced through a "create your band" screen they don't want.
 - Decision: skip user search — invite links only. Simpler to build and discovery isn't needed for a small band.
-- At signup, ask what instrument(s) the user plays. Pick from a preset list (each with a nice icon); also allow a custom instrument for things not in the list (e.g. oddball/traditional instruments). A user can play multiple instruments.
+- At signup, ask what instrument(s) the user plays. Pick from a preset list (each with a nice icon); also allow a custom instrument for things not in the list (e.g. oddball/traditional instruments). A user can play multiple instruments. Instruments belong to the user (not to each band membership), since they're asked before any band exists and edited in personal settings.
 
 # Tech Stack
 

@@ -5,7 +5,6 @@ import {
   gigSetlists,
   gigs,
   mediaFolders,
-  memberInstruments,
   memberships,
   practiceOccurrenceOverrides,
   practiceRsvps,
@@ -15,6 +14,7 @@ import {
   setlists,
   songLinks,
   songs,
+  userInstruments,
   users,
 } from "../schema/index.js";
 import {
@@ -91,14 +91,13 @@ export async function seedBand(
       role: "admin",
     },
   ]);
-  await db.insert(memberInstruments).values([
-    { membershipId: MEMBERSHIPS.ava, presetKey: "guitar" },
-    { membershipId: MEMBERSHIPS.ava, presetKey: "vocals" },
-    { membershipId: MEMBERSHIPS.ben, presetKey: "bass" },
-    { membershipId: MEMBERSHIPS.cleo, presetKey: "keys" },
-    { membershipId: MEMBERSHIPS.cleo, customName: "Theremin" },
-    { membershipId: MEMBERSHIPS.dev, presetKey: "drums" },
-    { membershipId: MEMBERSHIPS.benSideProject, presetKey: "bass" },
+  await db.insert(userInstruments).values([
+    { userId: USERS.ava.id, presetKey: "guitar", position: 0 },
+    { userId: USERS.ava.id, presetKey: "vocals", position: 1 },
+    { userId: USERS.ben.id, presetKey: "bass", position: 0 },
+    { userId: USERS.cleo.id, presetKey: "keys", position: 0 },
+    { userId: USERS.cleo.id, customName: "Theremin", position: 1 },
+    { userId: USERS.dev.id, presetKey: "drums", position: 0 },
   ]);
 
   // Songs: three Spotify-backed, three YouTube-backed, two manual, one in the other band.

@@ -16,6 +16,7 @@ export const magicLinkTokens = pgTable("magic_link_tokens", {
   email: text("email").notNull(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash").notNull().unique(),
+  redirectTo: text("redirect_to"),
   expiresAt: tstz("expires_at").notNull(),
   usedAt: tstz("used_at"),
   createdAt: createdAt(),

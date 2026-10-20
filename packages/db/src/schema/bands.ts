@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -68,20 +69,22 @@ export const memberships = pgTable(
   ],
 );
 
-export const memberInstruments = pgTable(
-  "member_instruments",
+// Instruments belong to the user (set at signup and in personal settings), not a membership.
+export const userInstruments = pgTable(
+  "user_instruments",
   {
     id: id(),
-    membershipId: uuid("membership_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => memberships.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     presetKey: text("preset_key"),
     customName: text("custom_name"),
+    position: integer("position").notNull().default(0),
   },
   (t) => [
-    index("member_instruments_membership_id_idx").on(t.membershipId),
+    index("user_instruments_user_id_idx").on(t.userId),
     check(
-      "member_instruments_one_of_preset_custom",
+      "user_instruments_one_of_preset_custom",
       sql`(${t.presetKey} is null) <> (${t.customName} is null)`,
     ),
   ],

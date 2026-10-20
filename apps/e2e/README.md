@@ -13,6 +13,7 @@ Projects: `desktop` (Chromium 1280x800) and `mobile` (iPhone 15, WebKit). Tests 
 Put it in `tests/*.spec.ts` and import from `../src/fixtures.js`:
 - `testApi.seed("band")` returns fixture ids/handles (`USERS`, `BANDS`, `GIG_IDS`... are also exported from `@greenroom/db`).
 - `testApi.reset()`, `testApi.magicLinksFor(email)`.
+- `loginAs(email)` creates the user + session and adds the session cookie to the browser `context`; `testApi.login(email)` returns the raw cookie for API-level `request` use.
 - `db` is a Drizzle handle on the test DB for assertions.
 - An auto fixture resets DB and fakes before every test, so start from `empty` and seed what you need.
 

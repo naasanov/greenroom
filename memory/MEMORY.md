@@ -26,7 +26,8 @@ Before adding an entry, check for an existing one that covers it and update that
 ## Entries
 
 - [Orchestrator role](orchestrator-role.md) — sessions start as Opus orchestrator; all code is written by Sonnet subagents
-- [Commit cadence](commit-cadence.md) — orchestrator commits on its own after validated checkpoints; no branching/pushing unless asked
+- [Parallel agent coordination](parallel-agent-coordination.md) — one lockfile owner per wave, orchestrator pre-installs deps, e2e mutex lock
+- [Commit cadence](commit-cadence.md) — orchestrator commits and pushes on its own after validated checkpoints; watch CI + staging deploy
 - [Secrets in Keychain](secrets-in-keychain.md) — secrets are Keychain generic passwords named after the env var; inject into .env with `security`, never print
 - [Fly infra gotchas](fly-infra-gotchas.md) — merged FlyV1 deploy token format, deploy from repo root, DNS-only CNAMEs, db is private
 - [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first

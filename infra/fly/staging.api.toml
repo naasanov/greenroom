@@ -9,6 +9,11 @@ dockerfile = "../../apps/api/Dockerfile"
 NODE_ENV = "production"
 INTEGRATIONS_MODE = "fake"
 API_PORT = "4000"
+WEB_URL = "https://staging.greenroom.fyi"
+WEB_ORIGIN = "https://staging.greenroom.fyi"
+API_PUBLIC_URL = "https://api.staging.greenroom.fyi"
+SESSION_COOKIE_NAME = "gr_staging_session"
+COOKIE_DOMAIN = "staging.greenroom.fyi"
 
 [deploy]
 release_command = "node packages/db/dist/migrate-cli.js"

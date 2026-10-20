@@ -44,7 +44,7 @@ Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typechec
 ## Conventions
 
 - Code comments: three lines max, describe current behavior declaratively (no change-history narration), never use em dashes.
-- The orchestrator commits on its own at sensible checkpoints (e.g. after each validated wave or task), without being asked. Subagents never commit. No AI attribution or co-author trailers in commit messages. Do not branch or push unless the user asks.
+- The orchestrator commits on its own at sensible checkpoints (e.g. after each validated wave or task), without being asked. Subagents never commit. Each commit is pushed to `main` immediately (CI runs, then staging redeploys); check both go green. No AI attribution, co-author trailers, or session links in commit messages. Do not branch unless the user asks.
 - External services (Google, Spotify, Songsterr, GitHub) sit behind adapter interfaces with fakes for tests.
 
 ## Memory

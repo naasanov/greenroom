@@ -41,6 +41,9 @@ export default defineConfig({
         DATABASE_URL: TEST_DATABASE_URL,
         INTEGRATIONS_MODE: "fake",
         NODE_ENV: "test",
+        WEB_URL,
+        WEB_ORIGIN: WEB_URL,
+        API_PUBLIC_URL: API_URL,
       },
     },
     {

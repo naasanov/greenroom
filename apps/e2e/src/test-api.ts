@@ -8,6 +8,18 @@ export interface MagicLink {
   link: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface LoginResult {
+  user: User;
+  cookie: { name: string; value: string };
+}
+
 /** Typed client for the API's /__test__ control endpoints. */
 export class TestApi {
   constructor(private readonly request: APIRequestContext) {}
@@ -44,5 +56,10 @@ export class TestApi {
       { params: { to: email } },
     );
     return links;
+  }
+
+  /** Creates the user if needed plus a session; returns the raw session cookie. */
+  login(email: string): Promise<LoginResult> {
+    return this.call("post", "login", { data: { email } });
   }
 }
