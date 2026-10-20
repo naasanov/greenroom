@@ -8,4 +8,4 @@ Whenever a task or gate changes state (agent launched, wave validated, blocked, 
 
 **Why:** the user said on 2026-10-20 that usage limits can end a session at any moment and they don't want the status page left stale.
 
-**How to apply:** docs-only commits are fine and expected; stage only the docs files (agents may have uncommitted code in the tree). Keep status text specific (what's running, what's waiting on the user). Related: [[commit-cadence]], [[orchestrator-role]].
+**How to apply:** docs-only commits are fine and expected. Commit them with a pathspec (`git commit -m ... -- docs/execution-plan.md`), never `git add` + bare `git commit`: subagents can leave changes staged in the index, and a bare commit ships them (on 2026-10-20 a staged file deletion rode along with a status commit and broke CI). Keep status text specific (what's running, what's waiting on the user). Related: [[commit-cadence]], [[orchestrator-role]].
