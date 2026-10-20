@@ -183,11 +183,21 @@ test("dragging the handle down dismisses a drawer", async ({
   test.skip(isMobile, "mouse drag only; touch swipe is covered manually");
   await page.getByRole("button", { name: "Open drawer" }).click();
   const note = page.getByRole("dialog", { name: "Quick note" });
-  const box = (await note.boundingBox())!;
+  await expect(note).toBeVisible();
+  // Vaul ignores drags for 500ms after opening, so wait that out and for
+  // the slide-in animation to finish before measuring the handle.
+  await note.evaluate((el) =>
+    Promise.all(el.getAnimations().map((a) => a.finished)),
+  );
+  await page.waitForTimeout(600);
+  const handle = note.locator('[data-slot="drawer-handle"]');
+  const box = (await handle.boundingBox())!;
+  const noteBox = (await note.boundingBox())!;
   const x = box.x + box.width / 2;
-  await page.mouse.move(x, box.y + 12);
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x, box.y + box.height, { steps: 12 });
+  await page.mouse.move(x, y + noteBox.height, { steps: 20 });
   await page.mouse.up();
   await expect(note).toBeHidden();
 });
