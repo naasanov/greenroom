@@ -155,6 +155,8 @@ test("Band section shows for admins and is hidden for members", async ({
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
+  // Leaves sign-in first so it can't redirect home once the new session exists.
+  await page.goto("about:blank");
   await loginAs(USERS.cleo.email);
   await page.goto("/settings");
   await expect(page.getByTestId("settings-name")).toHaveText(
