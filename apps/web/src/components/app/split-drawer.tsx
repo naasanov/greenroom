@@ -113,6 +113,7 @@ export function SplitDrawer({
       }}
     >
       <DrawerContent
+        onPointerDownOutside={() => onOpenChange(false)}
         className={cn(
           "mx-auto h-[min(34rem,88dvh)] w-full max-w-lg data-[vaul-drawer-direction=bottom]:mt-12 data-[vaul-drawer-direction=bottom]:max-h-[90dvh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:shadow-lift",
           className,

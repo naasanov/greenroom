@@ -3,17 +3,39 @@
 import * as React from "react";
 import { cn } from "cn";
 import { Drawer as DrawerPrimitive } from "vaul";
+import {
+  useKeyboardViewport,
+  useRevealFocusedField,
+} from "@/lib/use-visual-viewport";
 
+/**
+ * Drawers are non-modal: no backdrop, no body scroll lock, and the page behind
+ * stays interactive. Vaul's input repositioning is off; DrawerContent fits the
+ * visual viewport itself.
+ */
 function Drawer({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
+  return (
+    <DrawerPrimitive.Root
+      data-slot="drawer"
+      modal={false}
+      noBodyStyles
+      repositionInputs={false}
+      {...props}
+    />
+  );
 }
 
+/**
+ * A drawer opened from inside another drawer's content. Uses a plain Root:
+ * Vaul's NestedRoot scales the parent from open callbacks that controlled
+ * drawers never fire, which makes the parent jump when the child is dragged.
+ */
 function NestedDrawer({
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) {
-  return <DrawerPrimitive.NestedRoot data-slot="drawer" {...props} />;
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) {
+  return <Drawer {...props} />;
 }
 
 function DrawerTrigger({
@@ -41,27 +63,95 @@ function DrawerOverlay({
   return (
     <DrawerPrimitive.Overlay
       data-slot="drawer-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-black/40 supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
-        className,
-      )}
+      className={cn("fixed inset-0 z-50", className)}
       {...props}
     />
   );
 }
 
+// Layers opened from inside a drawer; clicks in them are not "outside".
+const INSIDE_LAYERS =
+  '[role="menu"], [role="listbox"], [role="alertdialog"], [data-radix-popper-content-wrapper], [role="dialog"]:not([data-vaul-drawer])';
+
+/**
+ * Swallows clicks outside `el` and reports them instead, so a guarded drawer
+ * can ask before closing. Drawers stacked above `el` count as inside.
+ */
+function useOutsideClickGuard(el: HTMLElement | null, guard?: () => void) {
+  const guardRef = React.useRef(guard);
+  React.useEffect(() => {
+    guardRef.current = guard;
+  });
+  const active = !!guard;
+  React.useEffect(() => {
+    if (!el || !active) return;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target || el.contains(target) || target.closest(INSIDE_LAYERS)) {
+        return;
+      }
+      const drawer = target.closest("[data-vaul-drawer]");
+      if (
+        drawer &&
+        el.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        return;
+      }
+      if (document.querySelector('[role="alertdialog"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      guardRef.current?.();
+    };
+    window.addEventListener("click", onClick, true);
+    return () => window.removeEventListener("click", onClick, true);
+  }, [el, active]);
+}
+
 function DrawerContent({
   className,
   children,
+  style,
+  onOutsideClickGuard,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+}: React.ComponentProps<typeof DrawerPrimitive.Content> & {
+  /** Set to swallow outside clicks and call this instead of letting them through. */
+  onOutsideClickGuard?: () => void;
+}) {
+  const [el, setEl] = React.useState<HTMLDivElement | null>(null);
+  const keyboard = useKeyboardViewport();
+  useRevealFocusedField(el, keyboard);
+  useOutsideClickGuard(el, onOutsideClickGuard);
+  // Vaul mounts a modal Radix dialog even with modal={false}. Undo its body
+  // pointer lock and aria-hidden on the page so the page stays interactive.
+  React.useEffect(() => {
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      document.body.style.pointerEvents = "auto";
+      document.querySelectorAll("[data-aria-hidden]").forEach((node) => {
+        node.removeAttribute("aria-hidden");
+        node.removeAttribute("data-aria-hidden");
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [el]);
   return (
     <DrawerPortal data-slot="drawer-portal">
-      <DrawerOverlay />
       <DrawerPrimitive.Content
+        ref={setEl}
         data-slot="drawer-content"
+        data-keyboard={keyboard.open ? "open" : undefined}
+        // With the keyboard up, sit on its top edge and cap to the space above.
+        style={
+          keyboard.open
+            ? {
+                bottom: keyboard.bottom,
+                maxHeight: keyboard.height - 12,
+                ...style,
+              }
+            : style
+        }
         className={cn(
-          "group/drawer-content fixed z-50 flex h-auto flex-col bg-popover text-sm text-popover-foreground data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:border-t data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
+          "group/drawer-content pointer-events-auto! fixed z-50 flex h-auto flex-col bg-popover text-sm text-popover-foreground data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:border-t data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
           className,
         )}
         {...props}

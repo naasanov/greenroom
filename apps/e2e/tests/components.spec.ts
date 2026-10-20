@@ -97,34 +97,182 @@ test("split drawer swipe returns to the split", async ({ page, isMobile }) => {
   await expect(viewport).toHaveAttribute("data-view", "split");
 });
 
-test("side drawer sits beside on desktop and over on mobile", async ({
+test("side drawer sits beside on desktop and stacks over on mobile", async ({
   page,
   isMobile,
 }) => {
   await page.getByRole("button", { name: "New gig" }).click();
-  const main = page.locator("[data-vaul-drawer]").last();
+  const main = page.getByRole("dialog", { name: "New gig" });
   await expect(main).toBeVisible();
   await page.getByRole("button", { name: "Add songs" }).click();
-  const side = page.locator('aside[aria-label="Song library"]');
-  await expect(side).toHaveAttribute("data-state", "open");
-  await expect(side).toBeVisible();
-  const m = (await main.boundingBox())!;
-  await expect(async () => {
-    const s = (await side.boundingBox())!;
-    if (isMobile) {
-      expect(s.x).toBeGreaterThanOrEqual(m.x - 1);
-      expect(s.width).toBeGreaterThan(m.width - 4);
-    } else {
-      expect(s.x + s.width).toBeLessThanOrEqual(m.x + 1);
-    }
-  }).toPass();
 
-  await side.getByText("Dreams").click();
-  await side.getByRole("button", { name: "Done" }).click();
-  await expect(side).toHaveAttribute("data-state", "closed");
+  if (isMobile) {
+    const lib = page.getByRole("dialog", { name: "Song library" });
+    await expect(lib).toBeVisible();
+    await expect(async () => {
+      const m = (await main.boundingBox())!;
+      const l = (await lib.boundingBox())!;
+      // Gig drawer peeks out above the library drawer.
+      expect(l.y).toBeGreaterThan(m.y + 40);
+      expect(l.y + l.height).toBeGreaterThanOrEqual(m.y + m.height - 4);
+    }).toPass();
+    await lib.getByText("Dreams").click();
+
+    await lib.getByRole("button", { name: "Done" }).click();
+    await expect(lib).toBeHidden();
+  } else {
+    const side = page.locator('aside[aria-label="Song library"]');
+    await expect(side).toHaveAttribute("data-state", "open");
+    await expect(side).toBeVisible();
+    const m = (await main.boundingBox())!;
+    await expect(async () => {
+      const s = (await side.boundingBox())!;
+      expect(s.x + s.width).toBeLessThanOrEqual(m.x + 1);
+    }).toPass();
+    await side.getByText("Dreams").click();
+    await side.getByRole("button", { name: "Done" }).click();
+    await expect(side).toHaveAttribute("data-state", "closed");
+  }
+  await expect(main).toBeVisible();
   await expect(
     main.getByText("Dreams", { exact: true }).filter({ visible: true }),
   ).toHaveCount(1);
+});
+
+test("tapping the visible gig drawer closes the stacked library", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "stacked library drawer is the narrow-screen layout");
+  await page.getByRole("button", { name: "New gig" }).click();
+  const main = page.getByRole("dialog", { name: "New gig" });
+  await page.getByRole("button", { name: "Add songs" }).click();
+  const lib = page.getByRole("dialog", { name: "Song library" });
+  await expect(lib).toBeVisible();
+  const m = (await main.boundingBox())!;
+  const l = (await lib.boundingBox())!;
+  await page.touchscreen.tap(m.x + m.width / 2, (m.y + l.y) / 2);
+  await expect(lib).toBeHidden();
+  await expect(main).toBeVisible();
+});
+
+test("drawers have no backdrop and leave the page interactive", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Open drawer" }).click();
+  const note = page.getByRole("dialog", { name: "Quick note" });
+  await expect(note).toBeVisible();
+  await expect(page.locator("[data-vaul-overlay]")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).position),
+  ).not.toBe("fixed");
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).overflow),
+  ).not.toBe("hidden");
+
+  // The tap closes the first drawer and still reaches the button behind it.
+  await page.getByRole("button", { name: "Open split drawer" }).click();
+  await expect(note).toBeHidden();
+  await expect(page.getByTestId("split-viewport")).toBeVisible();
+});
+
+test("dragging the handle down dismisses a drawer", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "mouse drag only; touch swipe is covered manually");
+  await page.getByRole("button", { name: "Open drawer" }).click();
+  const note = page.getByRole("dialog", { name: "Quick note" });
+  const box = (await note.boundingBox())!;
+  const x = box.x + box.width / 2;
+  await page.mouse.move(x, box.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(x, box.y + box.height, { steps: 12 });
+  await page.mouse.up();
+  await expect(note).toBeHidden();
+});
+
+test("Escape closes a drawer", async ({ page }) => {
+  await page.getByRole("button", { name: "Open drawer" }).click();
+  const note = page.getByRole("dialog", { name: "Quick note" });
+  await expect(note).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(note).toBeHidden();
+});
+
+test("tapping inside a drawer or its dialogs does not close it", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Drawer with discard guard" }).click();
+  const drawer = page.getByRole("dialog", { name: "New gig" });
+  await drawer.getByLabel("Title").fill("Halloween");
+  await drawer.getByLabel("Title").click();
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("Escape");
+  const discard = page.getByRole("alertdialog", { name: "Discard changes?" });
+  await expect(discard).toBeVisible();
+  await discard.getByRole("button", { name: "Keep editing" }).click();
+  await expect(discard).toBeHidden();
+  await expect(drawer).toBeVisible();
+});
+
+test("guarded drawer asks before an outside tap closes it", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Drawer with discard guard" }).click();
+  const drawer = page.getByRole("dialog", { name: "New gig" });
+  await drawer.getByLabel("Title").fill("Halloween");
+
+  await page.getByRole("button", { name: "Open split drawer" }).click();
+  const discard = page.getByRole("alertdialog", { name: "Discard changes?" });
+  await expect(discard).toBeVisible();
+  await expect(page.getByTestId("split-viewport")).toHaveCount(0);
+  await discard.getByRole("button", { name: "Keep editing" }).click();
+  await expect(discard).toBeHidden();
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByLabel("Title")).toHaveValue("Halloween");
+
+  // A dialog closed over the drawer leaves aria-hidden on the page, so use CSS.
+  await page.locator("button", { hasText: "Open split drawer" }).click();
+  await discard.getByRole("button", { name: "Discard" }).click();
+  await expect(drawer).toBeHidden();
+});
+
+test("drawer fits above a simulated on-screen keyboard", async ({ page }) => {
+  await page.getByRole("button", { name: "New gig" }).click();
+  const main = page.getByRole("dialog", { name: "New gig" });
+  const input = main.getByLabel("Title");
+  await expect(input).toBeVisible();
+  await input.focus();
+
+  // Playwright has no real keyboard; shrink visualViewport and fire its events.
+  const vvHeight = await page.evaluate(() => {
+    const vv = window.visualViewport!;
+    const h = Math.round(window.innerHeight * 0.55);
+    Object.defineProperty(vv, "height", { value: h, configurable: true });
+    vv.dispatchEvent(new Event("resize"));
+    return h;
+  });
+  await expect(async () => {
+    const box = (await main.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(vvHeight + 1);
+    const i = (await input.boundingBox())!;
+    expect(i.y + i.height).toBeLessThanOrEqual(vvHeight);
+  }).toPass();
+
+  await page.evaluate(() => {
+    const vv = window.visualViewport!;
+    Object.defineProperty(vv, "height", {
+      value: window.innerHeight,
+      configurable: true,
+    });
+    vv.dispatchEvent(new Event("resize"));
+  });
+  await expect(async () => {
+    const box = (await main.boundingBox())!;
+    expect(box.y + box.height).toBeGreaterThan(vvHeight + 50);
+  }).toPass();
 });
 
 test("stacked drawers open one over another", async ({ page }) => {

@@ -142,9 +142,10 @@ export function DrawersSection() {
 
       <BottomDrawer
         open={guarded}
-        onOpenChange={(o) => (o || !dirty ? setGuarded(o) : setDiscard(true))}
+        onOpenChange={setGuarded}
         title="New gig"
         dismissible={!dirty}
+        onDismissAttempt={() => setDiscard(true)}
       >
         <div className="py-2">
           <FormField
@@ -301,7 +302,7 @@ function SongDetail({
         />
       </FormField>
       <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium">Links</p>
+        <p className="text-sm font-medium">Reference</p>
         <LinkList rows={links} onChange={setLinks} editing={editing} />
       </div>
       {editing && song ? (

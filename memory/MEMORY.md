@@ -32,3 +32,4 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Secrets in Keychain](secrets-in-keychain.md) — secrets are Keychain generic passwords named after the env var; inject into .env with `security`, never print
 - [Fly infra gotchas](fly-infra-gotchas.md) — merged FlyV1 deploy token format, deploy from repo root, DNS-only CNAMEs, db is private
 - [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first
+- [Non-modal drawer gotchas](drawer-nonmodal-gotchas.md) — Radix stays modal under Vaul; close event drawers by id; focus trap and aria-hidden caveats
