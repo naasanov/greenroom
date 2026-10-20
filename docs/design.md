@@ -150,12 +150,12 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 # UI / Navigation
 - **Tab placement (revised):** on mobile, a bottom tab bar like a native app, tap to switch (no swipe). On desktop, tabs across the top. **Rejected:** left-hand sidebar nav (the original plan). With only three tabs it's mostly empty space and takes width the calendar and setlists need.
 - **LOCKED: three tabs, in this order — Calendar, Music Library, Roster.** The app opens to Calendar (the daily-use surface); Music Library second (used whenever building setlists); Roster last (rarely changes once everyone has joined).
-- **Decision: NO separate Gigs tab.** The agenda/list sheet inside the Calendar tab already covers browsing past and upcoming gigs, the gig filter, and the duplicate-a-past-setlist flow.
+- **Decision: NO separate Gigs tab.** The agenda/list sheet inside the Events tab already covers browsing past and upcoming gigs, the gig filter, and the duplicate-a-past-setlist flow.
 - Settings is NOT a tab: it lives behind the profile icon.
 - Rationale for not over-splitting: a tab should be a distinct way of working, not just a filter on the same data. Don't give practices and gigs each their own calendar-duplicate tab — three views of the same events means three places to look.
   - Practices live essentially entirely on the calendar; no separate home needed.
-  - Gigs DO have a second life beyond "when" (setlist, lineup, media, contact = "manage this gig" work). The non-date view of gigs that's actually needed is a browsable gigs LIST — which the "duplicate a past setlist" feature already requires (browse gig history). Resolved: that list is the agenda sheet inside the Calendar tab, not a separate Gigs tab.
-- Calendar tab: behaves like Google Calendar — month / week view toggle. Both practices and gigs appear on it, distinguished by type (color-coded / marked).
+  - Gigs DO have a second life beyond "when" (setlist, lineup, media, contact = "manage this gig" work). The non-date view of gigs that's actually needed is a browsable gigs LIST — which the "duplicate a past setlist" feature already requires (browse gig history). Resolved: that list is the agenda sheet inside the Events tab, not a separate Gigs tab.
+- Events tab (named "Calendar" until 2026-10-20): behaves like Google Calendar — month / week view toggle. Both practices and gigs appear on it, distinguished by type (color-coded / marked).
 - How events render (borrow what fits from Google Calendar, drop the rest — we have far fewer event types than a general calendar):
   - All-day vs. timed distinction IS worth keeping: a gig with a date but no time yet (the tentative case) sits in an all-day strip at the top of that day. Once it has a time, it drops into its time slot. Maps directly onto the drop-it-then-flesh-out-later flow.
   - Month mode: no time grid. Show each day's events as chips (color-coded gig vs. practice, time as text on the chip). Month mode is for "what's coming up," not precise scheduling.
@@ -167,7 +167,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Explicitly NOT adding (general-calendar bloat that doesn't serve a band): external calendar overlays, weather, travel-time.
 
 ## Agenda / list view (events as a list)
-- Lives INSIDE the calendar tab — no new tab. A list is just another lens on the same events, not a different way of working. Also doubles as the browse-past-gigs surface the "duplicate a past setlist" feature needs.
+- Lives INSIDE the Events tab — no new tab. A list is just another lens on the same events, not a different way of working. Also doubles as the browse-past-gigs surface the "duplicate a past setlist" feature needs.
 - Opened via a floating button; pulls out as a sheet from the RIGHT. Deliberate spatial contrast: bottom drawers = create/edit one thing; right-side sheet = browse many. Helps build a mental model.
 - Past and upcoming live together in ONE continuous timeline (no toggle between them), anchored by a "today" line (e.g. a blue line). Opens positioned on the today line: scroll down = soonest-to-latest upcoming, scroll up = most-recent-to-oldest past. Same sort, one axis — matches how you actually think about time (one timeline with "now" in the middle).
   - Signal that past is upward: show a sliver/peek of the most recent past card above the today line (a half-visible card is a universal "scroll up for more" cue). Chosen over an up-arrow + "past" caption, which is more explicit but more clutter.
@@ -186,6 +186,9 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Conflict rule: by default the change overwrites forward. If any later occurrence has its own custom (individually edited) setlist, warn first, e.g. "10/18 has its own setlist. Replace it or keep it?" No prompt when there's nothing custom to lose.
   - Recurrence must map to what Google Calendar's API can represent (it uses the RRULE recurrence standard). Mirror RRULE's supported options rather than inventing custom recurrence that can't round-trip through Calendar sync.
 - Bottom-drawer pattern throughout: chosen deliberately — thumb-reachable, touch/mobile-friendly, feels native when pulling the app up at a venue. Flow reveals only the next decision at each step (no wall of fields).
+- **Drawers are non-modal (decided 2026-10-20):** no dimmed or blurred backdrop, and the page behind stays interactive. A tap outside the drawer closes it AND goes through to what was tapped (e.g. gig A's drawer is open, tapping gig B closes A and opens B). If the drawer has unsaved input, an outside tap shows the discard-changes confirm instead and does not pass through. Inside a stacked drawer, tapping the drawer underneath closes only the top one.
+- **Stacked drawers look stacked:** a second drawer (library, roster, venue picker) on a phone slides up as its own drawer on top, with the drawer underneath still peeking out above it, not as a panel that replaces the first drawer's content.
+- **Keyboard:** when an input in a drawer is focused on a phone, the drawer must keep the focused input visible above the on-screen keyboard.
 - Adding songs = second drawer: tapping "Add songs" slides up a second, thin drawer listing songs from the Music Library. If the library is empty, a big "Add song" button → paste a link / search Spotify / etc., which adds the song to the library. Then drag the song from the library drawer into the setlist in the gig drawer.
   - Same mechanic for lineup: a Roster drawer you drag people from into the gig, exactly like the song library. One drag gesture, learned once, reused for songs and people.
   - Two thin drawers open at once (library + gig) is the intended drag experience. Caveat: on a narrow phone screen side-by-side drag may not fit — fall back to tap-to-add there. Decided phone fallback:
@@ -249,7 +252,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - YouTube import fills title from the video title and artist from the channel name.
 - Every imported field stays editable; it doesn't need to match the source exactly.
 - **Only title is required.**
-- Links: a simple key-value list at the bottom of the form. Plus adds a row (label | value). Imports add their own row automatically. Free-form notes field (optional) below that. Done button saves.
+- **Reference** (named "Links" until 2026-10-20, renamed because values are often not links, e.g. "Key: F# minor, 105 bpm"): a simple key-value list at the bottom of the form. Plus adds a row (label | value). Imports add their own row automatically. Free-form notes field (optional) below that. Done button saves.
 - **Add = the song detail sheet in edit mode.** Adding a song opens the same right-hand detail sheet used for viewing/editing (full-screen on mobile), already in edit mode with empty fields and the smart input at the top. One component, one mental model.
 - **Progressive disclosure in the add sheet:** initially only the smart input is shown. The rest of the form appears when (a) a Spotify/YouTube match is picked (fields appear pre-filled), or (b) the user taps "enter manually" (fields appear, with any typed text carried into Title). If a search returns no results, suggest manual entry the same way. Editing an existing song always shows all fields.
 - **Adding songs while building a setlist (from the gig drawers):** never punt to the Music Library tab. The library drawer has a plus that opens the same add sheet in place (on desktop beside the drawers; on mobile full-screen, returning to the setlist on Done). On save, the song is added to the library AND appended to the end of the current setlist automatically (no extra drag). If a search in the library drawer finds no match, offer "Add this song" with the typed text pre-filled into the smart input.
@@ -262,7 +265,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 ## Song detail sheet
 - Tapping a card opens a sheet on the right with full info: all links and notes. Full-screen on mobile.
 - On desktop you can click other songs while the sheet stays open. On mobile, up/down arrows or swipe inside the sheet move between songs.
-- Link values render as tappable links with the site's favicon and open directly.
+- Reference values render as tappable links with the site's favicon only when the value is an actual URL; plain values render as plain text (no favicon, no link styling).
 - Edit button top-right switches fields to editable in place without shifting the layout (no jitter when toggling edit/cancel).
 - Delete lives in edit mode, with a warning if the song is used in setlists ("this is in 3 setlists").
 
@@ -331,7 +334,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Files added directly in the Drive folder outside the app DO show up in the app (via the changes poller), landing in the matching folder section, or Unsorted if they're not in a known folder.
 
 # Linking Google Calendar
-- Same lazy pattern as Drive: the Calendar tab works fully without Google Calendar. An unlinked band shows a small banner on the Calendar tab offering to connect (also available in Band settings).
+- Same lazy pattern as Drive: the Events tab works fully without Google Calendar. An unlinked band shows a small banner on the Events tab offering to connect (also available in Band settings).
 - On connect, the app creates a **new dedicated calendar named after the band** in the connecting account, rather than writing into anyone's personal calendar.
 - Every practice and gig on that calendar invites band members as attendees by email. Members RSVP from their own Google Calendar, which is what drives the two-way decline/RSVP sync.
 - Ownership follows the same rule as Drive: the band chooses whose account (dedicated band account or a member's).

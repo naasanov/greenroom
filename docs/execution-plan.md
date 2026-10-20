@@ -43,17 +43,17 @@ Parallel group 1A
 - **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains (per-environment cookie names, see Hosting & domain in the design doc); post-login redirect to the original link. Status: Done
 - **1.3 Bands + onboarding.** Signup (no auto band), create band, invite link (handles existing and new accounts), instrument picker (preset + custom, multiple), admin/member roles, multiple bands. Status: Done
 
-🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Awaiting review (https://staging.greenroom.fyi/showcase)
+🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Feedback round 1 in progress (2026-10-20: sliding segmented toggle, Calendar tab renamed Events, non-modal drawers, stacked library drawer on phones, iOS keyboard fit, right sheet animation on phones, Links renamed Reference with plain values not linked). Re-review at https://staging.greenroom.fyi/showcase
 
 # Phase 2: App shell
-- **2.1 Shell + navigation.** Three tabs (Calendar, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: Not started
+- **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: Not started
 - **2.2 Deep links.** Routes for gigs, practice occurrences, songs; open the right view with drawer or sheet open; auto-switch band; share button (copy / native share). Status: Not started
 
 # Phase 3: Core tabs
 Parallel group 3A
-- **3.1 Calendar.** Month/week views, all-day strip, chips, today marker + jump to today, FAB + click-a-day create, split drawer, gig form (all gig fields, Places type-ahead), practice form (RRULE-compatible recurrence, end conditions), edit scope dialog (this / this and following / all), discard-changes confirm, gig delete (Drive media untouched, warning). Status: Not started
-- **3.2 Agenda sheet.** Right-side sheet, one timeline with today line and past-card peek, cards, gig/practice filter, opens event drawer beside or over. Status: Not started
-- **3.3 Music Library.** Smart add input (Spotify/YouTube links, Spotify search, manual), progressive disclosure, song detail sheet (view/edit, links with favicons, notes, used-in, delete warning), list, search, sorts, duplicate check, playlist import with progress + summary, Songsterr suggestion. App-level Spotify credentials only. Status: Not started
+- **3.1 Events tab (calendar).** Month/week views, all-day strip, chips, today marker + jump to today, FAB + click-a-day create, split drawer, gig form (all gig fields, Places type-ahead), practice form (RRULE-compatible recurrence, end conditions), edit scope dialog (this / this and following / all), discard-changes confirm, gig delete (Drive media untouched, warning). Status: In progress (backend API started 2026-10-20 ahead of Gate 1; UI waits for the gate)
+- **3.2 Agenda sheet.** Right-side sheet, one timeline with today line and past-card peek, cards, gig/practice filter, opens event drawer beside or over. Status: In progress (range listing API is part of the 3.1 backend; UI waits for Gate 1)
+- **3.3 Music Library.** Smart add input (Spotify/YouTube links, Spotify search, manual), progressive disclosure, song detail sheet (view/edit, links with favicons, notes, used-in, delete warning), list, search, sorts, duplicate check, playlist import with progress + summary, Songsterr suggestion. App-level Spotify credentials only. Status: In progress (backend API + pg-boss JobsModule started 2026-10-20 ahead of Gate 1; UI waits for the gate)
 - **3.4 Roster + Settings.** Member cards, member detail sheet, invite link button, admin actions (promote, remove, reset link), leave band + last-admin rules, personal and band settings. Status: Not started
 
 🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Not started
