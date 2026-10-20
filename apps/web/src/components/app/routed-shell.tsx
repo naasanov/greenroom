@@ -21,7 +21,11 @@ export function tabPath(tab: TabKey): string {
 
 function tabFromPath(pathname: string): TabKey | null {
   const seg = pathname.split("/")[1];
-  return seg === "events" || seg === "library" || seg === "roster" ? seg : null;
+  if (seg === "events" || seg === "library" || seg === "roster") return seg;
+  // Deep links highlight the tab their resource lives in.
+  if (seg === "gigs" || seg === "practices") return "events";
+  if (seg === "songs") return "library";
+  return null;
 }
 
 const LastTabContext = createContext<TabKey | null>(null);
@@ -47,7 +51,7 @@ export function RoutedShell({ children }: { children: ReactNode }) {
     return (
       <StartScreen
         name={me?.displayName ?? ""}
-        onCreated={(band) => setCurrentBandId(band.id)}
+        onCreated={() => {}}
         onSignOut={() => signOut.mutate()}
       />
     );
@@ -85,8 +89,7 @@ export function RoutedShell({ children }: { children: ReactNode }) {
           </DialogHeader>
           <CreateBandForm
             idPrefix="another-band"
-            onCreated={(band) => {
-              setCurrentBandId(band.id);
+            onCreated={() => {
               setCreateOpen(false);
               router.push("/events");
             }}

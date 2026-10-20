@@ -13,9 +13,16 @@ import {
   bandSummarySchema,
   inviteLinkSchema,
   invitePreviewSchema,
+  gigLinkSchema,
   myInstrumentsSchema,
+  practiceLinkSchema,
+  songLinkSchema,
   userSchema,
   type CreateBand,
+  type Gig,
+  type PracticeOccurrence,
+  type SongDetail,
+  type User,
   type MagicLinkRequest,
   type SetInstruments,
   type UpdateProfile,
@@ -29,7 +36,20 @@ export const keys = {
   invite: (bandId: string) => ["bands", bandId, "invite"] as const,
   invitePreview: (token: string) => ["invites", token] as const,
   instruments: ["me", "instruments"] as const,
+  link: (kind: string, id: string, date?: string | null) =>
+    ["links", kind, id, date ?? null] as const,
+  gig: (bandId: string, id: string) => ["bands", bandId, "gigs", id] as const,
+  occurrence: (bandId: string, seriesId: string, key: string) =>
+    ["bands", bandId, "practices", seriesId, key] as const,
+  song: (bandId: string, id: string) => ["bands", bandId, "songs", id] as const,
 };
+
+/** Refreshes the user (server-side current band) and the band list together. */
+const refreshBands = (qc: QueryClient) =>
+  Promise.all([
+    qc.invalidateQueries({ queryKey: keys.me }),
+    qc.invalidateQueries({ queryKey: keys.bands }),
+  ]);
 
 /** Current user; `data` is null when signed out (401). */
 export function useMe() {
@@ -104,7 +124,7 @@ export function useAcceptInvite(token: string) {
         method: "POST",
         schema: bandSummarySchema,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bands }),
+    onSuccess: () => refreshBands(qc),
   });
 }
 
@@ -113,7 +133,96 @@ export function useCreateBand() {
   return useMutation({
     mutationFn: (body: CreateBand) =>
       api("/bands", { method: "POST", body, schema: bandSummarySchema }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bands }),
+    onSuccess: () => refreshBands(qc),
+  });
+}
+
+/** Makes a band current: updates the cached user at once, then tells the server. */
+export function useSetCurrentBand() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (bandId: string) =>
+      api("/me/current-band", { method: "PUT", body: { bandId } }),
+    onMutate: (bandId) => {
+      qc.setQueryData<User | null>(keys.me, (me) =>
+        me ? { ...me, lastBandId: bandId } : me,
+      );
+    },
+    onError: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+// ---- deep link resolvers and band-scoped reads ----
+
+export function useGigLink(gigId: string) {
+  return useQuery({
+    queryKey: keys.link("gigs", gigId),
+    queryFn: () =>
+      api(`/links/gigs/${encodeURIComponent(gigId)}`, {
+        schema: gigLinkSchema,
+      }),
+    retry: false,
+  });
+}
+
+export function useSongLink(songId: string) {
+  return useQuery({
+    queryKey: keys.link("songs", songId),
+    queryFn: () =>
+      api(`/links/songs/${encodeURIComponent(songId)}`, {
+        schema: songLinkSchema,
+      }),
+    retry: false,
+  });
+}
+
+export function usePracticeLink(seriesId: string, date: string | null) {
+  return useQuery({
+    queryKey: keys.link("practices", seriesId, date),
+    queryFn: () =>
+      api(
+        `/links/practices/${encodeURIComponent(seriesId)}${
+          date ? `?date=${encodeURIComponent(date)}` : ""
+        }`,
+        { schema: practiceLinkSchema },
+      ),
+    retry: false,
+  });
+}
+
+/** Passes an already-typed server response through without runtime parsing. */
+const typed = <T>() => z.custom<T>();
+
+export function useGig(bandId: string | undefined, gigId: string) {
+  return useQuery({
+    queryKey: keys.gig(bandId ?? "", gigId),
+    queryFn: () =>
+      api(`/bands/${bandId}/gigs/${gigId}`, { schema: typed<Gig>() }),
+    enabled: !!bandId,
+  });
+}
+
+export function usePracticeOccurrence(
+  bandId: string | undefined,
+  seriesId: string,
+  key: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: keys.occurrence(bandId ?? "", seriesId, key ?? ""),
+    queryFn: () =>
+      api(`/bands/${bandId}/practices/${seriesId}/occurrences/${key}`, {
+        schema: typed<PracticeOccurrence>(),
+      }),
+    enabled: !!bandId && !!key,
+  });
+}
+
+export function useSong(bandId: string | undefined, songId: string) {
+  return useQuery({
+    queryKey: keys.song(bandId ?? "", songId),
+    queryFn: () =>
+      api(`/bands/${bandId}/songs/${songId}`, { schema: typed<SongDetail>() }),
+    enabled: !!bandId,
   });
 }
 

@@ -190,3 +190,33 @@ test("share button copies the link and shows feedback", async ({
     page.getByRole("status").filter({ hasText: "Link copied" }),
   ).toHaveCount(0, { timeout: 4000 });
 });
+
+test("switching bands persists across a reload and a fresh browser context", async ({
+  page,
+  browser,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ben.email);
+  await page.goto("/events");
+  const switcher = (p: import("@playwright/test").Page, name: string) =>
+    p.getByRole("button", { name: `Switch band, current: ${name}` });
+  await expect(switcher(page, "The Night Owls")).toBeVisible();
+  await page.getByRole("button", { name: /Switch band/ }).click();
+  await page.getByRole("menuitem", { name: /Side Project/ }).click();
+  await expect(switcher(page, "Side Project")).toBeVisible();
+  await page.reload();
+  await expect(switcher(page, "Side Project")).toBeVisible();
+
+  // The choice lives on the server, so another browser sees it too.
+  const other = await browser.newContext();
+  const { cookie } = await testApi.login(USERS.ben.email);
+  await other.addCookies([
+    { ...cookie, url: WEB_URL, httpOnly: true, sameSite: "Lax" },
+  ]);
+  const op = await other.newPage();
+  await op.goto(`${WEB_URL}/events`);
+  await expect(switcher(op, "Side Project")).toBeVisible();
+  await other.close();
+});

@@ -5,33 +5,14 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
 import type { BandSummary } from "@greenroom/shared";
-
-const STORAGE_KEY = "gr_current_band";
-
-export function getStoredBandId(): string | null {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/** Remembers the band outside React, e.g. right after accepting an invite. */
-export function storeBandId(id: string): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, id);
-  } catch {
-    // Storage unavailable: the first band is used as the fallback.
-  }
-}
+import { useMe, useSetCurrentBand } from "@/lib/queries";
 
 interface CurrentBandValue {
   bands: BandSummary[];
-  /** The stored band if the user still belongs to it, else their first band. */
+  /** The user's server-side current band if still a member, else their first band. */
   currentBand: BandSummary | null;
   setCurrentBandId: (id: string) => void;
 }
@@ -45,18 +26,16 @@ export function CurrentBandProvider({
   bands: BandSummary[];
   children: ReactNode;
 }) {
-  const [storedId, setStoredId] = useState<string | null>(getStoredBandId);
-  const setCurrentBandId = useCallback((id: string) => {
-    storeBandId(id);
-    setStoredId(id);
-  }, []);
+  const lastBandId = useMe().data?.lastBandId ?? null;
+  const { mutate } = useSetCurrentBand();
+  const setCurrentBandId = useCallback((id: string) => mutate(id), [mutate]);
   const value = useMemo<CurrentBandValue>(
     () => ({
       bands,
-      currentBand: bands.find((b) => b.id === storedId) ?? bands[0] ?? null,
+      currentBand: bands.find((b) => b.id === lastBandId) ?? bands[0] ?? null,
       setCurrentBandId,
     }),
-    [bands, storedId, setCurrentBandId],
+    [bands, lastBandId, setCurrentBandId],
   );
   return (
     <CurrentBandContext.Provider value={value}>

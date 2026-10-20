@@ -22,6 +22,8 @@ export interface BottomDrawerProps {
   description?: string;
   /** Keeps the title for screen readers but hides the visible header. */
   hideHeader?: boolean;
+  /** Icon button(s) shown in the header beside the close button. */
+  headerAction?: ReactNode;
   /** Optional trigger element for uncontrolled use. */
   trigger?: ReactNode;
   /** Pinned below the scrolling body, above the safe area. */
@@ -52,6 +54,7 @@ export function BottomDrawer({
   title,
   description,
   hideHeader,
+  headerAction,
   trigger,
   footer,
   aside,
@@ -104,21 +107,29 @@ export function BottomDrawer({
           </>
         ) : (
           <DrawerHeader className="relative px-5 pt-3 pb-2 text-left">
-            <DrawerTitle className="pr-12 text-lg font-semibold">
+            <DrawerTitle
+              className={cn(
+                "text-lg font-semibold",
+                headerAction ? "pr-24" : "pr-12",
+              )}
+            >
               {title}
             </DrawerTitle>
             {description ? (
               <DrawerDescription>{description}</DrawerDescription>
             ) : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Close"
-              className="absolute top-1 right-3 text-muted-foreground"
-              onClick={requestClose}
-            >
-              <X />
-            </Button>
+            <div className="absolute top-1 right-3 flex items-center">
+              {headerAction}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Close"
+                className="text-muted-foreground"
+                onClick={requestClose}
+              >
+                <X />
+              </Button>
+            </div>
           </DrawerHeader>
         )}
         <div

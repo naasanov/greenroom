@@ -7,7 +7,6 @@ import { BandAvatar } from "@/components/app/band-switcher";
 import { AuthLayout, Brand } from "@/components/onboarding/auth-layout";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api";
-import { storeBandId } from "@/lib/current-band";
 import { useAcceptInvite, useInvitePreview, useMe } from "@/lib/queries";
 import { signInUrl } from "@/lib/redirect";
 
@@ -84,10 +83,7 @@ export function InviteView() {
               disabled={accept.isPending}
               onClick={() =>
                 accept.mutate(undefined, {
-                  onSuccess: (joined) => {
-                    storeBandId(joined.id);
-                    router.replace("/");
-                  },
+                  onSuccess: () => router.replace("/"),
                 })
               }
             >

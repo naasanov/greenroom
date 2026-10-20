@@ -1,5 +1,5 @@
-import { TabPlaceholder } from "@/components/onboarding/tab-placeholder";
+import { EventsTab } from "@/components/onboarding/events-tab";
 
 export default function EventsPage() {
-  return <TabPlaceholder tab="events" />;
+  return <EventsTab />;
 }

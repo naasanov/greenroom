@@ -1,5 +1,5 @@
-import { TabPlaceholder } from "@/components/onboarding/tab-placeholder";
+import { LibraryTab } from "@/components/onboarding/library-tab";
 
 export default function LibraryPage() {
-  return <TabPlaceholder tab="library" />;
+  return <LibraryTab />;
 }
