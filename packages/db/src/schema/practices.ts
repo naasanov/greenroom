@@ -125,9 +125,10 @@ export const practiceSetlistAssignments = pgTable(
       .references(() => practiceSeries.id, { onDelete: "cascade" }),
     effectiveFrom: tstz("effective_from").notNull(),
     scope: assignmentScope("scope").notNull(),
-    setlistId: uuid("setlist_id")
-      .notNull()
-      .references(() => setlists.id, { onDelete: "cascade" }),
+    // Null is an explicit "no setlist" marker that shadows an earlier forward row.
+    setlistId: uuid("setlist_id").references(() => setlists.id, {
+      onDelete: "cascade",
+    }),
     createdAt: createdAt(),
   },
   (t) => [

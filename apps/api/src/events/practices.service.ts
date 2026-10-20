@@ -18,7 +18,9 @@ import {
 import {
   EVENT_ERROR_CODES,
   type Attendee,
+  type ClearPracticeSetlistQuery,
   type CreatePractice,
+  type CreatePracticeSetlist,
   type EditScope,
   type PracticeEditResult,
   type PracticeOccurrence,
@@ -29,6 +31,7 @@ import {
   type UpdatePractice,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
+import { copyItems } from "../setlists/items.js";
 import { resolveAssignment } from "./assignment.js";
 import {
   buildOccurrence,
@@ -665,39 +668,148 @@ export class PracticesService {
       .from(setlists)
       .where(and(eq(setlists.id, body.setlistId), eq(setlists.bandId, bandId)));
     if (!setlist) throw new NotFoundException("Setlist not found");
+    return this.db.transaction((tx) =>
+      this.applyAssignment(
+        tx,
+        bandId,
+        seriesId,
+        original,
+        body.setlistId,
+        body,
+      ),
+    );
+  }
 
+  /** Makes a new setlist (optionally pre-filled) and assigns it like `setSetlist`. */
+  async createSetlist(
+    bandId: string,
+    seriesId: string,
+    key: string,
+    body: CreatePracticeSetlist,
+  ): Promise<PracticeSetlistResult & { newSetlistId: string }> {
+    const series = await this.findSeries(bandId, seriesId);
+    const { original } = await this.requireOccurrence(series, key);
+    if (body.sourceSetlistId) {
+      const [src] = await this.db
+        .select({ id: setlists.id })
+        .from(setlists)
+        .where(
+          and(
+            eq(setlists.id, body.sourceSetlistId),
+            eq(setlists.bandId, bandId),
+          ),
+        );
+      if (!src) throw new NotFoundException("Setlist not found");
+    }
     return this.db.transaction(async (tx) => {
-      const before = await tx
+      let sourceId = body.sourceSetlistId ?? null;
+      if (!sourceId && body.copyCurrent) {
+        const rows = await tx
+          .select()
+          .from(assignmentsTable)
+          .where(eq(assignmentsTable.seriesId, seriesId));
+        sourceId = resolveAssignment(rows, original).setlistId;
+      }
+      const [created] = await tx
+        .insert(setlists)
+        .values({ bandId })
+        .returning();
+      if (sourceId) await copyItems(tx, sourceId, created!.id, "replace");
+      const result = await this.applyAssignment(
+        tx,
+        bandId,
+        seriesId,
+        original,
+        created!.id,
+        body,
+      );
+      return { ...result, newSetlistId: created!.id };
+    });
+  }
+
+  /**
+   * Removes the occurrence's setlist. A null marker row is written only when an
+   * earlier forward row would otherwise keep applying.
+   */
+  async clearSetlist(
+    bandId: string,
+    seriesId: string,
+    key: string,
+    body: ClearPracticeSetlistQuery,
+  ): Promise<PracticeSetlistResult> {
+    const series = await this.findSeries(bandId, seriesId);
+    const { original } = await this.requireOccurrence(series, key);
+    return this.db.transaction((tx) =>
+      this.applyAssignment(tx, bandId, seriesId, original, null, body),
+    );
+  }
+
+  /** Writes (or, with a null setlist, clears) the assignment for one occurrence. */
+  private async applyAssignment(
+    tx: Tx,
+    bandId: string,
+    seriesId: string,
+    original: Date,
+    setlistId: string | null,
+    opts: {
+      scope: "this" | "this_and_following";
+      onConflict: "replace" | "keep";
+    },
+  ): Promise<PracticeSetlistResult> {
+    const before = await tx
+      .select()
+      .from(assignmentsTable)
+      .where(eq(assignmentsTable.seriesId, seriesId));
+    const conflicts = laterCustom(before, original);
+    const scope = opts.scope === "this" ? "single" : "forward";
+    const replace = opts.onConflict === "replace";
+    const clearing = setlistId === null;
+
+    if (opts.scope === "this_and_following") {
+      // The occurrence itself and everything after it follow the new forward row.
+      await tx
+        .delete(assignmentsTable)
+        .where(
+          and(
+            eq(assignmentsTable.seriesId, seriesId),
+            eq(assignmentsTable.scope, "single"),
+            replace
+              ? gte(assignmentsTable.effectiveFrom, original)
+              : eq(assignmentsTable.effectiveFrom, original),
+          ),
+        );
+      await tx
+        .delete(assignmentsTable)
+        .where(
+          and(
+            eq(assignmentsTable.seriesId, seriesId),
+            eq(assignmentsTable.scope, "forward"),
+            clearing
+              ? gte(assignmentsTable.effectiveFrom, original)
+              : gt(assignmentsTable.effectiveFrom, original),
+          ),
+        );
+    } else if (clearing) {
+      await tx
+        .delete(assignmentsTable)
+        .where(
+          and(
+            eq(assignmentsTable.seriesId, seriesId),
+            eq(assignmentsTable.scope, "single"),
+            eq(assignmentsTable.effectiveFrom, original),
+          ),
+        );
+    }
+
+    let write = !clearing;
+    if (clearing) {
+      const rest = await tx
         .select()
         .from(assignmentsTable)
         .where(eq(assignmentsTable.seriesId, seriesId));
-      const conflicts = laterCustom(before, original);
-      const scope = body.scope === "this" ? "single" : "forward";
-      const replace = body.onConflict === "replace";
-
-      if (body.scope === "this_and_following") {
-        // The occurrence itself and everything after it follow the new forward row.
-        await tx
-          .delete(assignmentsTable)
-          .where(
-            and(
-              eq(assignmentsTable.seriesId, seriesId),
-              eq(assignmentsTable.scope, "single"),
-              replace
-                ? gte(assignmentsTable.effectiveFrom, original)
-                : eq(assignmentsTable.effectiveFrom, original),
-            ),
-          );
-        await tx
-          .delete(assignmentsTable)
-          .where(
-            and(
-              eq(assignmentsTable.seriesId, seriesId),
-              eq(assignmentsTable.scope, "forward"),
-              gt(assignmentsTable.effectiveFrom, original),
-            ),
-          );
-      }
+      write = resolveAssignment(rest, original).setlistId !== null;
+    }
+    if (write) {
       await tx
         .insert(assignmentsTable)
         .values({
@@ -705,7 +817,7 @@ export class PracticesService {
           seriesId,
           effectiveFrom: original,
           scope,
-          setlistId: body.setlistId,
+          setlistId,
         })
         .onConflictDoUpdate({
           target: [
@@ -713,26 +825,30 @@ export class PracticesService {
             assignmentsTable.effectiveFrom,
             assignmentsTable.scope,
           ],
-          set: { setlistId: body.setlistId },
+          set: { setlistId },
         });
+    }
 
-      const after = await tx
-        .select()
-        .from(assignmentsTable)
-        .where(eq(assignmentsTable.seriesId, seriesId));
-      const resolved = resolveAssignment(after, original);
-      return {
-        setlistId: resolved.setlistId,
-        source: resolved.source,
-        conflicts: body.scope === "this" ? [] : conflicts,
-        conflictsReplaced: body.scope === "this_and_following" && replace,
-      };
-    });
+    const after = await tx
+      .select()
+      .from(assignmentsTable)
+      .where(eq(assignmentsTable.seriesId, seriesId));
+    const resolved = resolveAssignment(after, original);
+    return {
+      setlistId: resolved.setlistId,
+      source: resolved.setlistId ? resolved.source : null,
+      conflicts: opts.scope === "this" ? [] : conflicts,
+      conflictsReplaced: opts.scope === "this_and_following" && replace,
+    };
   }
 }
 
 function laterCustom(
-  rows: readonly { scope: string; effectiveFrom: Date; setlistId: string }[],
+  rows: readonly {
+    scope: string;
+    effectiveFrom: Date;
+    setlistId: string | null;
+  }[],
   original: Date,
 ) {
   return rows

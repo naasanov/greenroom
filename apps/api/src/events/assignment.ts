@@ -1,7 +1,8 @@
 export interface AssignmentRow {
   effectiveFrom: Date;
   scope: "forward" | "single";
-  setlistId: string;
+  /** Null marks an explicit "no setlist". */
+  setlistId: string | null;
 }
 
 export interface ResolvedAssignment {

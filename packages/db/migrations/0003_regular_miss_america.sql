@@ -1,0 +1,1 @@
+ALTER TABLE "practice_setlist_assignments" ALTER COLUMN "setlist_id" DROP NOT NULL;

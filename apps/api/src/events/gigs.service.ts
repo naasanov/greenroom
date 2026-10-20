@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
-import { gigs, type Database } from "@greenroom/db";
+import { gigLineup, gigs, memberships, type Database } from "@greenroom/db";
 import type { CreateGig, Gig, UpdateGig } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { addDays, isValidTimeZone, localTime, zonedInstant } from "./time.js";
@@ -142,11 +142,26 @@ export class GigsService {
       allDay: body.allDay ?? false,
       showOnPublicCalendar: body.showOnPublicCalendar ?? true,
     });
-    const [row] = await this.db
-      .insert(gigs)
-      .values({ ...cols, bandId, createdByUserId: userId })
-      .returning();
-    return toGig(row!);
+    const row = await this.db.transaction(async (tx) => {
+      const [gig] = await tx
+        .insert(gigs)
+        .values({ ...cols, bandId, createdByUserId: userId })
+        .returning();
+      // New gigs start with the full band in the lineup.
+      const active = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.bandId, bandId), isNull(memberships.leftAt)));
+      if (active.length > 0) {
+        await tx
+          .insert(gigLineup)
+          .values(
+            active.map((m) => ({ bandId, gigId: gig!.id, membershipId: m.id })),
+          );
+      }
+      return gig!;
+    });
+    return toGig(row);
   }
 
   async get(bandId: string, gigId: string): Promise<Gig> {

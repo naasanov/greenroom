@@ -4,3 +4,4 @@ export * from "./instruments.js";
 export * from "./bands.js";
 export * from "./songs.js";
 export * from "./events.js";
+export * from "./setlists.js";

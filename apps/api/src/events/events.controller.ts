@@ -19,11 +19,15 @@ import {
   listEventsQuerySchema,
   placesQuerySchema,
   setPracticeSetlistSchema,
+  clearPracticeSetlistQuerySchema,
+  createPracticeSetlistSchema,
   setRsvpSchema,
   updateGigSchema,
   updatePracticeSchema,
   type CalendarEvent,
+  type ClearPracticeSetlistQuery,
   type CreateGig,
+  type CreatePracticeSetlist,
   type CreatePractice,
   type DeletePracticeQuery,
   type Gig,
@@ -174,6 +178,30 @@ export class PracticesController {
     @Body(new ZodPipe(setPracticeSetlistSchema)) body: SetPracticeSetlist,
   ): Promise<PracticeSetlistResult> {
     return this.practices.setSetlist(m.bandId, seriesId, key, body);
+  }
+
+  /** Creates a new setlist for the occurrence and assigns it. */
+  @BandMember()
+  @Post(":seriesId/occurrences/:key/setlist")
+  createSetlist(
+    @CurrentMembership() m: BandMembership,
+    @Param("seriesId") seriesId: string,
+    @Param("key") key: string,
+    @Body(new ZodPipe(createPracticeSetlistSchema)) body: CreatePracticeSetlist,
+  ): Promise<PracticeSetlistResult & { newSetlistId: string }> {
+    return this.practices.createSetlist(m.bandId, seriesId, key, body);
+  }
+
+  @BandMember()
+  @Delete(":seriesId/occurrences/:key/setlist")
+  clearSetlist(
+    @CurrentMembership() m: BandMembership,
+    @Param("seriesId") seriesId: string,
+    @Param("key") key: string,
+    @Query(new ZodPipe(clearPracticeSetlistQuerySchema))
+    query: ClearPracticeSetlistQuery,
+  ): Promise<PracticeSetlistResult> {
+    return this.practices.clearSetlist(m.bandId, seriesId, key, query);
   }
 }
 

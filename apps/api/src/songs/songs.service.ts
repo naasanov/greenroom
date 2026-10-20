@@ -393,7 +393,7 @@ export class SongsService {
       })),
       ...practiceRows.map((p): UsedIn => ({
         kind: "practice",
-        setlistId: p.setlistId,
+        setlistId: p.setlistId!,
         seriesId: p.seriesId,
         title: p.title,
         effectiveFrom: p.effectiveFrom.toISOString(),

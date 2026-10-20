@@ -6,6 +6,8 @@ import { EventsModule } from "./events/events.module.js";
 import { HealthController } from "./health.controller.js";
 import { IntegrationsModule } from "./integrations/index.js";
 import { JobsModule } from "./jobs/jobs.module.js";
+import { LineupsModule } from "./lineups/lineups.module.js";
+import { SetlistsModule } from "./setlists/setlists.module.js";
 import { SongsModule } from "./songs/songs.module.js";
 import { testingEnabled } from "./testing/testing.enabled.js";
 import { TestingModule } from "./testing/testing.module.js";
@@ -19,6 +21,8 @@ import { TestingModule } from "./testing/testing.module.js";
     EventsModule,
     JobsModule,
     SongsModule,
+    SetlistsModule,
+    LineupsModule,
     // The test-control API is only registered with fakes outside production.
     ...(testingEnabled() ? [TestingModule] : []),
   ],

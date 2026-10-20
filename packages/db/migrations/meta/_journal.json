@@ -22,6 +22,13 @@
       "when": 1792461278237,
       "tag": "0002_natural_pet_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792521373592,
+      "tag": "0003_regular_miss_america",
+      "breakpoints": true
     }
   ]
 }

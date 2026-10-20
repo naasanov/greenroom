@@ -257,7 +257,8 @@ export type SetlistSource = "single" | "forward" | null;
 export interface CustomSetlistOccurrence {
   occurrenceKey: string;
   originalStart: string;
-  setlistId: string;
+  /** Null when the occurrence was explicitly cleared. */
+  setlistId: string | null;
 }
 
 export interface PracticeSetlistResult {

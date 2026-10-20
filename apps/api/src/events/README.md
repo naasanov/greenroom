@@ -8,6 +8,8 @@ All routes sit under `/bands/:bandId/...` behind `@BandMember()` (non-members ge
 - `GET|PATCH|DELETE /practices/:seriesId/occurrences/:key`. PATCH body carries `scope`; DELETE takes `?scope=`.
 - `PUT /practices/:seriesId/occurrences/:key/rsvp` `{status}`. Returns the occurrence.
 - `PUT /practices/:seriesId/occurrences/:key/setlist` `{setlistId, scope: this | this_and_following, onConflict?: replace | keep}`.
+- `POST .../setlist` `{scope, onConflict?, sourceSetlistId?, copyCurrent?}` creates a new setlist (optionally pre-filled from another setlist or the one in force) and assigns it; returns the assignment result plus `newSetlistId`.
+- `DELETE .../setlist?scope=&onConflict=` clears the occurrence's setlist (same scopes and conflict flags).
 - `GET /events?from=&to=&type=gig|practice` (ISO instants, at most 400 days). Gigs plus expanded occurrences, time ordered, each with a `type` discriminator.
 - `GET /places/autocomplete?q=` and `GET /places/:placeId` through the Places adapter; 30 requests per minute per user.
 
@@ -23,7 +25,7 @@ Series store an RRULE line without DTSTART (`RRULE:FREQ=WEEKLY;BYDAY=TU,TH;UNTIL
 - `all`: updates the series. Changing time, start date, time zone or recurrence deletes overrides, since their keys no longer match. Delete soft-deletes the series.
 
 ## Setlist assignment
-Resolution (`assignment.ts`): a `single` row at exactly the occurrence start wins, else the latest `forward` row with `effective_from <=` it. `this_and_following` writes a forward row and removes later forward rows; later single rows are removed with `onConflict: replace` (default) or kept with `keep`. The response and occurrence reads list later occurrences that have their own single setlist (`conflicts`, `laterCustomSetlists`) so the UI can warn.
+Resolution (`assignment.ts`): a `single` row at exactly the occurrence start wins, else the latest `forward` row with `effective_from <=` it. `this_and_following` writes a forward row and removes later forward rows; later single rows are removed with `onConflict: replace` (default) or kept with `keep`. A row with a null `setlist_id` is an explicit "no setlist" marker: clearing writes one only when an earlier forward row would otherwise still apply (a cleared single still counts as a custom row in `laterCustomSetlists`, with `setlistId: null`). The response and occurrence reads list later occurrences that have their own single setlist (`conflicts`, `laterCustomSetlists`) so the UI can warn.
 
 ## RSVPs
 Attendees are active members; a missing row is `no_response`. Order: going, maybe, no_response, not_going, then by name.
