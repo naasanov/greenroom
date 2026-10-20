@@ -38,6 +38,7 @@ TypeScript end to end. pnpm workspace + Turborepo monorepo: Next.js frontend (`a
 Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format`.
 
 - Local setup: `cp .env.example .env` (secrets come from the Keychain, see `memory/secrets-in-keychain.md`), `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`.
+- Staging: https://staging.greenroom.fyi and https://api.staging.greenroom.fyi (Fly apps `greenroom-staging-{web,api,db}`, region `iad`). Pushes to `main` run CI and then auto-deploy staging; manual deploy with `pnpm deploy:staging`. Runbook, DNS, backups, and prod setup: `infra/fly/README.md`. Creating cloud resources or DNS changes needs explicit user approval.
 - Tests: `pnpm test:e2e` (Playwright, desktop + iPhone/WebKit, fake integrations, test DB). How to write specs and add fake-control endpoints: `apps/e2e/README.md`.
 
 ## Conventions

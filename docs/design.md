@@ -101,6 +101,8 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 ## Hosting & domain
 - **Everything on Fly.io:** Next.js frontend, NestJS backend, and Postgres. One provider, one bill, one deploy setup, frontend and backend on the same private network. (Considered Vercel for the frontend; rejected in favor of single-provider simplicity for an agent-built app. Heroku also available but not preferred.)
 - **Domain via Cloudflare** (DNS). App and API on subdomains of the same domain so auth cookies work smoothly. Domain: **greenroom.fyi** (registered on Cloudflare).
+- **Environments:** production web at the apex `greenroom.fyi` (public calendars read as `greenroom.fyi/<band>`), API at `api.greenroom.fyi`. Staging at `staging.greenroom.fyi` + `api.staging.greenroom.fyi`. Fly region `iad`. Staging Postgres is a self-run Postgres machine with a volume (cheapest option); web/API machines auto-stop when idle. Production is created closer to launch.
+- **Cookie names are per environment** (e.g. a staging-specific session cookie name), because cookies scoped to `greenroom.fyi` are also sent to `staging.greenroom.fyi`.
 - Note: Cloudflare's proxy caps request bodies at 100 MB, which is fine because uploads are already chunked.
 - Development approach: agent-written code, no-code iteration — the user is not reviewing code directly, so consistency and convention matter more than minimizing framework concepts.
 

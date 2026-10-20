@@ -34,13 +34,13 @@ Things the orchestrator cannot fully do itself. Rule: hand work to the orchestra
 Parallel group 0A
 - **0.1 Monorepo + stack scaffold.** pnpm/Turborepo; Next.js frontend, NestJS backend, shared types package (DTOs + Zod). TypeScript end to end. Status: Done
 - **0.2 Database.** Postgres, migrations, core schema (users, bands, memberships, roles, events, recurrence, songs, setlists, lineups, media metadata). Starting input: [data-model.md](./data-model.md), a rough draft only, not the source of truth; change it freely. Status: Done
-- **0.3 Infra.** Fly.io apps (frontend, backend, Postgres), Cloudflare DNS with app and API subdomains, staging environment, CI. Status: Not started
+- **0.3 Infra.** Fly.io apps (frontend, backend, Postgres), Cloudflare DNS with app and API subdomains, staging environment, CI. Status: Done (staging live at staging.greenroom.fyi / api.staging.greenroom.fyi; prod not created yet; runbook in `infra/fly/README.md`)
 - **0.4 Test harness.** Playwright setup, seeded test data, adapter interfaces + fakes for every external service. Status: Done
 
 # Phase 1: Component library + Auth
 Parallel group 1A
 - **1.1 Component library / design system.** Bottom drawers, split drawer with slide + back arrow + swipe-back, right-side sheet, FAB, horizontal cards (Spotify-style), event chips, mobile bottom tab bar, desktop top tabs, band switcher + profile icon, icons (instruments, RSVP check/X/?), action bar, dialogs. Showcase page listing every component in its states. Status: Not started
-- **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains; post-login redirect to the original link. Status: Not started
+- **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains (per-environment cookie names, see Hosting & domain in the design doc); post-login redirect to the original link. Status: Not started
 - **1.3 Bands + onboarding.** Signup (no auto band), create band, invite link (handles existing and new accounts), instrument picker (preset + custom, multiple), admin/member roles, multiple bands. Status: Not started
 
 🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Not started

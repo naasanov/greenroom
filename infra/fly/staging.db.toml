@@ -1,0 +1,26 @@
+# Self-run Postgres. No [http_service] or [[services]] and no public IPs: reachable only
+# over the private network at greenroom-staging-db.internal:5432. Needs POSTGRES_PASSWORD secret.
+app = "greenroom-staging-db"
+primary_region = "iad"
+
+[build]
+image = "postgres:17"
+
+[env]
+POSTGRES_USER = "greenroom"
+POSTGRES_DB = "greenroom"
+PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[processes]
+app = "postgres -c shared_buffers=48MB -c max_connections=30 -c listen_addresses=*"
+
+[mounts]
+source = "pgdata"
+destination = "/var/lib/postgresql/data"
+initial_size = "1gb"
+snapshot_retention = 7
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "256mb"
+processes = ["app"]

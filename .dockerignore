@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+.git
+.github
+.env*
+!.env.example
+apps/e2e
+docs
+memory
+infra
+test-results
+playwright-report
+.DS_Store
