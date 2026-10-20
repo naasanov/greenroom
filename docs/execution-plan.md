@@ -54,7 +54,7 @@ Parallel group 3A
 - **3.1 Events tab (calendar).** Month/week views, all-day strip, chips, today marker + jump to today, FAB + click-a-day create, split drawer, gig form (all gig fields, Places type-ahead), practice form (RRULE-compatible recurrence, end conditions), edit scope dialog (this / this and following / all), discard-changes confirm, gig delete (Drive media untouched, warning). Status: In progress (UI wave 1 running 2026-10-20: FullCalendar month/week, split create drawer, gig and practice forms, event drawer with RSVPs and edit scopes, deep links into the real calendar; backend API done)
 - **3.2 Agenda sheet.** Right-side sheet, one timeline with today line and past-card peek, cards, gig/practice filter, opens event drawer beside or over. Status: Not started (wave 2, after the 3.1 event drawer lands; range listing API done)
 - **3.3 Music Library.** Smart add input (Spotify/YouTube links, Spotify search, manual), progressive disclosure, song detail sheet (view/edit, links with favicons, notes, used-in, delete warning), list, search, sorts, duplicate check, playlist import with progress + summary, Songsterr suggestion. App-level Spotify credentials only. Status: In progress (UI wave 1 running 2026-10-20: library list, smart add sheet, song detail sheet, playlist import, real YouTube and Songsterr adapters; real Spotify adapter still needs the Spotify app credentials)
-- **3.4 Roster + Settings.** Member cards, member detail sheet, invite link button, admin actions (promote, remove, reset link), leave band + last-admin rules, personal and band settings. Status: In progress (wave 1 running 2026-10-20: roster cards, member sheet, invite button, admin actions, leave band rules, personal and band settings; photo upload waits on the open question)
+- **3.4 Roster + Settings.** Member cards, member detail sheet, invite link button, admin actions (promote, remove, reset link), leave band + last-admin rules, personal and band settings. Status: Done (2026-10-20: roster cards, member sheet with email and instruments, invite link button in the FAB spot, promote/demote/remove and invite reset for admins, leave band with last-admin and delete-band rules, personal settings (name, instruments, sign out) and admin band settings (name, bio, booking email, social links); no photo upload or per-member upcoming gigs yet)
 
 🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Not started
 
@@ -95,7 +95,7 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
-- Where do user and band photos live (personal/band settings)? Options: Google profile photo URL only, a small object store (e.g. Tigris on Fly), or the band's Drive. Blocks photo upload in 3.4; not urgent.
+- Where do user and band photos live (personal/band settings)? Options: Google profile photo URL only, a small object store (e.g. Tigris on Fly), or the band's Drive. Blocks photo upload in 3.4 (built without upload: avatar or initials only); not urgent.
 
 # Temporary
 - **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (live)
