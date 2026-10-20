@@ -106,12 +106,26 @@ export function AttendeeList({
     n: attendees.filter((a) => a.status === s).length,
   })).filter((c) => c.n > 0);
 
+  if (attendees.length === 0) {
+    return (
+      <p
+        data-testid="attendee-empty"
+        className={cn(
+          "py-6 text-center text-sm text-muted-foreground",
+          className,
+        )}
+      >
+        No attendees
+      </p>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <p className="text-sm text-muted-foreground">
         {counts
           .map((c) => `${c.n} ${RSVP[c.status].label.toLowerCase()}`)
-          .join(" · ") || "No attendees"}
+          .join(" · ")}
       </p>
       <ul className="flex flex-col" data-testid="attendee-list">
         {sorted.map((a) => (

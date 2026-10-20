@@ -190,6 +190,39 @@
     @apply bg-background text-foreground;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Tailwind 4 preflight drops the pointer cursor on interactive elements. */
+  button:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="button"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="tab"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="option"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitem"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitemcheckbox"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitemradio"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="switch"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="checkbox"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  [role="radio"]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  summary:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  label[for]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  select:not(:disabled):not([aria-disabled="true"]):not([data-disabled]),
+  a[href]:not(:disabled):not([aria-disabled="true"]):not([data-disabled]) {
+    cursor: pointer;
+  }
+  button:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="button"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="tab"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="option"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="menuitem"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="menuitemcheckbox"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="menuitemradio"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="switch"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="checkbox"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  [role="radio"]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  summary:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  label[for]:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  select:is(:disabled, [aria-disabled="true"], [data-disabled]),
+  a[href]:is(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: not-allowed;
+  }
   html {
     @apply font-sans;
     text-size-adjust: 100%;

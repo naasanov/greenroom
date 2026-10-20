@@ -98,6 +98,7 @@ export function ListCard({
         type="button"
         onClick={onClick}
         disabled={!interactive}
+        aria-pressed={checked}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-0.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
       >
         <Thumbnail src={thumbnail} seed={title} icon={thumbnailIcon} />
@@ -123,11 +124,13 @@ export function ListCard({
           role="img"
           aria-label={checked ? "Added" : "Not added"}
           data-checked={checked}
+          onClick={onClick}
           className={cn(
             "mr-1 ml-1 flex size-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
             checked
               ? "border-primary bg-primary text-primary-foreground"
               : "border-muted-foreground/30",
+            interactive && "cursor-pointer",
           )}
         >
           {checked ? <Check className="size-4" strokeWidth={3} /> : null}

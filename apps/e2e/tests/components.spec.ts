@@ -418,3 +418,24 @@ test("attendee list sorts going, maybe, none, declined", async ({ page }) => {
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
   expect(statuses).toEqual(["going", "going", "maybe", "none", "declined"]);
 });
+
+test("clicking the check circle toggles a selectable list card", async ({
+  page,
+}) => {
+  const circle = page.locator("[data-checked]").first();
+  await circle.scrollIntoViewIfNeeded();
+  const before = await circle.getAttribute("data-checked");
+  await circle.click();
+  await expect(circle).not.toHaveAttribute("data-checked", before ?? "");
+  await circle.click();
+  await expect(circle).toHaveAttribute("data-checked", before ?? "");
+});
+
+test("buttons show a pointer cursor and drag handles a grab cursor", async ({
+  page,
+}) => {
+  const button = page.getByRole("button").first();
+  await expect(button).toHaveCSS("cursor", "pointer");
+  const handle = page.getByRole("button", { name: "Drag to reorder" }).first();
+  await expect(handle).toHaveCSS("cursor", "grab");
+});

@@ -73,7 +73,8 @@ export function RightSheet({
         className,
       )}
     >
-      <header className="pt-safe flex shrink-0 items-center gap-1 border-b px-2 py-2">
+      {/* Top padding is max(0.75rem, safe-area inset); pt-safe alone would zero it. */}
+      <header className="flex shrink-0 items-center gap-1 border-b px-2 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <Button
           variant="ghost"
           size="icon"
