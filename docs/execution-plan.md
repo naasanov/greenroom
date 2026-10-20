@@ -96,3 +96,6 @@ Parallel group 7A
 
 # Open questions
 - (none yet)
+
+# Temporary
+- **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: In progress (agent building it, 2026-10-20)

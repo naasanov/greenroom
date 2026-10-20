@@ -44,6 +44,7 @@ Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typechec
 ## Conventions
 
 - Code comments: three lines max, describe current behavior declaratively (no change-history narration), never use em dashes.
+- Status lines in `docs/execution-plan.md` are updated and pushed the moment a task or gate changes state (staging `/status` renders them from GitHub `main`).
 - The orchestrator commits on its own at sensible checkpoints (e.g. after each validated wave or task), without being asked. Subagents never commit. Each commit is pushed to `main` immediately (CI runs, then staging redeploys); check both go green. No AI attribution, co-author trailers, or session links in commit messages. Do not branch unless the user asks.
 - External services (Google, Spotify, Songsterr, GitHub) sit behind adapter interfaces with fakes for tests.
 
