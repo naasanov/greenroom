@@ -50,7 +50,7 @@ function ShellDemo({
         bands={BANDS}
         activeBandId={band}
         onBandChange={setBand}
-        onCreateBand={() => setToast("Create or join a band")}
+        onCreateBand={() => setToast("Create another band")}
         activeTab={tab}
         onTabChange={setTab}
         profile={{ name: "Ava" }}

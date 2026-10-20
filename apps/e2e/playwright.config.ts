@@ -50,7 +50,6 @@ export default defineConfig({
       command: `pnpm exec next start -p ${WEB_PORT}`,
       cwd: "../web",
       url: WEB_URL,
-      env: { NEXT_PUBLIC_API_URL: API_URL },
     },
   ],
 });

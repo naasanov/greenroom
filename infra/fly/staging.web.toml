@@ -1,12 +1,9 @@
-# Prod copy: rename app to greenroom-web and set NEXT_PUBLIC_API_URL to https://api.greenroom.fyi.
+# Prod copy: rename app to greenroom-web. The browser derives the API URL (https://api.<host>) at runtime.
 app = "greenroom-staging-web"
 primary_region = "iad"
 
 [build]
 dockerfile = "../../apps/web/Dockerfile"
-
-[build.args]
-NEXT_PUBLIC_API_URL = "https://api.staging.greenroom.fyi"
 
 [http_service]
 internal_port = 3000

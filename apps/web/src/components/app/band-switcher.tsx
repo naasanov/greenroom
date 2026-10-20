@@ -104,7 +104,7 @@ export function BandSwitcher({
               <span className="flex size-8 items-center justify-center rounded-xl border border-dashed">
                 <Plus className="size-4" />
               </span>
-              Create or join a band
+              Create another band
             </DropdownMenuItem>
           </>
         ) : null}

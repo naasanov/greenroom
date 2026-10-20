@@ -9,9 +9,14 @@ test("api health reports the database up", async ({ request }) => {
   expect(await res.json()).toMatchObject({ status: "ok", database: "up" });
 });
 
-test("web home page renders", async ({ page }) => {
+test("web home redirects signed-out visitors to the sign-in page", async ({
+  page,
+}) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Greenroom" })).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(
+    page.getByRole("heading", { name: "Your band's home base" }),
+  ).toBeVisible();
 });
 
 test("seed band returns fixtures that exist in the database", async ({
