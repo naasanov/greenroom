@@ -43,29 +43,17 @@ test("tab bar names the main tab Events", async ({ page, isMobile }) => {
   await expect(nav.getByRole("button", { name: "Calendar" })).toHaveCount(0);
 });
 
-/** Samples the sheet's computed `translate` each frame while `action` runs. */
-async function sampleTranslate(page: Page, action: () => Promise<void>) {
-  await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="right-sheet"]')!;
-    const w = window as unknown as { __samples: string[]; __stop: boolean };
-    w.__samples = [];
-    w.__stop = false;
-    const tick = () => {
-      w.__samples.push(getComputedStyle(el).translate);
-      if (!w.__stop) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  });
-  await action();
-  await page.waitForTimeout(700);
-  return page.evaluate(() => {
-    const w = window as unknown as { __samples: string[]; __stop: boolean };
-    w.__stop = true;
-    return w.__samples;
+/** The sheet's computed `translate` and the transition declared for it. */
+async function sheetMotion(page: Page) {
+  return page.getByTestId("right-sheet").evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const props = cs.transitionProperty.split(",").map((v) => v.trim());
+    const durations = cs.transitionDuration
+      .split(",")
+      .map((v) => parseFloat(v) * (v.trim().endsWith("ms") ? 1 : 1000));
+    return { translate: cs.translate, props, durations };
   });
 }
-
-const isMid = (t: string) => t !== "100%" && t !== "0px" && t !== "none";
 
 async function openSheet(page: Page) {
   await page
@@ -77,28 +65,42 @@ async function openSheet(page: Page) {
 test("right sheet slides in and out", async ({ page }) => {
   const sheet = page.getByTestId("right-sheet");
   await sheet.waitFor({ state: "attached" });
-  const opening = await sampleTranslate(page, () => openSheet(page));
-  expect(opening.some(isMid)).toBe(true);
-  await expect(sheet).toHaveAttribute("data-state", "open");
-  expect(opening.at(-1)).toBe("0px");
 
-  const closing = await sampleTranslate(page, () =>
-    sheet.getByRole("button", { name: "Close" }).click(),
-  );
-  expect(closing.some(isMid)).toBe(true);
-  expect(closing.at(-1)).not.toBe("0px");
+  // Tailwind 4 positions the sheet with the `translate` property, so the
+  // transition must target it with a non-zero duration or nothing animates.
+  const closed = await sheetMotion(page);
+  expect(closed.translate).not.toBe("0px");
+  const i = closed.props.findIndex((p) => p === "translate" || p === "all");
+  expect(i).toBeGreaterThanOrEqual(0);
+  expect(closed.durations[i % closed.durations.length]).toBeGreaterThan(0);
+
+  await openSheet(page);
+  await expect(sheet).toHaveAttribute("data-state", "open");
+  await expect
+    .poll(async () => (await sheetMotion(page)).translate)
+    .toBe("0px");
+
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect
+    .poll(async () => (await sheetMotion(page)).translate)
+    .not.toBe("0px");
 });
 
 test("right sheet does not animate with reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByTestId("right-sheet").waitFor({ state: "attached" });
-  const opening = await sampleTranslate(page, () => openSheet(page));
-  expect(opening.some(isMid)).toBe(false);
-  await expect(page.getByTestId("right-sheet")).toHaveAttribute(
-    "data-state",
-    "open",
-  );
-  expect(opening.at(-1)).toBe("0px");
+  const sheet = page.getByTestId("right-sheet");
+  await sheet.waitFor({ state: "attached" });
+
+  const closed = await sheetMotion(page);
+  expect(
+    closed.props.includes("none") || closed.durations.every((d) => d === 0),
+  ).toBe(true);
+
+  await openSheet(page);
+  await expect(sheet).toHaveAttribute("data-state", "open");
+  await expect
+    .poll(async () => (await sheetMotion(page)).translate)
+    .toBe("0px");
 });
 
 test("reference values render as links only when they are URLs", async ({
