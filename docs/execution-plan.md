@@ -46,8 +46,8 @@ Parallel group 1A
 🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Feedback (round 2, 2026-10-20: buttons and clickable elements lack the pointer cursor; tapping the check circle on a selectable horizontal card does not select it; the top of the right side sheet looks cut off; the empty attendees placeholder is not centered). Fixes committed (typecheck and lint pass); e2e and deploy pending because this machine could not reach GitHub or launch browsers. The gate passes once CI and the staging deploy are green. Round 1 fixes are deployed.
 
 # Phase 2: App shell
-- **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: Not started
-- **2.2 Deep links.** Routes for gigs, practice occurrences, songs; open the right view with drawer or sheet open; auto-switch band; share button (copy / native share). Status: Not started
+- **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: In progress (wave 1 running 2026-10-20: tabs in the URL, /settings page behind the profile icon, share button; backend storing the last used band on the user)
+- **2.2 Deep links.** Routes for gigs, practice occurrences, songs; open the right view with drawer or sheet open; auto-switch band; share button (copy / native share). Status: In progress (wave 1 running 2026-10-20: backend link resolvers mapping a gig, practice, or song id to its band; deep link routes follow in wave 2)
 
 # Phase 3: Core tabs
 Parallel group 3A
