@@ -1,6 +1,6 @@
 "use client";
 
-import { RosterTab } from "@/components/onboarding/roster-tab";
+import { RosterTab } from "@/components/roster/roster-tab";
 import { useCurrentBand } from "@/lib/current-band";
 
 export default function RosterPage() {

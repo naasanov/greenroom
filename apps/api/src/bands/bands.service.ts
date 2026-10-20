@@ -137,6 +137,7 @@ export class BandsService {
       .select({
         userId: users.id,
         displayName: users.displayName,
+        email: users.email,
         avatarUrl: users.avatarUrl,
         role: memberships.role,
         joinedAt: memberships.joinedAt,

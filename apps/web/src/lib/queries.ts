@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 import {
   authResultSchema,
+  bandDetailSchema,
   bandMemberSchema,
   bandSummarySchema,
   inviteLinkSchema,
@@ -18,7 +19,10 @@ import {
   practiceLinkSchema,
   songLinkSchema,
   userSchema,
+  type BandRole,
   type CreateBand,
+  type LeaveBand,
+  type UpdateBand,
   type Gig,
   type PracticeOccurrence,
   type SongDetail,
@@ -33,6 +37,7 @@ export const keys = {
   me: ["me"] as const,
   bands: ["bands"] as const,
   members: (bandId: string) => ["bands", bandId, "members"] as const,
+  band: (bandId: string) => ["bands", bandId, "detail"] as const,
   invite: (bandId: string) => ["bands", bandId, "invite"] as const,
   invitePreview: (token: string) => ["invites", token] as const,
   instruments: ["me", "instruments"] as const,
@@ -82,6 +87,66 @@ export function useMembers(bandId: string | undefined) {
     queryFn: () =>
       api(`/bands/${bandId}/members`, { schema: z.array(bandMemberSchema) }),
     enabled: !!bandId,
+  });
+}
+
+/** Full band profile (bio, social links, booking contact). */
+export function useBandDetail(bandId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: keys.band(bandId ?? ""),
+    queryFn: () => api(`/bands/${bandId}`, { schema: bandDetailSchema }),
+    enabled: !!bandId && enabled,
+  });
+}
+
+export function useUpdateBand(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateBand) =>
+      api(`/bands/${bandId}`, {
+        method: "PATCH",
+        body,
+        schema: bandDetailSchema,
+      }),
+    onSuccess: (detail) => {
+      qc.setQueryData(keys.band(bandId), detail);
+      void qc.invalidateQueries({ queryKey: keys.bands });
+    },
+  });
+}
+
+export function useSetMemberRole(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { userId: string; role: BandRole }) =>
+      api(`/bands/${bandId}/members/${v.userId}`, {
+        method: "PATCH",
+        body: { role: v.role },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(bandId) }),
+  });
+}
+
+export function useRemoveMember(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api(`/bands/${bandId}/members/${userId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(bandId) }),
+  });
+}
+
+/** Leaves the band (or deletes it when `deleteBand` is set and the user is alone). */
+export function useLeaveBand(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: LeaveBand) =>
+      api(`/bands/${bandId}/leave`, { method: "POST", body }),
+    onSuccess: () => {
+      // Drop the band's own queries so their 404 refetches don't delay the refresh.
+      qc.removeQueries({ queryKey: keys.band(bandId).slice(0, 2) });
+      return refreshBands(qc);
+    },
   });
 }
 
@@ -247,7 +312,7 @@ export function useMyInstruments(enabled = true) {
   });
 }
 
-/** Saves display name and instruments for the welcome screen. */
+/** Saves display name and instruments (welcome screen and settings). */
 export function useSaveProfile() {
   const qc = useQueryClient();
   return useMutation({
@@ -270,6 +335,11 @@ export function useSaveProfile() {
     onSuccess: (user) => {
       qc.setQueryData(keys.me, user);
       void qc.invalidateQueries({ queryKey: keys.instruments });
+      // Rosters show the saved name and instruments.
+      void qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "bands" && q.queryKey[2] === "members",
+      });
     },
   });
 }

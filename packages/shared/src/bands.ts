@@ -58,6 +58,7 @@ export type MyInstruments = z.infer<typeof myInstrumentsSchema>;
 export const bandMemberSchema = z.object({
   userId: z.string().uuid(),
   displayName: z.string(),
+  email: z.string(),
   avatarUrl: z.string().nullable(),
   instruments: myInstrumentsSchema,
   role: bandRoleSchema,
