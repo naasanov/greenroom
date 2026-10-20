@@ -1,0 +1,25 @@
+{
+  "name": "@greenroom/e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@greenroom/db": "workspace:*",
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@greenroom/api": "workspace:*",
+    "@greenroom/web": "workspace:*",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22",
+    "eslint": "^9",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8"
+  }
+}

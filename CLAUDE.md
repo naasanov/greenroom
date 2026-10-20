@@ -1,6 +1,6 @@
 # Greenroom
 
-A web app that is a small band's home base: gigs and practices on a shared calendar (two-way Google Calendar sync), setlists built from a song library (Spotify/YouTube/manual), roster, gig media stored in Google Drive, stage mode, and a public gig calendar. Domain: `greenroom.so`. Repo: `naasanov/greenroom` (public).
+A web app that is a small band's home base: gigs and practices on a shared calendar (two-way Google Calendar sync), setlists built from a song library (Spotify/YouTube/manual), roster, gig media stored in Google Drive, stage mode, and a public gig calendar. Domain: `greenroom.fyi` (Cloudflare). Repo: `naasanov/greenroom` (public).
 
 ## Your role: orchestrator
 
@@ -36,6 +36,9 @@ TypeScript end to end. pnpm workspace + Turborepo monorepo: Next.js frontend (`a
 ## Commands
 
 Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format`.
+
+- Local setup: `cp .env.example .env` (secrets come from the Keychain, see `memory/secrets-in-keychain.md`), `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`.
+- Tests: `pnpm test:e2e` (Playwright, desktop + iPhone/WebKit, fake integrations, test DB). How to write specs and add fake-control endpoints: `apps/e2e/README.md`.
 
 ## Conventions
 

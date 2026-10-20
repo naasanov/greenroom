@@ -12,12 +12,12 @@
 Things the orchestrator cannot fully do itself. Rule: hand work to the orchestrator via CLI only when that is genuinely faster than the user clicking through it. When a task needs one of these, check this list. If an item isn't done, mark the task Blocked and tell the user exactly what's needed.
 
 **User does manually (browser consoles, payments, identity):**
-- **Domain:** buy/confirm the domain and put it on Cloudflare. Chosen: `greenroom.so` (available as of 2026-10-19, not yet purchased). Status: In progress
+- **Domain:** buy/confirm the domain and put it on Cloudflare. `greenroom.fyi`, registered on Cloudflare 2026-10-19. Status: Done
 - **Google Cloud project:** create the project; enable Drive, Calendar, Picker, and Places APIs; configure the OAuth consent screen (keep it in Testing mode and add the band members as test users, which avoids Google verification for the full drive scope); create OAuth client IDs and a Places/Picker API key. Status: Not started
 - **Spotify developer app:** create the app; set the redirect URIs; copy the client id and secret. Status: Not started
 - **Magic-link email provider:** decided: Resend. Create the account and verify the sending domain. The DNS records can then go to the orchestrator. Status: Not started
 - **Sentry:** create the org and projects and copy the DSNs. Status: Not started
-- **Accounts + logins:** create accounts for Fly.io, Cloudflare, and GitHub with billing set up, then log in to the CLIs once on the dev machine (`fly auth login`, `gh auth login`) and create a scoped Cloudflare API token. GitHub + `gh` login done; Fly.io and Cloudflare remaining. Status: In progress
+- **Accounts + logins:** create accounts for Fly.io, Cloudflare, and GitHub with billing set up, then log in to the CLIs once on the dev machine (`fly auth login`, `gh auth login`) and create a scoped Cloudflare API token. GitHub + `gh` login done; Fly.io + `fly` login done (flyctl in `~/.fly/bin`, not Homebrew); Cloudflare API token in Keychain (`CLOUDFLARE_API_TOKEN`) with zone access verified. Status: Done
 - **Secrets:** put the keys above in a local .env / Fly secrets, or hand them to the orchestrator to set. Status: Not started
 - **Real test accounts for Phase 8:** a Google account and a Spotify account the walkthrough agent can use, with any 2FA prompts handled by the user. Status: Not started
 
@@ -35,7 +35,7 @@ Parallel group 0A
 - **0.1 Monorepo + stack scaffold.** pnpm/Turborepo; Next.js frontend, NestJS backend, shared types package (DTOs + Zod). TypeScript end to end. Status: Done
 - **0.2 Database.** Postgres, migrations, core schema (users, bands, memberships, roles, events, recurrence, songs, setlists, lineups, media metadata). Starting input: [data-model.md](./data-model.md), a rough draft only, not the source of truth; change it freely. Status: Done
 - **0.3 Infra.** Fly.io apps (frontend, backend, Postgres), Cloudflare DNS with app and API subdomains, staging environment, CI. Status: Not started
-- **0.4 Test harness.** Playwright setup, seeded test data, adapter interfaces + fakes for every external service. Status: In progress (adapters + fakes in wave 1; Playwright + seeding after 0.2 lands)
+- **0.4 Test harness.** Playwright setup, seeded test data, adapter interfaces + fakes for every external service. Status: Done
 
 # Phase 1: Component library + Auth
 Parallel group 1A

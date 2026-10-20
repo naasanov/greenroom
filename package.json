@@ -15,7 +15,9 @@
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @greenroom/db generate",
-    "db:migrate": "pnpm --filter @greenroom/db migrate"
+    "db:migrate": "pnpm --filter @greenroom/db migrate",
+    "db:seed": "turbo run build --filter=@greenroom/db && pnpm --filter @greenroom/db seed",
+    "test:e2e": "turbo run test:e2e"
   },
   "devDependencies": {
     "prettier": "^3.9.10",

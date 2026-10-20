@@ -100,7 +100,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 ## Hosting & domain
 - **Everything on Fly.io:** Next.js frontend, NestJS backend, and Postgres. One provider, one bill, one deploy setup, frontend and backend on the same private network. (Considered Vercel for the frontend; rejected in favor of single-provider simplicity for an agent-built app. Heroku also available but not preferred.)
-- **Domain via Cloudflare** (DNS). App and API on subdomains of the same domain so auth cookies work smoothly. Domain: **greenroom.so**.
+- **Domain via Cloudflare** (DNS). App and API on subdomains of the same domain so auth cookies work smoothly. Domain: **greenroom.fyi** (registered on Cloudflare).
 - Note: Cloudflare's proxy caps request bodies at 100 MB, which is fine because uploads are already chunked.
 - Development approach: agent-written code, no-code iteration — the user is not reviewing code directly, so consistency and convention matter more than minimizing framework concepts.
 

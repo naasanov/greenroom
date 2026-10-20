@@ -21,7 +21,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate"
+    "migrate": "drizzle-kit migrate",
+    "seed": "node --env-file-if-exists=../../.env dist/seed/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9",
