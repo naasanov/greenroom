@@ -58,8 +58,7 @@ export function SignInView() {
   });
 
   function googleUrl() {
-    const afterGoogle = `/welcome?redirectTo=${encodeURIComponent(redirectTo)}`;
-    return `${getApiUrl()}/auth/google/start?redirectTo=${encodeURIComponent(afterGoogle)}`;
+    return `${getApiUrl()}/auth/google/start?redirectTo=${encodeURIComponent(redirectTo)}`;
   }
 
   const sendError = send.error

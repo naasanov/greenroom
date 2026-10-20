@@ -79,24 +79,28 @@ export function InstrumentPicker({
         })}
       </div>
 
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          addCustom();
-        }}
-      >
+      <div className="flex gap-2">
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            addCustom();
+          }}
           placeholder="Something else? e.g. Oud"
           aria-label="Custom instrument"
           maxLength={40}
         />
-        <Button type="submit" variant="secondary" disabled={!draft.trim()}>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={!draft.trim()}
+          onClick={addCustom}
+        >
           <Plus /> Add
         </Button>
-      </form>
+      </div>
 
       {custom.length > 0 ? (
         <ul className="flex flex-wrap gap-2" aria-label="Custom instruments">

@@ -135,7 +135,13 @@ test("google sign-in creates then links by email", async ({
 }) => {
   const first = await googleLogin(request, "g@example.com", "/band/1");
   expect(first.status()).toBe(302);
-  expect(first.headers()["location"]).toBe(`${WEB_URL}/band/1`);
+  expect(first.headers()["location"]).toBe(
+    `${WEB_URL}/welcome?redirectTo=${encodeURIComponent("/band/1")}`,
+  );
+
+  // A returning Google user goes straight to the destination.
+  const returning = await googleLogin(request, "g@example.com", "/band/1");
+  expect(returning.headers()["location"]).toBe(`${WEB_URL}/band/1`);
   const me = await request.get(`${API_URL}/auth/me`);
   expect(await me.json()).toMatchObject({ email: "g@example.com" });
 
@@ -199,7 +205,10 @@ test("unsafe redirectTo values fall back to /", async ({
   ];
   for (const redirectTo of unsafe) {
     const res = await googleLogin(request, "r@example.com", redirectTo);
-    expect(res.headers()["location"]).toBe(`${WEB_URL}/`);
+    const location = res.headers()["location"];
+    expect([`${WEB_URL}/`, `${WEB_URL}/welcome?redirectTo=%2F`]).toContain(
+      location,
+    );
   }
   await request.post(`${API_URL}/auth/magic-link`, {
     data: { email: "r2@example.com", redirectTo: "//evil.example" },

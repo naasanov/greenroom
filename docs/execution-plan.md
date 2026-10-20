@@ -40,10 +40,10 @@ Parallel group 0A
 # Phase 1: Component library + Auth
 Parallel group 1A
 - **1.1 Component library / design system.** Bottom drawers, split drawer with slide + back arrow + swipe-back, right-side sheet, FAB, horizontal cards (Spotify-style), event chips, mobile bottom tab bar, desktop top tabs, band switcher + profile icon, icons (instruments, RSVP check/X/?), action bar, dialogs. Showcase page listing every component in its states. Status: Done (showcase at /showcase)
-- **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains (per-environment cookie names, see Hosting & domain in the design doc); post-login redirect to the original link. Status: In progress (API done; web sign-in pages next)
-- **1.3 Bands + onboarding.** Signup (no auto band), create band, invite link (handles existing and new accounts), instrument picker (preset + custom, multiple), admin/member roles, multiple bands. Status: In progress (API done; web onboarding next)
+- **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains (per-environment cookie names, see Hosting & domain in the design doc); post-login redirect to the original link. Status: Done
+- **1.3 Bands + onboarding.** Signup (no auto band), create band, invite link (handles existing and new accounts), instrument picker (preset + custom, multiple), admin/member roles, multiple bands. Status: Done
 
-🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Not started
+🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Awaiting review (https://staging.greenroom.fyi/showcase)
 
 # Phase 2: App shell
 - **2.1 Shell + navigation.** Three tabs (Calendar, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: Not started

@@ -130,7 +130,13 @@ export class AuthController {
     if (!found) return fail("account_conflict");
 
     this.sessions.setCookie(res, await this.sessions.create(found.user.id));
-    res.redirect(`${webUrl()}${safeRedirect(parsed.redirectTo)}`);
+    const dest = safeRedirect(parsed.redirectTo);
+    // New users finish their profile first, then continue to the original destination.
+    res.redirect(
+      found.isNewUser
+        ? `${webUrl()}/welcome?redirectTo=${encodeURIComponent(dest)}`
+        : `${webUrl()}${dest}`,
+    );
   }
 
   @Get("me")

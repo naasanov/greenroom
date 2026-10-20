@@ -35,7 +35,7 @@ test("new user signs in by magic link, sets up a profile, and creates a band", a
   await page.goto("/sign-in");
   await expect(
     page.getByRole("link", { name: "Continue with Google" }),
-  ).toHaveAttribute("href", /\/auth\/google\/start\?redirectTo=/);
+  ).toHaveAttribute("href", /\/auth\/google\/start\?redirectTo=%2F$/);
   const link = await requestLink(page, testApi, "new@example.com");
 
   await page.goto(link);
@@ -186,6 +186,7 @@ test("invite flow: admin shares the link, a new user signs in, joins, and sees t
   await expect(gp).toHaveURL(inviteUrl);
   await gp.getByRole("button", { name: "Join The Night Owls" }).click();
   await expect(switcher(gp, "The Night Owls")).toBeVisible();
+  await expect(switcher(gp, "The Night Owls")).toContainText("NO");
   await gp.getByRole("button", { name: "Roster" }).click();
   await expect(gp.getByTestId("member-card")).toHaveCount(5);
   await guest.close();

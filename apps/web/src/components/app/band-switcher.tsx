@@ -19,6 +19,20 @@ export interface BandSummary {
   imageUrl?: string | null;
 }
 
+/** Skips leading articles; two words give their first letters, one word its first two. */
+export function bandInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const rest =
+    words.length > 1 && /^(the|a|an)$/i.test(words[0]!)
+      ? words.slice(1)
+      : words;
+  const letters =
+    rest.length > 1
+      ? `${rest[0]![0]}${rest[1]![0]}`
+      : (rest[0] ?? "").slice(0, 2);
+  return letters.toUpperCase();
+}
+
 export function BandAvatar({
   band,
   className,
@@ -34,10 +48,7 @@ export function BandAvatar({
       <AvatarFallback
         className={cn("rounded-xl text-sm font-semibold", toneFor(band.id))}
       >
-        {band.name
-          .replace(/^the\s+/i, "")
-          .slice(0, 2)
-          .toUpperCase()}
+        {bandInitials(band.name)}
       </AvatarFallback>
     </Avatar>
   );

@@ -12,7 +12,7 @@ import { findInstrument } from "@/components/app/instruments";
 import { AuthLayout, Brand } from "@/components/onboarding/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMe, useMyInstruments, useSaveProfile } from "@/lib/queries";
+import { useMe, useSaveProfile } from "@/lib/queries";
 import { safeRedirectTo, signInUrl } from "@/lib/redirect";
 
 const profileSchema = z.object({
@@ -42,10 +42,9 @@ function ProfileForm({ user, onDone }: { user: User; onDone: () => void }) {
     ),
   );
 
-  // The picker has its own form, so the submit button sits outside this one.
   return (
-    <div className="flex flex-col gap-6">
-      <form id="profile-form" noValidate onSubmit={submit}>
+    <form noValidate className="flex flex-col gap-6" onSubmit={submit}>
+      <div className="flex flex-col gap-6">
         <FormField label="Your name" htmlFor="displayName">
           <Input
             id="displayName"
@@ -59,7 +58,7 @@ function ProfileForm({ user, onDone }: { user: User; onDone: () => void }) {
             </p>
           ) : null}
         </FormField>
-      </form>
+      </div>
 
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium">What do you play?</p>
@@ -71,15 +70,10 @@ function ProfileForm({ user, onDone }: { user: User; onDone: () => void }) {
           We could not save your profile. Please try again.
         </p>
       ) : null}
-      <Button
-        type="submit"
-        form="profile-form"
-        size="lg"
-        disabled={save.isPending}
-      >
+      <Button type="submit" size="lg" disabled={save.isPending}>
         {save.isPending ? "Saving..." : "Continue"}
       </Button>
-    </div>
+    </form>
   );
 }
 
@@ -87,20 +81,10 @@ export function WelcomeView() {
   const router = useRouter();
   const dest = safeRedirectTo(useSearchParams().get("redirectTo"));
   const me = useMe();
-  const instruments = useMyInstruments(!!me.data);
-  const hasInstruments = instruments.data
-    ? instruments.data.presets.length + instruments.data.custom.length > 0
-    : null;
-  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     if (me.isSuccess && !me.data) router.replace(signInUrl("/welcome"));
   }, [me.isSuccess, me.data, router]);
-
-  // People who already filled in instruments (returning Google sign-ins) skip ahead.
-  useEffect(() => {
-    if (hasInstruments && !justSaved) router.replace(dest);
-  }, [hasInstruments, justSaved, dest, router]);
 
   return (
     <AuthLayout className="max-w-lg">
@@ -114,14 +98,8 @@ export function WelcomeView() {
         </p>
       </div>
       <div className="rounded-3xl border bg-card p-5 shadow-soft">
-        {me.data && hasInstruments === false ? (
-          <ProfileForm
-            user={me.data}
-            onDone={() => {
-              setJustSaved(true);
-              router.replace(dest);
-            }}
-          />
+        {me.data ? (
+          <ProfileForm user={me.data} onDone={() => router.replace(dest)} />
         ) : (
           <p
             role="status"
