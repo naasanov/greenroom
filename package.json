@@ -21,6 +21,7 @@
     "deploy:staging": "fly deploy . --config infra/fly/staging.api.toml --dockerfile apps/api/Dockerfile --remote-only && fly deploy . --config infra/fly/staging.web.toml --dockerfile apps/web/Dockerfile --remote-only"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "prettier": "^3.9.10",
     "turbo": "^2.11.9",
     "typescript": "^6.0.2"
