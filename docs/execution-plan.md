@@ -46,8 +46,8 @@ Parallel group 1A
 🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Approved (2026-10-20, after round 2 fixes passed CI and deployed to staging)
 
 # Phase 2: App shell
-- **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: In progress (wave 1 landed 2026-10-20: tabs in the URL, /settings page behind the profile icon, share button, last used band stored on the user; wave 2 running: web reads and writes the current band server-side)
-- **2.2 Deep links.** Routes for gigs, practice occurrences, songs; open the right view with drawer or sheet open; auto-switch band; share button (copy / native share). Status: In progress (link resolver API landed 2026-10-20; wave 2 running: /gigs, /practices, /songs routes with band auto-switch and drawers)
+- **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: Done (2026-10-20: tabs are routes /events, /library, /roster; /settings behind the profile icon with Personal and admin-only Band sections; current band stored on the user server-side)
+- **2.2 Deep links.** Routes for gigs, practice occurrences, songs; open the right view with drawer or sheet open; auto-switch band; share button (copy / native share). Status: Done (2026-10-20: /gigs/:id, /practices/:seriesId?date=, /songs/:id resolve via /links, switch band, open the drawer or sheet with a share button; event drawers show basic details until 3.1 and 3.3 replace them)
 
 # Phase 3: Core tabs
 Parallel group 3A
