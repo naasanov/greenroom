@@ -33,9 +33,9 @@ Things the orchestrator cannot fully do itself. Rule: hand work to the orchestra
 # Phase 0: Foundation
 Parallel group 0A
 - **0.1 Monorepo + stack scaffold.** pnpm/Turborepo; Next.js frontend, NestJS backend, shared types package (DTOs + Zod). TypeScript end to end. Status: Done
-- **0.2 Database.** Postgres, migrations, core schema (users, bands, memberships, roles, events, recurrence, songs, setlists, lineups, media metadata). Starting input: [data-model.md](./data-model.md), a rough draft only, not the source of truth; change it freely. Status: Not started
+- **0.2 Database.** Postgres, migrations, core schema (users, bands, memberships, roles, events, recurrence, songs, setlists, lineups, media metadata). Starting input: [data-model.md](./data-model.md), a rough draft only, not the source of truth; change it freely. Status: Done
 - **0.3 Infra.** Fly.io apps (frontend, backend, Postgres), Cloudflare DNS with app and API subdomains, staging environment, CI. Status: Not started
-- **0.4 Test harness.** Playwright setup, seeded test data, adapter interfaces + fakes for every external service. Status: Not started
+- **0.4 Test harness.** Playwright setup, seeded test data, adapter interfaces + fakes for every external service. Status: In progress (adapters + fakes in wave 1; Playwright + seeding after 0.2 lands)
 
 # Phase 1: Component library + Auth
 Parallel group 1A
@@ -68,7 +68,7 @@ Parallel group 3A
 Parallel group 5A
 - **5.1 Google Calendar sync.** Lazy link banner, dedicated band calendar, members as attendees, two-way sync with etags and last-write-wins, delete wins, recurrence round-trip, RSVPs mapped to attendee status (accepted / tentative / declined / needs action), single RSVP list in the practice drawer. Status: Not started
 - **5.2 Google Drive link.** Unlinked state, Google sign-in + Picker, full drive scope, Gigs folder structure, file-ID references, changes-API poller, missing-file placeholders. Status: Not started
-- **5.3 Spotify user auth.** Lazy login, export library/setlist to playlist (skipped-songs message), private playlist import with retry flow. Status: Not started
+- **5.3 Spotify user auth.** Add a Spotify user-OAuth adapter + fake (auth URL, code exchange, refresh; not in the 0.4 adapter set). Lazy login, export library/setlist to playlist (skipped-songs message), private playlist import with retry flow. Status: Not started
 
 # Phase 6: Media
 - **6.1 Upload backend.** Server-brokered chunked uploads to Drive resumable sessions, progress tracking, resume/skip on re-add. Status: Not started

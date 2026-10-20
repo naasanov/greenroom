@@ -1,0 +1,69 @@
+export const SPOTIFY = Symbol("SPOTIFY");
+
+export interface SpotifyTrack {
+  id: string;
+  uri: string;
+  url: string;
+  title: string;
+  artists: string[];
+  album: string;
+  albumArtUrl: string | null;
+  durationMs: number;
+}
+
+export interface SpotifyPlaylist {
+  id: string;
+  url: string;
+  name: string;
+  tracks: SpotifyTrack[];
+}
+
+export type SpotifyTrackResult =
+  { status: "ok"; track: SpotifyTrack } | { status: "not-found" };
+
+/** Private and nonexistent playlists are indistinguishable to the API. */
+export type SpotifyPlaylistResult =
+  | { status: "ok"; playlist: SpotifyPlaylist }
+  | { status: "not-found-or-private" };
+
+export type SpotifyWriteResult =
+  { status: "ok" } | { status: "unauthorized" } | { status: "not-found" };
+
+export type SpotifyCreatePlaylistResult =
+  | { status: "ok"; playlist: Omit<SpotifyPlaylist, "tracks"> }
+  | { status: "unauthorized" };
+
+export interface SpotifyAdapter {
+  /** App-level (client credentials) operations. */
+  searchTracks(query: string, limit?: number): Promise<SpotifyTrack[]>;
+  /** Accepts a bare id, a spotify: URI, or an open.spotify.com URL. */
+  getTrack(idOrUrl: string): Promise<SpotifyTrackResult>;
+  getPublicPlaylist(idOrUrl: string): Promise<SpotifyPlaylistResult>;
+
+  /** User-level operations take the user's access token. */
+  createPlaylist(
+    userToken: string,
+    input: { name: string; description?: string; isPublic?: boolean },
+  ): Promise<SpotifyCreatePlaylistResult>;
+  addTracksToPlaylist(
+    userToken: string,
+    playlistId: string,
+    trackUris: string[],
+  ): Promise<SpotifyWriteResult>;
+  getPrivatePlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistResult>;
+}
+
+/** Extracts a Spotify id from an id, URI, or URL; null if nothing plausible. */
+export function parseSpotifyId(idOrUrl: string): string | null {
+  const s = idOrUrl.trim();
+  const m =
+    /spotify:(?:track|playlist):([A-Za-z0-9_-]+)/.exec(s) ??
+    /open\.spotify\.com\/(?:intl-[a-z]+\/)?(?:track|playlist)\/([A-Za-z0-9_-]+)/.exec(
+      s,
+    );
+  if (m?.[1]) return m[1];
+  return /^[A-Za-z0-9_-]+$/.test(s) ? s : null;
+}

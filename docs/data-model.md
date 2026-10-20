@@ -1,40 +1,21 @@
-# Greenroom Data Model (DRAFT)
+# Greenroom Data Model
 
-> **DRAFT. Not the source of truth.** This is a rough starting sketch of entities, fields, and relationships, written before any code. [design.md](./design.md) is the source of truth for behavior. The orchestrator should treat this page as input only and is free to change, rename, split, or drop anything here while doing task 0.2 and the Phase 0 foundation. Once the real schema exists, the schema code is authoritative; update or replace this page to match it.
+The authoritative schema is the Drizzle code in `packages/db/src/schema` (one file per area). Migrations are in `packages/db/migrations`. This page is a short map.
 
-# Users & bands
-- **User:** id, email (unique), display name, avatar URL, Google account id (nullable), created at.
-- **Session / magic link token:** id, user id, token hash, expires at, used at.
-- **Band:** id, name, slug (for public calendar), profile image, bio/links for public page, Google Drive root folder id (nullable), linked-by user id, Google Calendar id (nullable), created at.
-- **Membership:** band id, user id, role (admin | member), joined at. Unique on band + user.
-- **Member instrument:** membership id, instrument (preset key or custom text). Many per member.
-- **Invite link:** band id, token, created by, revoked at. Reset = revoke + new.
-- **OAuth connection:** user id, provider (google | spotify), scopes, encrypted refresh token, access token expiry.
+## Conventions
+- uuid ids (`defaultRandom()`), `timestamptz` everywhere, `created_at`/`updated_at` on mutable tables.
+- Soft delete (`deleted_at`) on songs, gigs, practice_series, media_items. Memberships soft-leave via `left_at`.
+- Top-level band-owned tables and the practice, lineup, setlist-link and media tables carry an indexed `band_id`. Pure child tables (song_links, setlist_items, member_instruments) are scoped through their parent.
 
-# Events
-- **Event:** id, band id, type (gig | practice), title, start, end, all-day flag, time zone, notes, created by, Google Calendar event id + etag, updated at, deleted at.
-- **Gig details:** event id, venue name, address, Google Place id, lat/lng, load-in time, set time, pay, contact, public flag, Drive media folder id.
-- **Practice series:** id, band id, RRULE string, start, time zone, location. Practices are events generated from or overriding the series.
-- **Practice exception:** series id, original occurrence start, cancelled flag or override event id. Supports this / this and following / all.
-- **RSVP:** event id (or series id + occurrence start), user id, status (going | maybe | not going | no response). Maps to Google attendee status accepted / tentative / declined / needs action.
+## Tables
+- **users.ts:** users (google_sub column, no separate identities table), magic_link_tokens, sessions, oauth_connections (google | spotify, encrypted refresh token).
+- **bands.ts:** bands (slug, resettable `public_calendar_token`, Drive/Calendar link columns), memberships (admin | member, partial unique index on active band+user), member_instruments (preset_key xor custom_name), invite_links.
+- **gigs.ts:** gigs (required `date`, nullable `starts_at`, `all_day`, `time_zone`, venue/contact, Drive folder, gcal id + etag), gig_lineup (gig to membership).
+- **practices.ts:** practice_series (RRULE + dtstart + time zone, expanded on read, never materialized; a one-off is COUNT=1), practice_occurrence_overrides (unique per series + original_start), practice_rsvps (series + original_start + user), practice_setlist_assignments (forward | single scope; resolution rule is documented in the schema file).
+- **music.ts:** songs, song_links (label/value/position), setlists, setlist_items, gig_setlists (one setlist per gig).
+- **media.ts:** media_folders, media_items (null folder = Unsorted; `trashed_at` mirrors Drive, `deleted_at` is app soft delete), upload_sessions, public_upload_links.
+- **sync.ts:** drive_sync_cursors, calendar_sync_states (one row per band).
+- **feedback.ts:** feedback.
 
-# Music
-- **Song:** id, band id, title, artist, duration seconds, key, tempo, notes, Spotify track id, YouTube URL, Songsterr URL, created at, deleted at.
-- **Song link:** song id, URL, label.
-- **Setlist:** id, band id, event id or practice series id (+ effective-from occurrence for this-and-following), name.
-- **Setlist item:** setlist id, song id, position, per-item note.
-- **Lineup entry:** event id, user id (who is playing that gig).
-
-# Media
-- **Media item:** id, band id, event id (nullable = Unsorted), Drive file id, file name, mime type, size, thumbnail, uploaded by (user or public link), created at, missing flag (from changes poller).
-- **Upload session:** id, media target, Drive resumable session URL, bytes received, total bytes, status.
-- **Public upload link:** id, band id, event id (nullable), token, expires at, revoked at, max file size, allowed types.
-- **Drive sync cursor:** band id, changes page token, last polled at.
-
-# Other
-- **Feedback:** id, user id, band id, message, page URL, GitHub issue number, created at.
-- **Calendar sync state:** band id, sync token, last synced at.
-
-# Open questions for the orchestrator
-- Whether practices should be fully materialized rows or expanded on read from the RRULE.
-- Whether RSVPs on recurring practices key off occurrence start time or a materialized event id.
+## Resolved questions
+- Practices are expanded on read from the RRULE; RSVPs key off (series_id, original_start, user_id).
