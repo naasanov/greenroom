@@ -59,8 +59,8 @@ Parallel group 3A
 🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Not started
 
 # Phase 4: Setlists + lineup
-- **4.1 Setlists.** Library drawer beside the event drawer with drag-in, phone tap-to-add fallback, drag-to-reorder, running total time, duplicate a past setlist (search gig history), add-song-in-place (adds to library and setlist), practice setlists with this-and-following + custom-setlist warning. Status: Not started
-- **4.2 Lineup.** Roster drawer with the same drag/tap mechanic, default full band, copy-from-last-gig button. Status: Not started
+- **4.1 Setlists.** Library drawer beside the event drawer with drag-in, phone tap-to-add fallback, drag-to-reorder, running total time, duplicate a past setlist (search gig history), add-song-in-place (adds to library and setlist), practice setlists with this-and-following + custom-setlist warning. Status: In progress (backend API started 2026-10-20; UI waits for Gates 1-2)
+- **4.2 Lineup.** Roster drawer with the same drag/tap mechanic, default full band, copy-from-last-gig button. Status: In progress (backend API started 2026-10-20 with 4.1; UI waits for Gates 1-2)
 
 🛑 **GATE 3: Setlist and lineup feel review** (drag on desktop, tap fallback on phone). Status: Not started
 
@@ -95,7 +95,7 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
-- (none yet)
+- Where do user and band photos live (personal/band settings)? Options: Google profile photo URL only, a small object store (e.g. Tigris on Fly), or the band's Drive. Blocks photo upload in 3.4; not urgent.
 
 # Temporary
 - **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (live)
