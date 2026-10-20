@@ -98,4 +98,4 @@ Parallel group 7A
 - (none yet)
 
 # Temporary
-- **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (deploying with the next green CI run)
+- **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done, not deployed yet (CI on 1923911 failed on one timing-sensitive sheet animation test; deflaking, then redeploy)
