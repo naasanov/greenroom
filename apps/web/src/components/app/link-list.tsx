@@ -12,13 +12,18 @@ export interface LinkRow {
   value: string;
 }
 
-/** Returns a URL when the text looks like a link or bare domain. */
+const BARE_HOST =
+  /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?$/i;
+
+/** Returns a URL for explicit http(s) links and bare hostnames, else null. */
 export function parseLink(value: string): URL | null {
   const text = value.trim();
   if (!text || /\s/.test(text)) return null;
+  const explicit = /^https?:\/\//i.test(text);
+  if (!explicit && !BARE_HOST.test(text)) return null;
   try {
-    const url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
-    return url.hostname.includes(".") ? url : null;
+    const url = new URL(explicit ? text : `https://${text}`);
+    return /^(?:[^.]+\.)+[a-z]{2,}$/i.test(url.hostname) ? url : null;
   } catch {
     return null;
   }
@@ -49,7 +54,8 @@ function Favicon({ host }: { host: string | null }) {
 }
 
 /**
- * Label | value rows. Read mode renders links with the site favicon;
+ * Label | value rows. Read mode renders real URLs as links with the site favicon
+ * and anything else as plain text;
  * edit mode renders inputs with a remove button and an add-row button.
  */
 export function LinkList({
@@ -70,43 +76,54 @@ export function LinkList({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {rows.length === 0 && !editing ? (
-        <p className="text-sm text-muted-foreground">No links yet.</p>
+        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
       ) : null}
       {rows.map((row) => {
         const url = parseLink(row.value);
         if (!editing) {
-          const content = (
-            <>
-              <Favicon host={url?.hostname ?? null} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
-                  {row.label || url?.hostname || "Link"}
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {row.value}
-                </span>
-              </span>
-              {url ? (
-                <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
-              ) : null}
-            </>
-          );
           const base =
-            "flex min-h-14 items-center gap-3 rounded-2xl border bg-card px-3 py-2 shadow-soft";
-          return url ? (
+            "flex min-h-14 items-center gap-3 rounded-2xl border bg-card px-4 py-2 shadow-soft";
+          if (!url) {
+            return (
+              <div key={row.id} data-testid="reference-text" className={base}>
+                <span className="min-w-0 flex-1">
+                  {row.label ? (
+                    <span className="block text-sm font-medium">
+                      {row.label}
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "block text-sm break-words",
+                      row.label && "text-muted-foreground",
+                    )}
+                  >
+                    {row.value}
+                  </span>
+                </span>
+              </div>
+            );
+          }
+          return (
             <a
               key={row.id}
               href={url.href}
               target="_blank"
               rel="noreferrer noopener"
-              className={cn(base, "transition-colors hover:bg-muted")}
+              data-testid="reference-link"
+              className={cn(base, "px-3 transition-colors hover:bg-muted")}
             >
-              {content}
+              <Favicon host={url.hostname} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {row.label || url.hostname}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {row.value}
+                </span>
+              </span>
+              <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
             </a>
-          ) : (
-            <div key={row.id} className={base}>
-              {content}
-            </div>
           );
         }
         return (
@@ -123,14 +140,14 @@ export function LinkList({
                 value={row.label}
                 onChange={(e) => update(row.id, { label: e.target.value })}
                 placeholder="Label"
-                aria-label="Link label"
+                aria-label="Reference label"
                 className="sm:w-2/5"
               />
               <Input
                 value={row.value}
                 onChange={(e) => update(row.id, { value: e.target.value })}
                 placeholder="Link or text"
-                aria-label="Link value"
+                aria-label="Reference value"
                 inputMode="url"
                 autoCapitalize="none"
               />
@@ -159,7 +176,7 @@ export function LinkList({
             ])
           }
         >
-          <Plus /> Add link
+          <Plus /> Add row
         </Button>
       ) : null}
     </div>

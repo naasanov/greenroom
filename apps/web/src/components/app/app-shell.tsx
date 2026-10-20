@@ -13,10 +13,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Placement, ShellLayout } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
 
-export type TabKey = "calendar" | "library" | "roster";
+export type TabKey = "events" | "library" | "roster";
 
 export const NAV_TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
-  { key: "calendar", label: "Calendar", icon: Calendar },
+  { key: "events", label: "Events", icon: Calendar },
   { key: "library", label: "Music Library", icon: ListMusic },
   { key: "roster", label: "Roster", icon: Users },
 ];

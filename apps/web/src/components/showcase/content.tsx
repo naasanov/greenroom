@@ -173,16 +173,16 @@ export function LinksSection() {
   return (
     <Section
       id="links"
-      title="Key-value links"
-      description="Label and value rows. Links show the site favicon in read mode; edit mode adds inputs and an add-row button."
+      title="Reference"
+      description="Label and value rows for links and plain facts like key or tempo. Only real URLs render as links with the site favicon; edit mode adds inputs and an add-row button."
     >
-      <Demo title="Link list" className="flex max-w-xl flex-col gap-3">
+      <Demo title="Reference list" className="flex max-w-xl flex-col gap-3">
         <Button
           variant="secondary"
           className="self-start"
           onClick={() => setEditing((e) => !e)}
         >
-          {editing ? "Done" : "Edit links"}
+          {editing ? "Done" : "Edit reference"}
         </Button>
         <LinkList rows={rows} onChange={setRows} editing={editing} />
       </Demo>

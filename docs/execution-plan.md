@@ -98,4 +98,4 @@ Parallel group 7A
 - (none yet)
 
 # Temporary
-- **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: In progress (agent building it, 2026-10-20)
+- **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (deploying with the next green CI run)

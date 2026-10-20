@@ -20,9 +20,9 @@ import { useCurrentBand } from "@/lib/current-band";
 import { useMe, useSignOut } from "@/lib/queries";
 
 const PLACEHOLDERS = {
-  calendar: {
+  events: {
     icon: Calendar,
-    title: "Calendar",
+    title: "Events",
     description: "Gigs and practices will live here soon.",
   },
   library: {
@@ -37,7 +37,7 @@ export function HomeView() {
   const { bands, currentBand, setCurrentBandId } = useCurrentBand();
   const me = useMe().data;
   const signOut = useSignOut();
-  const [tab, setTab] = useState<TabKey>("calendar");
+  const [tab, setTab] = useState<TabKey>("events");
   const [profileOpen, setProfileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -111,7 +111,7 @@ export function HomeView() {
             onCreated={(band) => {
               setCurrentBandId(band.id);
               setCreateOpen(false);
-              setTab("calendar");
+              setTab("events");
             }}
           />
         </DialogContent>

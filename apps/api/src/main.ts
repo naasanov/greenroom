@@ -8,6 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Behind the Fly proxy, req.ip must come from X-Forwarded-For.
   if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+  app.enableShutdownHooks();
   app.use(cookieParser());
   const origins = (process.env.WEB_ORIGIN ?? "")
     .split(",")

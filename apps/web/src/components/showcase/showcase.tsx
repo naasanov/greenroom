@@ -37,7 +37,7 @@ const NAV = [
   ["selection", "Selection"],
   ["dialogs", "Dialogs"],
   ["people", "People"],
-  ["links", "Links"],
+  ["links", "Reference"],
   ["empty", "Empty"],
 ] as const;
 

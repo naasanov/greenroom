@@ -2,3 +2,5 @@ export * from "./health.js";
 export * from "./auth.js";
 export * from "./instruments.js";
 export * from "./bands.js";
+export * from "./songs.js";
+export * from "./events.js";

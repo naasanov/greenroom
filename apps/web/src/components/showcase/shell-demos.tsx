@@ -60,7 +60,7 @@ function ShellDemo({
           className="mx-auto flex max-w-2xl flex-col gap-2.5 p-3 pb-24"
           data-testid={`${testId}-content`}
         >
-          {tab === "calendar" ? (
+          {tab === "events" ? (
             <>
               <AgendaCard {...AGENDA[1]} timeZone="UTC" past />
               <TodayLine />
@@ -99,7 +99,7 @@ function ShellDemo({
         </div>
       </AppShell>
 
-      {tab === "calendar" ? (
+      {tab === "events" ? (
         <Fab
           placement="contained"
           layout={layout}
@@ -156,7 +156,7 @@ export function ShellSection() {
         <ShellDemo
           layout="responsive"
           testId="shell-auto"
-          initialTab="calendar"
+          initialTab="events"
         />
       </Demo>
       <Demo
