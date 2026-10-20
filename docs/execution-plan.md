@@ -43,7 +43,7 @@ Parallel group 1A
 - **1.2 Auth.** Sign in with Google + email magic link in NestJS; sessions/cookies across subdomains (per-environment cookie names, see Hosting & domain in the design doc); post-login redirect to the original link. Status: Done
 - **1.3 Bands + onboarding.** Signup (no auto band), create band, invite link (handles existing and new accounts), instrument picker (preset + custom, multiple), admin/member roles, multiple bands. Status: Done
 
-🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Feedback (round 2, 2026-10-20: buttons and clickable elements lack the pointer cursor; tapping the check circle on a selectable horizontal card does not select it; the top of the right side sheet looks cut off; the empty attendees placeholder is not centered). Fixes committed (typecheck and lint pass); e2e and deploy pending because this machine could not reach GitHub or launch browsers. The gate passes once CI and the staging deploy are green. Round 1 fixes are deployed.
+🛑 **GATE 1: Component library review.** User reviews the showcase page on desktop and phone. Status: Approved (2026-10-20, after round 2 fixes passed CI and deployed to staging)
 
 # Phase 2: App shell
 - **2.1 Shell + navigation.** Three tabs (Events, Music Library, Roster); bottom bar on mobile, top tabs on desktop; band switcher next to profile icon; settings behind profile icon. Status: In progress (wave 1 running 2026-10-20: tabs in the URL, /settings page behind the profile icon, share button; backend storing the last used band on the user)
