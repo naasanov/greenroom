@@ -312,6 +312,12 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Public gig calendar link, with copy and reset buttons.
 - **Band profile for the public page:** social links (e.g. Instagram, TikTok, YouTube, Spotify), contact info (e.g. a booking email), and a free-form bio. These show at the top of the public gig calendar page alongside the band name and photo.
 
+# Persistence across sessions (decided 2026-10-20)
+- **Current band:** stored server-side on the user (last used band), so it follows them across devices. The app opens to it; deep links switch it.
+- **Current tab:** lives in the URL only. A reload keeps it; a fresh open lands on Events.
+- **Per device (local storage):** calendar month/week view, agenda gig/practice/both filter, library sort, media view density, and stage mode position (current song, per setlist) so a locked phone or reload mid-gig resumes on the same song.
+- **Not persisted:** unsaved form edits (the discard confirm covers them), collapsed media sections, scroll positions. Upload progress is already covered by "re-add to finish."
+
 # Shareable deep links (members only)
 - Every resource has its own URL so a link can be dropped in the group chat (e.g. "here's the gig, add the tabs there"). Not public: login required.
 - Routes like `/gigs/:id`, `/practices/:seriesId?date=...` (a single occurrence of a recurring practice needs its date), `/songs/:id`.
