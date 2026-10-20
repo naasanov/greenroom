@@ -12,6 +12,7 @@ import {
 import {
   createBandSchema,
   leaveBandSchema,
+  setCurrentBandSchema,
   setInstrumentsSchema,
   updateBandSchema,
   updateMemberRoleSchema,
@@ -23,6 +24,7 @@ import {
   type InvitePreview,
   type LeaveBand,
   type MyInstruments,
+  type SetCurrentBand,
   type SetInstruments,
   type UpdateBand,
   type UpdateMemberRole,
@@ -156,5 +158,19 @@ export class MyInstrumentsController {
     @Body(new ZodPipe(setInstrumentsSchema)) body: SetInstruments,
   ): Promise<MyInstruments> {
     return this.bands.setInstruments(user.id, body);
+  }
+}
+
+@Controller("me/current-band")
+export class MyCurrentBandController {
+  constructor(private readonly bands: BandsService) {}
+
+  @Put()
+  @HttpCode(204)
+  async put(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(setCurrentBandSchema)) body: SetCurrentBand,
+  ): Promise<void> {
+    await this.bands.setCurrentBand(user.id, body.bandId);
   }
 }

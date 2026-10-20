@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { AttendeeList } from "@/components/app/rsvp";
 import { InstrumentPicker } from "@/components/app/instrument-picker";
 import { LinkList, type LinkRow } from "@/components/app/link-list";
+import { ShareButton } from "@/components/app/share-button";
 import { ListCard } from "@/components/app/list-card";
 import { AgendaCard, EventChip, TodayLine } from "@/components/app/event-views";
 import { Demo, Section } from "@/components/showcase/section";
@@ -185,6 +186,12 @@ export function LinksSection() {
           {editing ? "Done" : "Edit reference"}
         </Button>
         <LinkList rows={rows} onChange={setRows} editing={editing} />
+      </Demo>
+      <Demo
+        title="Share link"
+        note="Copies the link on desktop (inline check), opens the native share sheet on touch devices."
+      >
+        <ShareButton path="/showcase" title="Greenroom showcase" />
       </Demo>
       <Demo title="Empty" className="flex max-w-xl flex-col gap-3">
         <LinkList rows={[]} />

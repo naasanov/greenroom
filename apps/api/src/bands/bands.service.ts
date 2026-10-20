@@ -77,6 +77,10 @@ export class BandsService {
       await tx
         .insert(memberships)
         .values({ bandId: band!.id, userId, role: "admin" });
+      await tx
+        .update(users)
+        .set({ lastBandId: band!.id })
+        .where(eq(users.id, userId));
       return toSummary(band!, "admin");
     });
   }
@@ -393,12 +397,37 @@ export class BandsService {
             isNull(memberships.leftAt),
           ),
         );
-      if (existing) return toSummary(band, existing.role);
+      if (!existing) {
+        await tx
+          .insert(memberships)
+          .values({ bandId: band.id, userId, role: "member" });
+      }
       await tx
-        .insert(memberships)
-        .values({ bandId: band.id, userId, role: "member" });
+        .update(users)
+        .set({ lastBandId: band.id })
+        .where(eq(users.id, userId));
+      if (existing) return toSummary(band, existing.role);
       return toSummary(band, "member");
     });
+  }
+
+  /** Sets the user's last used band; 404 unless they are an active member. */
+  async setCurrentBand(userId: string, bandId: string): Promise<void> {
+    const [m] = await this.db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.bandId, bandId),
+          eq(memberships.userId, userId),
+          isNull(memberships.leftAt),
+        ),
+      );
+    if (!m) throw new NotFoundException("Band not found");
+    await this.db
+      .update(users)
+      .set({ lastBandId: bandId })
+      .where(eq(users.id, userId));
   }
 }
 

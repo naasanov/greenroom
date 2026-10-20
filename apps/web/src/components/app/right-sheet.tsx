@@ -22,6 +22,7 @@ export function RightSheet({
   editing = false,
   onEditingChange,
   headerSlot,
+  headerActions,
   placement = "fixed",
   children,
   footer,
@@ -42,6 +43,8 @@ export function RightSheet({
   onEditingChange?: (editing: boolean) => void;
   /** Replaces the Edit button area entirely (e.g. a Save button). */
   headerSlot?: ReactNode;
+  /** Extra icon buttons shown before the Edit button / header slot. */
+  headerActions?: ReactNode;
   placement?: "fixed" | "contained";
   children?: ReactNode;
   footer?: ReactNode;
@@ -113,6 +116,7 @@ export function RightSheet({
             </Button>
           </div>
         ) : null}
+        {headerActions}
         {headerSlot ??
           (editable ? (
             <Button

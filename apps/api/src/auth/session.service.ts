@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import type { CookieOptions, Response } from "express";
-import { sessions, users, type Database } from "@greenroom/db";
+import { memberships, sessions, users, type Database } from "@greenroom/db";
 import type { User } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { SESSION_TTL_MS, sessionCookieName } from "./auth.constants.js";
@@ -72,7 +72,7 @@ export class SessionService {
         .set({ expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
         .where(eq(sessions.id, row.sessionId));
     }
-    return toUser(row.user);
+    return toUser(this.db, row.user);
   }
 
   async destroy(token: string): Promise<void> {
@@ -82,11 +82,30 @@ export class SessionService {
   }
 }
 
-export function toUser(row: typeof users.$inferSelect): User {
+/** The user DTO; `lastBandId` is null unless the user is still an active member of it. */
+export async function toUser(
+  db: Database,
+  row: typeof users.$inferSelect,
+): Promise<User> {
+  let lastBandId: string | null = null;
+  if (row.lastBandId) {
+    const [m] = await db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.bandId, row.lastBandId),
+          eq(memberships.userId, row.id),
+          isNull(memberships.leftAt),
+        ),
+      );
+    if (m) lastBandId = row.lastBandId;
+  }
   return {
     id: row.id,
     email: row.email,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
+    lastBandId,
   };
 }

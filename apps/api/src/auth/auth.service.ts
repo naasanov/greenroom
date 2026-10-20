@@ -55,18 +55,20 @@ export class AuthService {
       .select()
       .from(users)
       .where(eq(users.email, email));
-    if (existing) return { user: toUser(existing), isNewUser: false };
+    if (existing)
+      return { user: await toUser(this.db, existing), isNewUser: false };
     const [created] = await this.db
       .insert(users)
       .values({ email, displayName: email.split("@")[0] || email })
       .onConflictDoNothing()
       .returning();
-    if (created) return { user: toUser(created), isNewUser: true };
+    if (created)
+      return { user: await toUser(this.db, created), isNewUser: true };
     const [raced] = await this.db
       .select()
       .from(users)
       .where(eq(users.email, email));
-    return { user: toUser(raced!), isNewUser: false };
+    return { user: await toUser(this.db, raced!), isNewUser: false };
   }
 
   /** Finds by google_sub, else links by verified email, else creates. */
@@ -81,7 +83,7 @@ export class AuthService {
       .select()
       .from(users)
       .where(eq(users.googleSub, profile.sub));
-    if (bySub) return { user: toUser(bySub), isNewUser: false };
+    if (bySub) return { user: await toUser(this.db, bySub), isNewUser: false };
 
     const [byEmail] = await this.db
       .select()
@@ -97,7 +99,7 @@ export class AuthService {
         })
         .where(eq(users.id, byEmail.id))
         .returning();
-      return { user: toUser(linked!), isNewUser: false };
+      return { user: await toUser(this.db, linked!), isNewUser: false };
     }
     const [created] = await this.db
       .insert(users)
@@ -108,7 +110,7 @@ export class AuthService {
         googleSub: profile.sub,
       })
       .returning();
-    return { user: toUser(created!), isNewUser: true };
+    return { user: await toUser(this.db, created!), isNewUser: true };
   }
 
   async updateProfile(
@@ -123,14 +125,14 @@ export class AuthService {
         .select()
         .from(users)
         .where(eq(users.id, userId));
-      return toUser(u!);
+      return await toUser(this.db, u!);
     }
     const [updated] = await this.db
       .update(users)
       .set(set)
       .where(eq(users.id, userId))
       .returning();
-    return toUser(updated!);
+    return await toUser(this.db, updated!);
   }
 
   newNonce(): string {

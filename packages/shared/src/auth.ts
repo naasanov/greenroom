@@ -5,6 +5,7 @@ export const userSchema = z.object({
   email: z.string(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
+  lastBandId: z.string().uuid().nullable(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -34,3 +35,6 @@ export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 
 export const meResponseSchema = userSchema;
 export type MeResponse = z.infer<typeof meResponseSchema>;
+
+export const setCurrentBandSchema = z.object({ bandId: z.string().uuid() });
+export type SetCurrentBand = z.infer<typeof setCurrentBandSchema>;

@@ -7,6 +7,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { BandSwitcher, type BandSummary } from "@/components/app/band-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,6 +15,9 @@ import type { Placement, ShellLayout } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
 
 export type TabKey = "events" | "library" | "roster";
+
+/** When set, tabs render as links to this href instead of buttons. */
+export type TabHref = (tab: TabKey) => string;
 
 export const NAV_TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "events", label: "Events", icon: Calendar },
@@ -32,16 +36,44 @@ const SHOW_TOP_TABS: Record<ShellLayout, string> = {
   desktop: "flex",
 };
 
+/** A tab control: a link when it has an href, otherwise a button. */
+function TabItem({
+  href,
+  children,
+  ...props
+}: {
+  href?: string;
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+  "aria-current"?: "page";
+}) {
+  if (href) {
+    return (
+      <Link href={href} {...props}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" {...props}>
+      {children}
+    </button>
+  );
+}
+
 /** Mobile bottom tab bar (tap only). Hidden on desktop in responsive layout. */
 export function BottomTabBar({
   active,
   onChange,
+  tabHref,
   layout = "responsive",
   placement = "fixed",
   className,
 }: {
-  active: TabKey;
+  active: TabKey | null;
   onChange?: (tab: TabKey) => void;
+  tabHref?: TabHref;
   layout?: ShellLayout;
   placement?: Placement;
   className?: string;
@@ -62,8 +94,8 @@ export function BottomTabBar({
           const isActive = t.key === active;
           return (
             <li key={t.key} className="flex">
-              <button
-                type="button"
+              <TabItem
+                href={tabHref?.(t.key)}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onChange?.(t.key)}
                 className={cn(
@@ -83,7 +115,7 @@ export function BottomTabBar({
                   />
                 </span>
                 {t.label}
-              </button>
+              </TabItem>
             </li>
           );
         })}
@@ -96,11 +128,13 @@ export function BottomTabBar({
 export function TopTabs({
   active,
   onChange,
+  tabHref,
   layout = "responsive",
   className,
 }: {
-  active: TabKey;
+  active: TabKey | null;
   onChange?: (tab: TabKey) => void;
+  tabHref?: TabHref;
   layout?: ShellLayout;
   className?: string;
 }) {
@@ -113,9 +147,9 @@ export function TopTabs({
       {NAV_TABS.map((t) => {
         const isActive = t.key === active;
         return (
-          <button
+          <TabItem
             key={t.key}
-            type="button"
+            href={tabHref?.(t.key)}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onChange?.(t.key)}
             className={cn(
@@ -127,7 +161,7 @@ export function TopTabs({
           >
             <t.icon className="size-[1.125rem]" />
             {t.label}
-          </button>
+          </TabItem>
         );
       })}
     </nav>
@@ -166,7 +200,7 @@ export function ProfileButton({
 
 /**
  * Top bar (band switcher, desktop tabs, profile) + content + mobile tab bar.
- * Presentational: the active tab comes from props, routing is wired later.
+ * Presentational: the active tab comes from props; pass tabHref to make tabs links.
  */
 export function AppShell({
   bands,
@@ -175,6 +209,7 @@ export function AppShell({
   onCreateBand,
   activeTab,
   onTabChange,
+  tabHref,
   profile,
   onProfileClick,
   layout = "responsive",
@@ -186,8 +221,10 @@ export function AppShell({
   activeBandId: string;
   onBandChange?: (id: string) => void;
   onCreateBand?: () => void;
-  activeTab: TabKey;
+  /** Null on pages outside the tabs (e.g. settings). */
+  activeTab: TabKey | null;
   onTabChange?: (tab: TabKey) => void;
+  tabHref?: TabHref;
   profile?: { name?: string; imageUrl?: string | null };
   onProfileClick?: () => void;
   layout?: ShellLayout;
@@ -222,6 +259,7 @@ export function AppShell({
           <TopTabs
             active={activeTab}
             onChange={onTabChange}
+            tabHref={tabHref}
             layout={layout}
             className="ml-3"
           />
@@ -244,6 +282,7 @@ export function AppShell({
       <BottomTabBar
         active={activeTab}
         onChange={onTabChange}
+        tabHref={tabHref}
         layout={layout}
         placement={placement}
       />

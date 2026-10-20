@@ -1,4 +1,12 @@
-import { index, pgEnum, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  uuid,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
+import { bands } from "./bands.js";
 import { createdAt, id, tstz, updatedAt } from "./helpers.js";
 
 export const users = pgTable("users", {
@@ -7,6 +15,9 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   googleSub: text("google_sub").unique(),
+  lastBandId: uuid("last_band_id").references((): AnyPgColumn => bands.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -59,7 +59,7 @@ test("new user signs in by magic link, sets up a profile, and creates a band", a
   await expect(
     page.getByRole("button", { name: "Switch band, current: The Newcomers" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Roster" }).click();
+  await page.getByRole("link", { name: "Roster" }).click();
   const card = page.getByTestId("member-card");
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("Nina New");
@@ -80,7 +80,7 @@ test("protected routes redirect to sign-in and return after login", async ({
   await expect(
     page.getByRole("button", { name: /Switch band, current: The Night Owls/ }),
   ).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page).toHaveURL(/\/events$/);
 });
 
 test("sign-in shows Google callback errors", async ({ page }) => {
@@ -104,6 +104,7 @@ test("sign out returns to sign-in and protects the app again", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/");
   await page.getByRole("button", { name: "Profile and settings" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText(USERS.ava.email)).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
@@ -152,7 +153,7 @@ test("invite flow: admin shares the link, a new user signs in, joins, and sees t
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
   await page.goto("/");
-  await page.getByRole("button", { name: "Roster" }).click();
+  await page.getByRole("link", { name: "Roster" }).click();
   await page.getByRole("button", { name: "Invite link" }).click();
   const field = page.getByLabel("Invite link", { exact: true });
   await expect(field).toHaveValue(/\/invite\/.+/);
@@ -187,7 +188,7 @@ test("invite flow: admin shares the link, a new user signs in, joins, and sees t
   await gp.getByRole("button", { name: "Join The Night Owls" }).click();
   await expect(switcher(gp, "The Night Owls")).toBeVisible();
   await expect(switcher(gp, "The Night Owls")).toContainText("NO");
-  await gp.getByRole("button", { name: "Roster" }).click();
+  await gp.getByRole("link", { name: "Roster" }).click();
   await expect(gp.getByTestId("member-card")).toHaveCount(5);
   await guest.close();
 });

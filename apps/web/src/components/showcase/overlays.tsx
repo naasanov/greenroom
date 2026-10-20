@@ -13,6 +13,7 @@ import { FormField } from "@/components/app/form-field";
 import { LinkList, type LinkRow } from "@/components/app/link-list";
 import { ListCard } from "@/components/app/list-card";
 import { RightSheet } from "@/components/app/right-sheet";
+import { ShareButton } from "@/components/app/share-button";
 import { SplitDrawer } from "@/components/app/split-drawer";
 import { Demo, Section } from "@/components/showcase/section";
 import { SONGS, type Song } from "@/components/showcase/sample-data";
@@ -377,6 +378,14 @@ export function SheetSection() {
         editable={index !== -1}
         editing={editing}
         onEditingChange={setEditing}
+        headerActions={
+          index !== null && index >= 0 ? (
+            <ShareButton
+              path={`/library?song=${song?.id}`}
+              title={song?.title ?? "Song"}
+            />
+          ) : undefined
+        }
         headerSlot={
           index === -1 ? (
             <Button className="w-[5.5rem]" onClick={() => setIndex(null)}>
