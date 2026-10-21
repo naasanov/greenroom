@@ -21,13 +21,11 @@ test("/ lands on Events and tabs navigate with browser history", async ({
     "aria-current",
     "page",
   );
-  await expect(
-    page.getByText("Gigs and practices will live here"),
-  ).toBeVisible();
+  await expect(page.getByTestId("calendar")).toBeVisible();
 
   await tabs.getByRole("link", { name: "Music Library" }).click();
   await expect(page).toHaveURL(/\/library$/);
-  await expect(page.getByText("Your band's songs and setlists")).toBeVisible();
+  await expect(page.getByTestId("library-tab")).toBeVisible();
 
   await tabs.getByRole("link", { name: "Roster" }).click();
   await expect(page).toHaveURL(/\/roster$/);
@@ -35,7 +33,7 @@ test("/ lands on Events and tabs navigate with browser history", async ({
 
   await page.goBack();
   await expect(page).toHaveURL(/\/library$/);
-  await expect(page.getByText("Your band's songs and setlists")).toBeVisible();
+  await expect(page.getByTestId("library-tab")).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/events$/);
 });

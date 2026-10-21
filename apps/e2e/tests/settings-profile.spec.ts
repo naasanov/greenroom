@@ -37,6 +37,7 @@ test("member edits their name and instruments", async ({
   expect(row?.displayName).toBe("Dev Deluxe");
 
   await page.getByRole("link", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/events$/);
   await page.goto("/roster");
   const mine = page
     .getByTestId("member-card")

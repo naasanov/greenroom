@@ -47,6 +47,8 @@ export function SplitDrawer({
   right,
   view: viewProp,
   onViewChange,
+  dismissible = true,
+  onDismissAttempt,
   className,
 }: {
   open: boolean;
@@ -57,6 +59,12 @@ export function SplitDrawer({
   right: SplitSide;
   view?: SplitView;
   onViewChange?: (view: SplitView) => void;
+  /**
+   * When false, outside taps, Escape, the close button and swipes call
+   * onDismissAttempt instead of closing (for forms with unsaved input).
+   */
+  dismissible?: boolean;
+  onDismissAttempt?: () => void;
   className?: string;
 }) {
   const [innerView, setInnerView] = useState<SplitView>("split");
@@ -103,17 +111,27 @@ export function SplitDrawer({
   }
 
   const index = view === "left" ? 0 : view === "split" ? 1 : 2;
+  const requestClose = () =>
+    dismissible ? onOpenChange(false) : onDismissAttempt?.();
 
   return (
     <Drawer
       open={open}
+      dismissible={dismissible}
       onOpenChange={(next) => {
         if (next) setView("split");
         onOpenChange(next);
       }}
     >
       <DrawerContent
-        onPointerDownOutside={() => onOpenChange(false)}
+        onPointerDownOutside={dismissible ? requestClose : undefined}
+        onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
+        onEscapeKeyDown={(e) => {
+          if (!dismissible) {
+            e.preventDefault();
+            onDismissAttempt?.();
+          }
+        }}
         className={cn(
           "mx-auto h-[min(34rem,88dvh)] w-full max-w-lg data-[vaul-drawer-direction=bottom]:mt-12 data-[vaul-drawer-direction=bottom]:max-h-[90dvh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:shadow-lift",
           className,
@@ -147,7 +165,7 @@ export function SplitDrawer({
             size="icon"
             aria-label="Close"
             className="absolute right-2 text-muted-foreground"
-            onClick={() => onOpenChange(false)}
+            onClick={requestClose}
           >
             <X />
           </Button>

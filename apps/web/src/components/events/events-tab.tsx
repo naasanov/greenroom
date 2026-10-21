@@ -1,0 +1,319 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { CalendarEvent, PracticeEditResult } from "@greenroom/shared";
+import { Fab } from "@/components/app/fab";
+import { CreateEventDrawer } from "@/components/events/create-drawer";
+import {
+  EventCalendar,
+  type CalendarMode,
+} from "@/components/events/event-calendar";
+import { GigDrawer } from "@/components/events/gig-drawer";
+import { PracticeDrawer } from "@/components/events/practice-drawer";
+import { NoAccess } from "@/components/onboarding/deep-link-views";
+import { useCurrentBand } from "@/lib/current-band";
+import { keys, useGig, usePracticeOccurrence } from "@/lib/queries";
+import {
+  useEvents,
+  useGigLinkFor,
+  usePracticeLinkFor,
+} from "@/lib/queries/events";
+
+// ---- calendar mode, persisted per device ----
+
+const MODE_KEY = "greenroom:calendar-mode";
+const modeListeners = new Set<() => void>();
+
+function readMode(): CalendarMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === "week" ? "week" : "month";
+  } catch {
+    return "month";
+  }
+}
+
+function writeMode(mode: CalendarMode) {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Storage can be blocked; the choice then lasts for this page load only.
+  }
+  modeListeners.forEach((l) => l());
+}
+
+function useCalendarMode(): [CalendarMode, (mode: CalendarMode) => void] {
+  const [session, setSession] = useState<CalendarMode | null>(null);
+  const stored = useSyncExternalStore(
+    (cb) => {
+      modeListeners.add(cb);
+      return () => void modeListeners.delete(cb);
+    },
+    readMode,
+    () => "month" as CalendarMode,
+  );
+  const set = useCallback((mode: CalendarMode) => {
+    setSession(mode);
+    writeMode(mode);
+  }, []);
+  return [session ?? stored, set];
+}
+
+// ---- URL-driven selection ----
+
+type Selection =
+  | { kind: "gig"; gigId: string }
+  | { kind: "practice"; seriesId: string; date: string | null };
+
+function parseSelection(
+  pathname: string,
+  date: string | null,
+): Selection | null {
+  const [, seg, id] = pathname.split("/");
+  if (seg === "gigs" && id) return { kind: "gig", gigId: id };
+  if (seg === "practices" && id) {
+    return { kind: "practice", seriesId: id, date };
+  }
+  return null;
+}
+
+function pathOf(sel: Selection | null): string {
+  if (!sel) return "/events";
+  if (sel.kind === "gig") return `/gigs/${sel.gigId}`;
+  return `/practices/${sel.seriesId}${sel.date ? `?date=${sel.date}` : ""}`;
+}
+
+/** Identity of a selection, independent of the URL's spelling. */
+function keyOf(sel: Selection | null): string {
+  if (!sel) return "none";
+  return sel.kind === "gig"
+    ? `gig:${sel.gigId}`
+    : `practice:${sel.seriesId}:${sel.date ?? ""}`;
+}
+
+/**
+ * The Events tab: calendar, create drawer and the event drawer. The open event
+ * mirrors the URL (`/gigs/:id`, `/practices/:id?date=`), but opening and closing
+ * update local state first so the drawer never waits on a navigation.
+ */
+export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const qc = useQueryClient();
+  const { currentBand, setCurrentBandId } = useCurrentBand();
+  const bandId = currentBand?.id;
+  const [mode, setMode] = useCalendarMode();
+
+  // Selection: local state mirrors the URL; `pending` holds a navigation we started.
+  const urlSelection = parseSelection(pathname, search.get("date"));
+  const urlKey = keyOf(urlSelection);
+  const [sel, setSel] = useState<Selection | null>(urlSelection);
+  const [prevUrlKey, setPrevUrlKey] = useState(urlKey);
+  const [pending, setPending] = useState<string | null>(null);
+  if (urlKey !== prevUrlKey) {
+    setPrevUrlKey(urlKey);
+    if (pending !== null) {
+      if (pending === urlKey) setPending(null);
+    } else {
+      setSel(urlSelection);
+    }
+  }
+  const selRef = useRef(sel);
+  useEffect(() => {
+    selRef.current = sel;
+  }, [sel]);
+
+  const go = useCallback(
+    (next: Selection | null, how: "push" | "replace") => {
+      selRef.current = next;
+      setSel(next);
+      setPending(keyOf(next) === urlKey ? null : keyOf(next));
+      router[how](pathOf(next));
+    },
+    [router, urlKey],
+  );
+
+  /** Closes `target` only if it is still the open event (late outside-tap closes are ignored). */
+  const close = useCallback(
+    (target: Selection) => {
+      if (keyOf(selRef.current) !== keyOf(target)) return;
+      go(null, "replace");
+    },
+    [go],
+  );
+
+  // Resolve the selection to a band and read its data.
+  const gigLink = useGigLinkFor(sel?.kind === "gig" ? sel.gigId : null);
+  const practiceLink = usePracticeLinkFor(
+    sel?.kind === "practice" ? sel.seriesId : null,
+    sel?.kind === "practice" ? sel.date : null,
+  );
+  const link = sel?.kind === "gig" ? gigLink : practiceLink;
+  const linkBandId = link.data?.bandId;
+  const gig = useGig(
+    sel?.kind === "gig" ? linkBandId : undefined,
+    sel?.kind === "gig" ? sel.gigId : "",
+  );
+  const occKey =
+    practiceLink.data && sel?.kind === "practice"
+      ? practiceLink.data.occurrenceKey
+      : null;
+  const occ = usePracticeOccurrence(
+    sel?.kind === "practice" ? linkBandId : undefined,
+    sel?.kind === "practice" ? sel.seriesId : "",
+    occKey,
+  );
+
+  // A link into another band switches to it once; a later manual switch closes the drawer.
+  const adopted = useRef<string | null>(null);
+  const prevBand = useRef(bandId);
+  useEffect(() => {
+    const was = prevBand.current;
+    prevBand.current = bandId;
+    if (!sel || !linkBandId) return;
+    const key = keyOf(sel);
+    if (adopted.current !== key) {
+      adopted.current = key;
+      if (bandId !== linkBandId) setCurrentBandId(linkBandId);
+      return;
+    }
+    if (was === linkBandId && bandId !== linkBandId) close(sel);
+  }, [sel, linkBandId, bandId, setCurrentBandId, close]);
+
+  // Calendar data.
+  const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const events = useEvents(bandId, range);
+  const onRangeChange = useCallback(
+    (next: { from: string; to: string }) =>
+      setRange((r) => (r?.from === next.from && r.to === next.to ? r : next)),
+    [],
+  );
+  const eventList = useMemo(() => events.data ?? [], [events.data]);
+  const fallbackTitle = useMemo(() => {
+    if (!sel) return undefined;
+    return eventList.find((e) =>
+      sel.kind === "gig"
+        ? e.id === sel.gigId
+        : e.type === "practice" && e.seriesId === sel.seriesId,
+    )?.title;
+  }, [eventList, sel]);
+
+  // Create drawer.
+  const [create, setCreate] = useState({ open: false, date: "", nonce: 0 });
+  const openCreate = (date: string) =>
+    setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
+  const [jumpDate, setJumpDate] = useState<string | undefined>();
+
+  function openEvent(ev: CalendarEvent) {
+    if (!bandId) return;
+    if (ev.type === "gig") {
+      qc.setQueryData(keys.link("gigs", ev.id), { bandId, gigId: ev.id });
+      go({ kind: "gig", gigId: ev.id }, "push");
+    } else {
+      qc.setQueryData(keys.link("practices", ev.seriesId, ev.date), {
+        bandId,
+        seriesId: ev.seriesId,
+        occurrenceKey: ev.occurrenceKey,
+      });
+      go({ kind: "practice", seriesId: ev.seriesId, date: ev.date }, "push");
+    }
+  }
+
+  function followEdit(result: PracticeEditResult) {
+    const next = result.occurrence;
+    if (!bandId || !next) return go(null, "replace");
+    qc.setQueryData(keys.link("practices", next.seriesId, next.date), {
+      bandId,
+      seriesId: next.seriesId,
+      occurrenceKey: next.occurrenceKey,
+    });
+    go(
+      { kind: "practice", seriesId: next.seriesId, date: next.date },
+      "replace",
+    );
+  }
+
+  if (link.isError && sel) return <NoAccess error={link.error} tab="events" />;
+
+  const focusDate =
+    jumpDate ??
+    (sel?.kind === "gig"
+      ? gig.data?.date
+      : sel?.kind === "practice"
+        ? (occ.data?.date ?? sel.date ?? undefined)
+        : undefined) ??
+    focusProp;
+
+  return (
+    <div
+      data-testid="events-tab"
+      data-focus-date={focusDate}
+      className="mx-auto w-full max-w-5xl px-3 py-4 pb-28 md:pb-24"
+    >
+      {practiceLink.data && sel?.kind === "practice" && occKey === null ? (
+        <p
+          role="status"
+          className="mx-auto mb-3 w-fit rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground"
+        >
+          This practice has no occurrence on that date.
+        </p>
+      ) : null}
+
+      <EventCalendar
+        mode={mode}
+        onModeChange={setMode}
+        focusDate={focusDate}
+        events={eventList}
+        onRangeChange={onRangeChange}
+        onDayClick={openCreate}
+        onEventClick={openEvent}
+      />
+
+      <Fab label="Add event" onClick={() => openCreate("")} />
+
+      {bandId ? (
+        <CreateEventDrawer
+          key={create.nonce}
+          bandId={bandId}
+          open={create.open}
+          defaultDate={create.date}
+          onOpenChange={(open) => setCreate((c) => ({ ...c, open }))}
+          onCreated={setJumpDate}
+        />
+      ) : null}
+
+      {sel?.kind === "gig" && gigLink.data ? (
+        <GigDrawer
+          key={keyOf(sel)}
+          bandId={gigLink.data.bandId}
+          gigId={sel.gigId}
+          gig={gig.data}
+          fallbackTitle={fallbackTitle}
+          onClose={() => close(sel)}
+        />
+      ) : null}
+
+      {sel?.kind === "practice" && practiceLink.data && occKey ? (
+        <PracticeDrawer
+          key={keyOf(sel)}
+          bandId={practiceLink.data.bandId}
+          seriesId={sel.seriesId}
+          occurrenceKey={occKey}
+          occ={occ.data}
+          fallbackTitle={fallbackTitle}
+          onClose={() => close(sel)}
+          onEdited={followEdit}
+        />
+      ) : null}
+    </div>
+  );
+}

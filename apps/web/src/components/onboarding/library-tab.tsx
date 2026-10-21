@@ -1,10 +1,10 @@
-import { TabPlaceholder } from "@/components/onboarding/tab-placeholder";
+"use client";
 
-/** Music Library tab content. */
+import { LibraryView } from "@/components/library/library-view";
+import { useCurrentBand } from "@/lib/current-band";
+
+/** Music Library tab content for the current band. */
 export function LibraryTab() {
-  return (
-    <div data-testid="library-tab">
-      <TabPlaceholder tab="library" />
-    </div>
-  );
+  const { currentBand } = useCurrentBand();
+  return currentBand ? <LibraryView bandId={currentBand.id} /> : null;
 }

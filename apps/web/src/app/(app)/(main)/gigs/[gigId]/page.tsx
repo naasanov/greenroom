@@ -1,9 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { GigLinkView } from "@/components/onboarding/deep-link-views";
-
+// Rendered by the Events tab host in RoutedShell, which opens this gig's drawer.
 export default function GigLinkPage() {
-  const { gigId } = useParams<{ gigId: string }>();
-  return <GigLinkView gigId={gigId} />;
+  return null;
 }

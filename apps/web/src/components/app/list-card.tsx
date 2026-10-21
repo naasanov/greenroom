@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, GripVertical, Music } from "lucide-react";
-import type { HTMLAttributes, ReactNode } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { toneFor } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
 
@@ -18,17 +18,24 @@ export function Thumbnail({
   icon?: ReactNode;
   className?: string;
 }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const shown = src && src !== failedSrc ? src : null;
   return (
     <span
       className={cn(
         "relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl",
-        !src && toneFor(seed),
+        !shown && toneFor(seed),
         className,
       )}
     >
-      {src ? (
+      {shown ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="size-full object-cover" />
+        <img
+          src={shown}
+          alt=""
+          className="size-full object-cover"
+          onError={() => setFailedSrc(shown)}
+        />
       ) : (
         (icon ?? <Music className="size-6 opacity-70" />)
       )}
