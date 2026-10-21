@@ -39,7 +39,7 @@ Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typechec
 
 - Local setup: `cp .env.example .env` (secrets come from the Keychain, see `memory/secrets-in-keychain.md`), `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`.
 - Staging: https://staging.greenroom.fyi and https://api.staging.greenroom.fyi (Fly apps `greenroom-staging-{web,api,db}`, region `iad`). Pushes to `main` run CI and then auto-deploy staging; manual deploy with `pnpm deploy:staging`. Runbook, DNS, backups, and prod setup: `infra/fly/README.md`. Creating cloud resources or DNS changes needs explicit user approval.
-- Tests: `pnpm test:e2e` (Playwright, desktop + iPhone/WebKit, fake integrations, test DB). How to write specs and add fake-control endpoints: `apps/e2e/README.md`.
+- Tests: targeted specs during work (`pnpm --filter @greenroom/e2e test:e2e <area>- smoke.spec`, args are path regex filters, not globs); the full `pnpm test:e2e` only at ticket end or before a gate (Playwright, desktop + iPhone/WebKit, fake integrations, test DB). How to write specs and add fake-control endpoints: `apps/e2e/README.md`.
 
 ## Conventions
 
