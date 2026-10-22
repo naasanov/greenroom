@@ -190,31 +190,44 @@ async function main(): Promise<void> {
     "ok",
   );
   assert.equal(
-    (await spotify.getPublicPlaylist(FAKE_PUBLIC_PLAYLIST_ID)).status,
+    (await spotify.getPlaylist("not-a-token", FAKE_PUBLIC_PLAYLIST_ID)).status,
+    "unauthorized",
+  );
+  assert.equal(
+    (await spotify.getPlaylist("fake-spotify-other", FAKE_PUBLIC_PLAYLIST_ID))
+      .status,
     "ok",
   );
   assert.equal(
-    (await spotify.getPublicPlaylist(FAKE_PRIVATE_PLAYLIST_ID)).status,
+    (await spotify.getPlaylist("fake-spotify-other", FAKE_PRIVATE_PLAYLIST_ID))
+      .status,
     "not-found-or-private",
   );
   assert.equal(
     (
-      await spotify.getPrivatePlaylist(
+      await spotify.getPlaylist(
         FAKE_SPOTIFY_OWNER_TOKEN,
         FAKE_PRIVATE_PLAYLIST_ID,
       )
     ).status,
     "ok",
   );
-  assert.equal(
-    (
-      await spotify.getPrivatePlaylist(
-        "fake-spotify-other",
-        FAKE_PRIVATE_PLAYLIST_ID,
-      )
-    ).status,
-    "not-found-or-private",
-  );
+  const sx = await spotify.exchangeCode({
+    code: "fake-code:smoke",
+    redirectUri: "http://x/cb",
+  });
+  assert.equal(sx.status, "ok");
+  if (sx.status === "ok") {
+    assert.equal(
+      (await spotify.refreshAccessToken(sx.tokens.refreshToken)).status,
+      "ok",
+    );
+    reg.spotify.revokeRefreshTokens();
+    assert.equal(
+      (await spotify.refreshAccessToken(sx.tokens.refreshToken)).status,
+      "invalid-grant",
+    );
+  }
   const pl = await spotify.createPlaylist("fake-spotify-u1", { name: "Set" });
   assert.equal(pl.status, "ok");
   if (pl.status === "ok") {

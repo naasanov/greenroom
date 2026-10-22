@@ -3,6 +3,7 @@ import { z } from "zod";
 export const SONG_ERROR_CODES = {
   duplicateSong: "DUPLICATE_SONG",
   playlistNotFound: "PLAYLIST_NOT_FOUND_OR_PRIVATE",
+  spotifyLoginRequired: "SPOTIFY_LOGIN_REQUIRED",
 } as const;
 
 /** Trims, and maps an empty string to null so cleared fields store null. */

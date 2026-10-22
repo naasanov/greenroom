@@ -9,6 +9,7 @@ import { request as pwRequest, type APIRequestContext } from "@playwright/test";
 import { API_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
 import type { TestApi } from "../src/test-api.js";
+import { connectSpotify } from "./spotify-helpers.js";
 
 test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
 
@@ -484,6 +485,7 @@ test("playlist import runs as a job and reports progress and a summary", async (
   testApi,
 }) => {
   const { api, base, bandId } = await bandWithClient(testApi);
+  await connectSpotify(api);
   await addSong(api, base, {
     title: "Mr. Brightside",
     artist: "The Killers",

@@ -3,12 +3,15 @@ import {
   parseSpotifyId,
   type SpotifyAdapter,
   type SpotifyCreatePlaylistResult,
+  type SpotifyExchangeResult,
   type SpotifyPlaylistResult,
+  type SpotifyRefreshResult,
   type SpotifyTrack,
   type SpotifyTrackResult,
   type SpotifyWriteResult,
 } from "./spotify.adapter.js";
 
+const AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 const API_URL = "https://api.spotify.com/v1";
 const TIMEOUT_MS = 8000;
@@ -17,9 +20,6 @@ const MAX_RETRY_WAIT_MS = 5000;
 const SEARCH_MAX = 50;
 
 const ni53 = <T>(): Promise<T> => notImplemented("Spotify", "5.3");
-
-const TRACK_FIELDS =
-  "track(id,uri,type,is_local,name,duration_ms,external_urls.spotify,artists(name),album(name,images))";
 
 type Json = Record<string, unknown>;
 
@@ -63,7 +63,20 @@ function mapTrack(raw: unknown): SpotifyTrack | null {
   };
 }
 
-/** Spotify Web API reads using client-credentials (app-level) auth. */
+const expiryFrom = (expiresIn: unknown): string =>
+  new Date(
+    Date.now() + (typeof expiresIn === "number" ? expiresIn : 3600) * 1000,
+  ).toISOString();
+
+function playlistMiss(status: number): SpotifyPlaylistResult | null {
+  if (status === 401) return { status: "unauthorized" };
+  if ([400, 403, 404].includes(status)) {
+    return { status: "not-found-or-private" };
+  }
+  return null;
+}
+
+/** Spotify Web API: app-level reads plus user OAuth and user-token reads. */
 export class RealSpotifyAdapter implements SpotifyAdapter {
   private token: { value: string; expiresAt: number } | null = null;
   private tokenPending: Promise<string> | null = null;
@@ -99,51 +112,123 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
     return track ? { status: "ok", track } : { status: "not-found" };
   }
 
-  async getPublicPlaylist(idOrUrl: string): Promise<SpotifyPlaylistResult> {
+  buildAuthUrl(input: {
+    redirectUri: string;
+    state: string;
+    scopes: string[];
+  }): string {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: process.env.SPOTIFY_CLIENT_ID ?? "",
+      scope: input.scopes.join(" "),
+      redirect_uri: input.redirectUri,
+      state: input.state,
+    });
+    return `${AUTHORIZE_URL}?${params}`;
+  }
+
+  async exchangeCode(input: {
+    code: string;
+    redirectUri: string;
+  }): Promise<SpotifyExchangeResult> {
+    const res = await this.tokenRequest({
+      grant_type: "authorization_code",
+      code: input.code,
+      redirect_uri: input.redirectUri,
+    });
+    if (res.status === 400) return { status: "invalid-code" };
+    if (!res.ok) throw await failure("code exchange", res);
+    const body: unknown = await res.json();
+    const accessToken = isObj(body) ? str(body.access_token) : null;
+    const refreshToken = isObj(body) ? str(body.refresh_token) : null;
+    if (!isObj(body) || !accessToken || !refreshToken)
+      throw new Error("Spotify code exchange response missing tokens");
+
+    const me = await fetch(`${API_URL}/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!me.ok) throw await failure("profile lookup", me);
+    const profile: unknown = await me.json();
+    const id = isObj(profile) ? str(profile.id) : null;
+    if (!isObj(profile) || !id)
+      throw new Error("Spotify profile response had no id");
+    return {
+      status: "ok",
+      tokens: {
+        accessToken,
+        refreshToken,
+        expiresAt: expiryFrom(body.expires_in),
+        scopes: (str(body.scope) ?? "").split(" ").filter(Boolean),
+      },
+      profile: { id, displayName: str(profile.display_name) },
+    };
+  }
+
+  async refreshAccessToken(
+    refreshToken: string,
+  ): Promise<SpotifyRefreshResult> {
+    const res = await this.tokenRequest({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    });
+    if (res.status === 400) return { status: "invalid-grant" };
+    if (!res.ok) throw await failure("token refresh", res);
+    const body: unknown = await res.json();
+    const accessToken = isObj(body) ? str(body.access_token) : null;
+    if (!isObj(body) || !accessToken)
+      throw new Error("Spotify refresh response had no access_token");
+    return {
+      status: "ok",
+      accessToken,
+      refreshToken: str(body.refresh_token),
+      expiresAt: expiryFrom(body.expires_in),
+    };
+  }
+
+  /** Reads through the user's token; the app token cannot read playlist items. */
+  async getPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistResult> {
     const id = parseSpotifyId(idOrUrl);
     if (!id) return { status: "not-found-or-private" };
-    const fields = encodeURIComponent(
-      `id,name,external_urls.spotify,tracks.next,tracks.items(${TRACK_FIELDS})`,
+    const enc = encodeURIComponent(id);
+    const head = await this.userGet(
+      userToken,
+      `/playlists/${enc}?fields=id,name,external_urls.spotify`,
     );
-    const first = await this.api(
-      `/playlists/${encodeURIComponent(id)}?fields=${fields}`,
-    );
-    if ([400, 403, 404].includes(first.status)) {
-      return { status: "not-found-or-private" };
-    }
-    if (!first.ok) throw await failure("playlist lookup", first);
-    const head: unknown = await first.json();
-    if (!isObj(head)) return { status: "not-found-or-private" };
+    const miss = playlistMiss(head.status);
+    if (miss) return miss;
+    if (!head.ok) throw await failure("playlist lookup", head);
+    const meta: unknown = await head.json();
+    if (!isObj(meta)) return { status: "not-found-or-private" };
 
     const tracks: SpotifyTrack[] = [];
-    const collect = (page: unknown) => {
-      if (!isObj(page) || !Array.isArray(page.items)) return;
-      for (const item of page.items) {
-        const t = isObj(item) ? mapTrack(item.track) : null;
-        if (t) tracks.push(t);
-      }
-    };
-    const firstTracks = isObj(head.tracks) ? head.tracks : {};
-    collect(firstTracks);
-
-    let next = str(firstTracks.next);
+    let next: string | null = `${API_URL}/playlists/${enc}/items?limit=100`;
     while (next) {
-      const url = new URL(next);
-      url.searchParams.set("fields", `next,items(${TRACK_FIELDS})`);
-      const res = await this.api(url.toString());
+      const res = await this.userGet(userToken, next);
+      const pageMiss = playlistMiss(res.status);
+      if (pageMiss) return pageMiss;
       if (!res.ok) throw await failure("playlist page", res);
       const page: unknown = await res.json();
-      collect(page);
-      next = isObj(page) ? str(page.next) : null;
+      if (!isObj(page)) break;
+      for (const entry of Array.isArray(page.items) ? page.items : []) {
+        if (!isObj(entry)) continue;
+        // The track sits under `item` or `track` depending on API version.
+        const t = mapTrack(entry.item ?? entry.track);
+        if (t) tracks.push(t);
+      }
+      next = str(page.next);
     }
 
-    const ext = isObj(head.external_urls) ? head.external_urls : {};
+    const ext = isObj(meta.external_urls) ? meta.external_urls : {};
     return {
       status: "ok",
       playlist: {
-        id: str(head.id) ?? id,
+        id: str(meta.id) ?? id,
         url: str(ext.spotify) ?? `https://open.spotify.com/playlist/${id}`,
-        name: str(head.name) ?? "",
+        name: str(meta.name) ?? "",
         tracks,
       },
     };
@@ -155,8 +240,44 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
   addTracksToPlaylist(): Promise<SpotifyWriteResult> {
     return ni53();
   }
-  getPrivatePlaylist(): Promise<SpotifyPlaylistResult> {
-    return ni53();
+
+  private tokenRequest(form: Record<string, string>): Promise<Response> {
+    const id = process.env.SPOTIFY_CLIENT_ID;
+    const secret = process.env.SPOTIFY_CLIENT_SECRET;
+    if (!id || !secret) {
+      throw new Error(
+        "Spotify credentials missing: set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET",
+      );
+    }
+    return fetch(TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(form),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  }
+
+  /** GET with a user token; retries once on 429. */
+  private async userGet(
+    userToken: string,
+    pathOrUrl: string,
+  ): Promise<Response> {
+    const url = pathOrUrl.startsWith("http") ? pathOrUrl : API_URL + pathOrUrl;
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${userToken}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (res.status !== 429 || attempt > 0) return res;
+      const secs = Number(res.headers.get("retry-after"));
+      const wait = Number.isFinite(secs) ? secs * 1000 : 1000;
+      await new Promise((r) =>
+        setTimeout(r, Math.min(MAX_RETRY_WAIT_MS, Math.max(0, wait))),
+      );
+    }
   }
 
   /** GET with bearer auth; retries once on 401 (fresh token) and on 429. */

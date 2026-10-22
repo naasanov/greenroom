@@ -24,7 +24,39 @@ export type SpotifyTrackResult =
 /** Private and nonexistent playlists are indistinguishable to the API. */
 export type SpotifyPlaylistResult =
   | { status: "ok"; playlist: SpotifyPlaylist }
-  | { status: "not-found-or-private" };
+  | { status: "not-found-or-private" }
+  | { status: "unauthorized" };
+
+export const SPOTIFY_IMPORT_SCOPES = [
+  "playlist-read-private",
+  "playlist-read-collaborative",
+];
+
+export interface SpotifyUserTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  scopes: string[];
+}
+
+export interface SpotifyProfile {
+  id: string;
+  displayName: string | null;
+}
+
+export type SpotifyExchangeResult =
+  | { status: "ok"; tokens: SpotifyUserTokens; profile: SpotifyProfile }
+  | { status: "invalid-code" };
+
+export type SpotifyRefreshResult =
+  | {
+      status: "ok";
+      accessToken: string;
+      /** Present only when Spotify rotated the refresh token. */
+      refreshToken: string | null;
+      expiresAt: string;
+    }
+  | { status: "invalid-grant" };
 
 export type SpotifyWriteResult =
   { status: "ok" } | { status: "unauthorized" } | { status: "not-found" };
@@ -38,9 +70,24 @@ export interface SpotifyAdapter {
   searchTracks(query: string, limit?: number): Promise<SpotifyTrack[]>;
   /** Accepts a bare id, a spotify: URI, or an open.spotify.com URL. */
   getTrack(idOrUrl: string): Promise<SpotifyTrackResult>;
-  getPublicPlaylist(idOrUrl: string): Promise<SpotifyPlaylistResult>;
+
+  /** User OAuth (authorization code flow). */
+  buildAuthUrl(input: {
+    redirectUri: string;
+    state: string;
+    scopes: string[];
+  }): string;
+  exchangeCode(input: {
+    code: string;
+    redirectUri: string;
+  }): Promise<SpotifyExchangeResult>;
+  refreshAccessToken(refreshToken: string): Promise<SpotifyRefreshResult>;
 
   /** User-level operations take the user's access token. */
+  getPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistResult>;
   createPlaylist(
     userToken: string,
     input: { name: string; description?: string; isPublic?: boolean },
@@ -50,10 +97,6 @@ export interface SpotifyAdapter {
     playlistId: string,
     trackUris: string[],
   ): Promise<SpotifyWriteResult>;
-  getPrivatePlaylist(
-    userToken: string,
-    idOrUrl: string,
-  ): Promise<SpotifyPlaylistResult>;
 }
 
 /** Extracts a Spotify id from an id, URI, or URL; null if nothing plausible. */

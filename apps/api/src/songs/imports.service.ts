@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -17,15 +18,18 @@ import {
   SPOTIFY,
   parseSpotifyId,
   type SpotifyAdapter,
+  type SpotifyPlaylistResult,
   type SpotifyTrack,
 } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
+import { SpotifyConnectionsService } from "../spotify-connect/index.js";
 import { SongIndex } from "./song-match.js";
 import { SongsService } from "./songs.service.js";
 
 export const PLAYLIST_IMPORT_QUEUE = "songs-playlist-import";
 
 interface ImportJobData {
+  userId: string;
   bandId: string;
   playlistId: string;
 }
@@ -59,6 +63,7 @@ export class ImportsService implements OnModuleInit {
     @Inject(SPOTIFY) private readonly spotify: SpotifyAdapter,
     private readonly jobs: JobsService,
     private readonly songs: SongsService,
+    private readonly connections: SpotifyConnectionsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -70,12 +75,16 @@ export class ImportsService implements OnModuleInit {
   }
 
   /** Validates the link, then queues the import. Private and missing playlists look the same. */
-  async start(bandId: string, url: string): Promise<ImportProgress> {
+  async start(
+    userId: string,
+    bandId: string,
+    url: string,
+  ): Promise<ImportProgress> {
     const playlistId = PLAYLIST_URL_RE.test(url) ? parseSpotifyId(url) : null;
     if (!playlistId) {
       throw new BadRequestException("Not a Spotify playlist link");
     }
-    const res = await this.spotify.getPublicPlaylist(playlistId);
+    const res = await this.fetchPlaylist(userId, playlistId);
     if (res.status !== "ok") {
       throw new NotFoundException({
         code: SONG_ERROR_CODES.playlistNotFound,
@@ -89,7 +98,7 @@ export class ImportsService implements OnModuleInit {
     try {
       await this.jobs.send<ImportJobData>(
         PLAYLIST_IMPORT_QUEUE,
-        { bandId, playlistId },
+        { userId, bandId, playlistId },
         { id: importId, retryLimit: 0 },
       );
     } catch (err) {
@@ -140,7 +149,7 @@ export class ImportsService implements OnModuleInit {
     progress.status = "running";
     this.remember(importId, data.bandId, progress);
     try {
-      const res = await this.spotify.getPublicPlaylist(data.playlistId);
+      const res = await this.fetchPlaylist(data.userId, data.playlistId);
       if (res.status !== "ok") throw new Error("Playlist not found or private");
       const { playlist } = res;
       progress.playlistName = playlist.name;
@@ -167,6 +176,24 @@ export class ImportsService implements OnModuleInit {
     } finally {
       this.live.get(importId)!.expires = Date.now() + MEMORY_TTL_MS;
     }
+  }
+
+  /** Reads via the user's Spotify login; no usable login is a 409 for the client to act on. */
+  private async fetchPlaylist(
+    userId: string,
+    playlistId: string,
+  ): Promise<Exclude<SpotifyPlaylistResult, { status: "unauthorized" }>> {
+    const token = await this.connections.getAccessToken(userId);
+    const res = token
+      ? await this.spotify.getPlaylist(token, playlistId)
+      : ({ status: "unauthorized" } as const);
+    if (res.status === "unauthorized") {
+      throw new ConflictException({
+        code: SONG_ERROR_CODES.spotifyLoginRequired,
+        message: "Connect Spotify to import playlists",
+      });
+    }
+    return res;
   }
 
   private async importTrack(

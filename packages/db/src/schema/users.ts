@@ -3,6 +3,7 @@ import {
   pgEnum,
   pgTable,
   text,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -60,11 +61,27 @@ export const oauthConnections = pgTable(
     provider: oauthProvider("provider").notNull(),
     scopes: text("scopes").array().notNull().default([]),
     refreshTokenEncrypted: text("refresh_token_encrypted").notNull(),
+    accessTokenEncrypted: text("access_token_encrypted"),
     accessTokenExpiresAt: tstz("access_token_expires_at"),
+    externalUserId: text("external_user_id"),
+    externalDisplayName: text("external_display_name"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    index("oauth_connections_user_provider_idx").on(t.userId, t.provider),
+    uniqueIndex("oauth_connections_user_provider_idx").on(t.userId, t.provider),
   ],
 );
+
+/** Short-lived, single-use `state` values for provider OAuth round trips. */
+export const oauthStates = pgTable("oauth_states", {
+  id: id(),
+  stateHash: text("state_hash").notNull().unique(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: oauthProvider("provider").notNull(),
+  redirectTo: text("redirect_to").notNull(),
+  expiresAt: tstz("expires_at").notNull(),
+  createdAt: createdAt(),
+});

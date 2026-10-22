@@ -81,4 +81,12 @@ export class TestingController {
     const value = await this.sessions.create(user.id);
     return { user, cookie: { name: sessionCookieName(), value } };
   }
+
+  /** Makes every issued Spotify refresh token fail with invalid-grant. */
+  @Post("spotify/revoke-refresh-tokens")
+  @HttpCode(200)
+  revokeSpotifyRefreshTokens(): { ok: true } {
+    this.registry.spotify.revokeRefreshTokens();
+    return { ok: true };
+  }
 }

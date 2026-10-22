@@ -11,11 +11,11 @@ All routes are under `/bands/:bandId/songs` and use `@BandMember()` (non-members
 | `DELETE /:songId` | Soft delete. Returns `{ id, setlistCount }` so the UI can say "This is in 3 setlists". Detail already carries `setlistCount` for the warning before delete. |
 | `POST /resolve` | Smart add: `{ input }` returns `{ kind, candidates }`. |
 | `POST /suggest-tab` | `{ title, artist? }` returns `{ suggestedReference }` (for showing the Songsterr suggestion before saving). |
-| `POST /import` | Start a Spotify playlist import. 202 with progress. 404 `PLAYLIST_NOT_FOUND_OR_PRIVATE` if not visible with app credentials; 400 if not a playlist link. |
+| `POST /import` | Start a Spotify playlist import. Reads through the caller's Spotify login. 202 with progress. 409 `{ code: "SPOTIFY_LOGIN_REQUIRED" }` when the user has no usable Spotify connection (see `spotify-connect/README.md`). 404 `PLAYLIST_NOT_FOUND_OR_PRIVATE` if the playlist is missing or not accessible to that Spotify account; 400 if not a playlist link. |
 | `GET /imports/:importId` | Poll `{ status, total, done, added, skipped, failed, playlistName, error }`. |
 
 ## Smart add
-`kind` is `spotify-link`, `youtube-link`, `search`, or `playlist` (the UI should switch to the import flow). A link yields at most one candidate, prefilled with title, artist, duration (Spotify only), image, `spotifyTrackId` / `youtubeUrl`, and a `references` row for the source link. Free text searches Spotify (app credentials, 10 results). Unknown links, unknown ids, and no-match searches return `candidates: []` so the UI can offer manual entry. Each candidate has `existingSongId` when it is already in the library.
+`kind` is `spotify-link`, `youtube-link`, `search`, or `playlist` (the UI should switch to the import flow). A link yields at most one candidate, prefilled with title, artist, duration (Spotify only), image, `spotifyTrackId` / `youtubeUrl`, and a `references` row for the source link. Free text searches Spotify (app credentials, 10 results). Search and single-track lookup need no Spotify login; only playlist import does. Unknown links, unknown ids, and no-match searches return `candidates: []` so the UI can offer manual entry. Each candidate has `existingSongId` when it is already in the library.
 
 ## Duplicates
 A new song is a duplicate when a non-deleted song in the same band has the same `spotifyTrackId`, or the same normalized title + artist (lowercase, accents and punctuation stripped, missing artist equals empty). The 409 body is `{ code: "DUPLICATE_SONG", songId, message }`. `force: true` skips the check ("add anyway"). Updates are not checked. Playlist imports skip duplicates silently and count them as `skipped`, including repeats inside the playlist.
@@ -30,7 +30,7 @@ A new song is a duplicate when a non-deleted song in the same band has the same 
 `usedIn` lists gigs (`kind: "gig"`, newest first) and practice series assignments (`kind: "practice"`) whose setlist contains the song. Soft-deleting a song keeps its `setlist_items` rows; setlist readers must filter `songs.deleted_at is null`.
 
 ## Playlist import flow
-1. `POST /import` parses the link, fetches the playlist once (so private/missing fails fast with 404), generates an `importId`, and enqueues a pg-boss job (`songs-playlist-import`, no retries) whose id is the `importId`.
-2. The worker refetches the playlist, then inserts tracks one by one (song plus a `Spotify` reference row), updating counters in memory.
+1. `POST /import` parses the link, gets the user's Spotify access token (refreshing if needed), fetches the playlist once (so a missing login fails fast with 409 and private/missing with 404), generates an `importId`, and enqueues a pg-boss job (`songs-playlist-import`, no retries) whose id is the `importId`.
+2. The worker (job data carries the `userId`) refetches the playlist with that user's token, then inserts tracks one by one (song plus a `Spotify` reference row), updating counters in memory.
 3. `GET /imports/:importId` returns the live counters. After a restart (or on another instance) it falls back to the pg-boss job: the final summary is the job output, so completed imports stay readable; in-flight counters are not persisted.
 Status is `queued`, `running`, `completed`, or `failed`. Per-track insert errors count as `failed` and do not stop the import.

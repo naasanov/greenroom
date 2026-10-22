@@ -62,4 +62,9 @@ export class TestApi {
   login(email: string): Promise<LoginResult> {
     return this.call("post", "login", { data: { email } });
   }
+
+  /** Makes the Spotify fake reject every issued refresh token. */
+  async revokeSpotifyRefreshTokens(): Promise<void> {
+    await this.call("post", "spotify/revoke-refresh-tokens");
+  }
 }

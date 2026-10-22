@@ -9,6 +9,7 @@ import {
   openLibrary,
   sheet,
 } from "./library-helpers.js";
+import { apiWithCookie, connectSpotify } from "./spotify-helpers.js";
 
 async function startAdd(
   page: Page,
@@ -216,6 +217,12 @@ test("a pasted playlist link switches to the import flow", async ({
   loginAs,
 }) => {
   await startAdd(page, testApi, loginAs);
+  // Import needs a Spotify login; connect through the API.
+  const api = await apiWithCookie(
+    (await testApi.login(USERS.ava.email)).cookie,
+  );
+  await connectSpotify(api);
+  await api.dispose();
   await smart(page).fill(
     "https://open.spotify.com/playlist/fakePlaylistPublic",
   );

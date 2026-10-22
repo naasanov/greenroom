@@ -1,10 +1,15 @@
 import { USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { cards, fabAction, openLibrary } from "./library-helpers.js";
+import { apiWithCookie, connectSpotify } from "./spotify-helpers.js";
 
 test.beforeEach(async ({ testApi, loginAs }) => {
   await testApi.seed("band");
-  await loginAs(USERS.ava.email);
+  const { cookie } = await loginAs(USERS.ava.email);
+  // Import needs a Spotify login; connect through the API so the UI test skips it.
+  const api = await apiWithCookie(cookie);
+  await connectSpotify(api);
+  await api.dispose();
 });
 
 test("importing a playlist shows the summary and skips repeats", async ({

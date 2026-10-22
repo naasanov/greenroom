@@ -10,6 +10,7 @@ import { LineupsModule } from "./lineups/lineups.module.js";
 import { LinksModule } from "./links/links.module.js";
 import { SetlistsModule } from "./setlists/setlists.module.js";
 import { SongsModule } from "./songs/songs.module.js";
+import { SpotifyConnectModule } from "./spotify-connect/spotify-connect.module.js";
 import { stagingLoginEnabled } from "./staging-login/staging-login.enabled.js";
 import { StagingLoginModule } from "./staging-login/staging-login.module.js";
 import { testingEnabled } from "./testing/testing.enabled.js";
@@ -24,6 +25,7 @@ import { TestingModule } from "./testing/testing.module.js";
     EventsModule,
     JobsModule,
     SongsModule,
+    SpotifyConnectModule,
     SetlistsModule,
     LineupsModule,
     LinksModule,

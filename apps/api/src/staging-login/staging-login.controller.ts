@@ -15,6 +15,8 @@ import { apiPublicUrl } from "../auth/auth.constants.js";
 import { AuthService } from "../auth/auth.service.js";
 import { Public } from "../auth/decorators.js";
 import { DemoBandService } from "./demo-band.service.js";
+import { spotifyRedirectUri } from "../spotify-connect/spotify-connections.service.js";
+import { renderFakeSpotifyPage } from "./fake-spotify.page.js";
 import { renderLoginPage } from "./staging-login.page.js";
 
 const MAX_FAILURES = 10;
@@ -126,5 +128,25 @@ export class StagingLoginController {
     if (recent.length) this.failures.set(ip, recent);
     else this.failures.delete(ip);
     return recent;
+  }
+}
+
+/** Stands in for Spotify's consent screen when fakes run with a passcode secret. */
+@Controller("fake-spotify")
+export class FakeSpotifyController {
+  @Public()
+  @Get("authorize")
+  page(
+    @Query("redirect_uri") redirectUri: unknown,
+    @Query("state") state: unknown,
+    @Res() res: Response,
+  ): void {
+    if (
+      redirectUri !== spotifyRedirectUri() ||
+      typeof state !== "string" ||
+      !STATE_PATTERN.test(state)
+    )
+      throw new HttpException("Invalid request", HttpStatus.BAD_REQUEST);
+    res.type("html").send(renderFakeSpotifyPage({ redirectUri, state }));
   }
 }

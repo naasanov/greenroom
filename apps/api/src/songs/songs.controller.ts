@@ -29,12 +29,14 @@ import {
   type SuggestedReference,
   type SuggestTab,
   type UpdateSong,
+  type User,
 } from "@greenroom/shared";
 import {
   BandMember,
   CurrentMembership,
   type BandMembership,
 } from "../bands/index.js";
+import { CurrentUser } from "../auth/decorators.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { ImportsService } from "./imports.service.js";
 import { SmartAddService } from "./smart-add.service.js";
@@ -88,10 +90,11 @@ export class SongsController {
   @Post("import")
   @HttpCode(202)
   startImport(
+    @CurrentUser() user: User,
     @CurrentMembership() m: BandMembership,
     @Body(new ZodPipe(importPlaylistSchema)) body: ImportPlaylist,
   ): Promise<ImportProgress> {
-    return this.imports.start(m.bandId, body.url);
+    return this.imports.start(user.id, m.bandId, body.url);
   }
 
   @Get("imports/:importId")

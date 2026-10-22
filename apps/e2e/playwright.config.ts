@@ -44,6 +44,8 @@ export default defineConfig({
         WEB_URL,
         WEB_ORIGIN: WEB_URL,
         API_PUBLIC_URL: API_URL,
+        // Fixed 32-byte test key (base64); never used outside e2e.
+        OAUTH_TOKEN_KEY: "dGVzdC1vbmx5LW9hdXRoLXRva2VuLWtleS0zMmJ5ISE=",
       },
     },
     {

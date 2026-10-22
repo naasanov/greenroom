@@ -1,9 +1,13 @@
+import { apiPublicUrl } from "../../auth/auth.constants.js";
+import { stagingLoginEnabled } from "../../staging-login/staging-login.enabled.js";
 import {
   parseSpotifyId,
   type SpotifyAdapter,
   type SpotifyCreatePlaylistResult,
+  type SpotifyExchangeResult,
   type SpotifyPlaylist,
   type SpotifyPlaylistResult,
+  type SpotifyRefreshResult,
   type SpotifyTrack,
   type SpotifyTrackResult,
   type SpotifyWriteResult,
@@ -33,6 +37,8 @@ function track(
   };
 }
 
+const CODE_PREFIX = "fake-code:";
+
 const CATALOG: SpotifyTrack[] = [
   track("fakeTrack1", "Mr. Brightside", ["The Killers"], "Hot Fuss", 222000),
   track(
@@ -59,6 +65,62 @@ const CATALOG: SpotifyTrack[] = [
   ),
 ];
 
+// Staging-only set returned for any playlist id; not part of search.
+const DEMO_TRACKS: SpotifyTrack[] = [
+  track(
+    "demoTrack1",
+    "Everlong",
+    ["Foo Fighters"],
+    "The Colour and the Shape",
+    250000,
+  ),
+  track(
+    "demoTrack2",
+    "Know Your Enemy",
+    ["Green Day"],
+    "21st Century Breakdown",
+    191000,
+  ),
+  track("demoTrack3", "Last Nite", ["The Strokes"], "Is This It", 193000),
+  track(
+    "demoTrack4",
+    "Pumped Up Kicks",
+    ["Foster the People"],
+    "Torches",
+    239000,
+  ),
+  track(
+    "demoTrack5",
+    "Little Lion Man",
+    ["Mumford & Sons"],
+    "Sigh No More",
+    247000,
+  ),
+  track(
+    "demoTrack6",
+    "Heads Will Roll",
+    ["Yeah Yeah Yeahs"],
+    "It's Blitz!",
+    221000,
+  ),
+  track(
+    "demoTrack7",
+    "Time to Pretend",
+    ["MGMT"],
+    "Oracular Spectacular",
+    261000,
+  ),
+  track(
+    "demoTrack8",
+    "Dog Days Are Over",
+    ["Florence + The Machine"],
+    "Lungs",
+    253000,
+  ),
+  track("demoTrack9", "Ho Hey", ["The Lumineers"], "The Lumineers", 163000),
+  track("demoTrack10", "Reptilia", ["The Strokes"], "Room on Fire", 221000),
+];
+
 interface StoredPlaylist {
   id: string;
   name: string;
@@ -71,6 +133,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   private tracks = new Map<string, SpotifyTrack>();
   private playlists = new Map<string, StoredPlaylist>();
   private counter = 0;
+  private refreshTokens = new Set<string>();
 
   constructor() {
     this.reset();
@@ -95,9 +158,85 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     return t ? { status: "ok", track: { ...t } } : { status: "not-found" };
   }
 
-  async getPublicPlaylist(idOrUrl: string): Promise<SpotifyPlaylistResult> {
+  buildAuthUrl(input: {
+    redirectUri: string;
+    state: string;
+    scopes: string[];
+  }): string {
+    // With a staging passcode set, the API serves its own consent page.
+    if (stagingLoginEnabled()) {
+      return `${apiPublicUrl()}/fake-spotify/authorize?${new URLSearchParams({
+        redirect_uri: input.redirectUri,
+        state: input.state,
+      })}`;
+    }
+    return `https://fake-accounts.spotify.test/authorize?${new URLSearchParams({
+      redirect_uri: input.redirectUri,
+      state: input.state,
+      scope: input.scopes.join(" "),
+    })}`;
+  }
+
+  async exchangeCode(input: {
+    code: string;
+    redirectUri: string;
+  }): Promise<SpotifyExchangeResult> {
+    if (!input.code.startsWith(CODE_PREFIX)) return { status: "invalid-code" };
+    const name = input.code.slice(CODE_PREFIX.length);
+    if (!name) return { status: "invalid-code" };
+    const n = ++this.counter;
+    const refreshToken = `fake-spotify-refresh-${n}`;
+    this.refreshTokens.add(refreshToken);
+    return {
+      status: "ok",
+      profile: { id: `fake-spotify-user-${name}`, displayName: name },
+      tokens: {
+        accessToken: `fake-spotify-access-${n}`,
+        refreshToken,
+        expiresAt: this.expiry(),
+        scopes: ["playlist-read-private", "playlist-read-collaborative"],
+      },
+    };
+  }
+
+  async refreshAccessToken(
+    refreshToken: string,
+  ): Promise<SpotifyRefreshResult> {
+    if (!this.refreshTokens.has(refreshToken))
+      return { status: "invalid-grant" };
+    return {
+      status: "ok",
+      accessToken: `fake-spotify-access-${++this.counter}`,
+      refreshToken: null,
+      expiresAt: this.expiry(),
+    };
+  }
+
+  async getPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistResult> {
+    if (!this.validToken(userToken)) return { status: "unauthorized" };
     const p = this.find(idOrUrl);
-    return p && p.isPublic ? this.ok(p) : { status: "not-found-or-private" };
+    if (p) {
+      return p.isPublic || p.ownerToken === userToken
+        ? this.ok(p)
+        : { status: "not-found-or-private" };
+    }
+    // Staging has no real playlists, so any id resolves to the demo set.
+    const id = parseSpotifyId(idOrUrl);
+    if (stagingLoginEnabled() && id) {
+      return {
+        status: "ok",
+        playlist: {
+          id,
+          name: "Demo Setlist",
+          url: `https://open.spotify.com/playlist/${id}`,
+          tracks: DEMO_TRACKS.map((t) => ({ ...t })),
+        },
+      };
+    }
+    return { status: "not-found-or-private" };
   }
 
   async createPlaylist(
@@ -138,18 +277,6 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     return { status: "ok" };
   }
 
-  async getPrivatePlaylist(
-    userToken: string,
-    idOrUrl: string,
-  ): Promise<SpotifyPlaylistResult> {
-    const p = this.find(idOrUrl);
-    if (!p || !this.validToken(userToken))
-      return { status: "not-found-or-private" };
-    return p.isPublic || p.ownerToken === userToken
-      ? this.ok(p)
-      : { status: "not-found-or-private" };
-  }
-
   // ---- test controls ----
 
   seedTrack(t: SpotifyTrack): void {
@@ -172,8 +299,14 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     return p ? this.hydrate(p) : undefined;
   }
 
+  /** Makes every issued refresh token fail with invalid-grant. */
+  revokeRefreshTokens(): void {
+    this.refreshTokens.clear();
+  }
+
   reset(): void {
     this.counter = 0;
+    this.refreshTokens.clear();
     this.tracks = new Map(CATALOG.map((t) => [t.id, t]));
     this.playlists = new Map();
     this.seedPlaylist({
@@ -188,6 +321,10 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
       isPublic: false,
       trackIds: ["fakeTrack4", "fakeTrack5"],
     });
+  }
+
+  private expiry(): string {
+    return new Date(Date.UTC(2030, 0, 1)).toISOString();
   }
 
   private validToken(token: string): boolean {
