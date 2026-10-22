@@ -43,7 +43,7 @@ export function SmartInput({
         <Input
           autoFocus
           aria-label="Song link or search"
-          placeholder="Paste a Spotify or YouTube link, or search"
+          placeholder="Paste a link or search Spotify"
           autoComplete="off"
           autoCapitalize="none"
           value={text}

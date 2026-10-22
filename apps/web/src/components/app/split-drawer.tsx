@@ -124,6 +124,7 @@ export function SplitDrawer({
       }}
     >
       <DrawerContent
+        data-exiting={open ? undefined : ""}
         onPointerDownOutside={dismissible ? requestClose : undefined}
         onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
         onEscapeKeyDown={(e) => {

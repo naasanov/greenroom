@@ -2,16 +2,15 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
-import type { CalendarEvent, PracticeEditResult } from "@greenroom/shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  CalendarEvent,
+  Gig,
+  PracticeEditResult,
+  PracticeOccurrence,
+} from "@greenroom/shared";
 import { Fab } from "@/components/app/fab";
+import { AgendaButton, AgendaSheet } from "@/components/events/agenda-sheet";
 import { CreateEventDrawer } from "@/components/events/create-drawer";
 import {
   EventCalendar,
@@ -21,6 +20,8 @@ import { GigDrawer } from "@/components/events/gig-drawer";
 import { PracticeDrawer } from "@/components/events/practice-drawer";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
 import { useCurrentBand } from "@/lib/current-band";
+import { useDrawerStack } from "@/lib/use-drawer-stack";
+import { createLocalChoice } from "@/lib/use-local-choice";
 import { keys, useGig, usePracticeOccurrence } from "@/lib/queries";
 import {
   useEvents,
@@ -28,44 +29,11 @@ import {
   usePracticeLinkFor,
 } from "@/lib/queries/events";
 
-// ---- calendar mode, persisted per device ----
-
-const MODE_KEY = "greenroom:calendar-mode";
-const modeListeners = new Set<() => void>();
-
-function readMode(): CalendarMode {
-  try {
-    return localStorage.getItem(MODE_KEY) === "week" ? "week" : "month";
-  } catch {
-    return "month";
-  }
-}
-
-function writeMode(mode: CalendarMode) {
-  try {
-    localStorage.setItem(MODE_KEY, mode);
-  } catch {
-    // Storage can be blocked; the choice then lasts for this page load only.
-  }
-  modeListeners.forEach((l) => l());
-}
-
-function useCalendarMode(): [CalendarMode, (mode: CalendarMode) => void] {
-  const [session, setSession] = useState<CalendarMode | null>(null);
-  const stored = useSyncExternalStore(
-    (cb) => {
-      modeListeners.add(cb);
-      return () => void modeListeners.delete(cb);
-    },
-    readMode,
-    () => "month" as CalendarMode,
-  );
-  const set = useCallback((mode: CalendarMode) => {
-    setSession(mode);
-    writeMode(mode);
-  }, []);
-  return [session ?? stored, set];
-}
+const useCalendarMode = createLocalChoice<CalendarMode>(
+  "greenroom:calendar-mode",
+  ["month", "week"],
+  "month",
+);
 
 // ---- URL-driven selection ----
 
@@ -97,6 +65,16 @@ function keyOf(sel: Selection | null): string {
   return sel.kind === "gig"
     ? `gig:${sel.gigId}`
     : `practice:${sel.seriesId}:${sel.date ?? ""}`;
+}
+
+/** What an event drawer renders; frozen while the drawer slides away. */
+interface EventDrawerData {
+  sel: Selection;
+  bandId: string;
+  gig?: Gig;
+  occurrenceKey?: string;
+  occ?: PracticeOccurrence;
+  fallbackTitle?: string;
 }
 
 /**
@@ -209,9 +187,43 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
 
   // Create drawer.
   const [create, setCreate] = useState({ open: false, date: "", nonce: 0 });
-  const openCreate = (date: string) =>
+  const openCreate = (date: string) => {
+    if (selRef.current) go(null, "replace");
     setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
+  };
+  const [agendaOpen, setAgendaOpen] = useState(false);
   const [jumpDate, setJumpDate] = useState<string | undefined>();
+
+  // Event drawers stay mounted while sliding away so a replacement overlaps them.
+  const [instantKey, setInstantKey] = useState<string | null>(null);
+  const eventDrawer: EventDrawerData | null =
+    sel?.kind === "gig" && gigLink.data
+      ? {
+          sel,
+          bandId: gigLink.data.bandId,
+          gig: gig.data,
+          fallbackTitle,
+        }
+      : sel?.kind === "practice" && practiceLink.data && occKey
+        ? {
+            sel,
+            bandId: practiceLink.data.bandId,
+            occurrenceKey: occKey,
+            occ: occ.data,
+            fallbackTitle,
+          }
+        : null;
+  const selKey = keyOf(sel);
+  if (instantKey && selKey !== instantKey) setInstantKey(null);
+  const drawerEntries = useDrawerStack<EventDrawerData>(
+    eventDrawer && sel
+      ? {
+          key: keyOf(sel),
+          data: eventDrawer,
+          instant: keyOf(sel) === instantKey,
+        }
+      : null,
+  );
 
   function openEvent(ev: CalendarEvent) {
     if (!bandId) return;
@@ -231,6 +243,9 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
   function followEdit(result: PracticeEditResult) {
     const next = result.occurrence;
     if (!bandId || !next) return go(null, "replace");
+    setInstantKey(
+      keyOf({ kind: "practice", seriesId: next.seriesId, date: next.date }),
+    );
     qc.setQueryData(keys.link("practices", next.seriesId, next.date), {
       bandId,
       seriesId: next.seriesId,
@@ -278,7 +293,19 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         onEventClick={openEvent}
       />
 
-      <Fab label="Add event" onClick={() => openCreate("")} />
+      {agendaOpen ? null : (
+        <>
+          <AgendaButton onClick={() => setAgendaOpen(true)} />
+          <Fab label="Add event" onClick={() => openCreate("")} />
+        </>
+      )}
+
+      <AgendaSheet
+        open={agendaOpen}
+        onOpenChange={setAgendaOpen}
+        bandId={bandId}
+        onSelect={openEvent}
+      />
 
       {bandId ? (
         <CreateEventDrawer
@@ -291,29 +318,34 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         />
       ) : null}
 
-      {sel?.kind === "gig" && gigLink.data ? (
-        <GigDrawer
-          key={keyOf(sel)}
-          bandId={gigLink.data.bandId}
-          gigId={sel.gigId}
-          gig={gig.data}
-          fallbackTitle={fallbackTitle}
-          onClose={() => close(sel)}
-        />
-      ) : null}
-
-      {sel?.kind === "practice" && practiceLink.data && occKey ? (
-        <PracticeDrawer
-          key={keyOf(sel)}
-          bandId={practiceLink.data.bandId}
-          seriesId={sel.seriesId}
-          occurrenceKey={occKey}
-          occ={occ.data}
-          fallbackTitle={fallbackTitle}
-          onClose={() => close(sel)}
-          onEdited={followEdit}
-        />
-      ) : null}
+      {drawerEntries.map((entry) => {
+        const { sel: target, bandId: drawerBand } = entry.data;
+        return target.kind === "gig" ? (
+          <GigDrawer
+            key={entry.id}
+            open={entry.open}
+            beside={agendaOpen}
+            bandId={drawerBand}
+            gigId={target.gigId}
+            gig={entry.data.gig}
+            fallbackTitle={entry.data.fallbackTitle}
+            onClose={() => close(target)}
+          />
+        ) : (
+          <PracticeDrawer
+            key={entry.id}
+            open={entry.open}
+            beside={agendaOpen}
+            bandId={drawerBand}
+            seriesId={target.seriesId}
+            occurrenceKey={entry.data.occurrenceKey!}
+            occ={entry.data.occ}
+            fallbackTitle={entry.data.fallbackTitle}
+            onClose={() => close(target)}
+            onEdited={followEdit}
+          />
+        );
+      })}
     </div>
   );
 }

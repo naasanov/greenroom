@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode, type Ref } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,8 @@ export function RightSheet({
   headerSlot,
   headerActions,
   placement = "fixed",
+  bodyRef,
+  bodyClassName,
   children,
   footer,
   className,
@@ -46,6 +48,9 @@ export function RightSheet({
   /** Extra icon buttons shown before the Edit button / header slot. */
   headerActions?: ReactNode;
   placement?: "fixed" | "contained";
+  /** The scrolling body element, for callers that control scroll position. */
+  bodyRef?: Ref<HTMLDivElement>;
+  bodyClassName?: string;
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
@@ -128,7 +133,14 @@ export function RightSheet({
             </Button>
           ) : null)}
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+      <div
+        ref={bodyRef}
+        data-testid="right-sheet-body"
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5",
+          bodyClassName,
+        )}
+      >
         {children}
       </div>
       {footer ? (

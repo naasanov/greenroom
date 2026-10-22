@@ -12,6 +12,7 @@ import { EVENT_TYPES } from "@/components/app/event-types";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
+import { BESIDE_SHEET } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
 import { useDeleteGig, useUpdateGig } from "@/lib/queries/events";
@@ -90,6 +91,8 @@ export function GigDrawer({
   gigId,
   gig,
   fallbackTitle,
+  open = true,
+  beside = false,
   onClose,
 }: {
   bandId: string;
@@ -97,6 +100,10 @@ export function GigDrawer({
   gig: Gig | undefined;
   /** Shown while the full gig loads. */
   fallbackTitle?: string;
+  /** False while the drawer slides away after being replaced or closed. */
+  open?: boolean;
+  /** Sits left of the agenda sheet on wide screens instead of centering on the page. */
+  beside?: boolean;
   onClose: () => void;
 }) {
   const update = useUpdateGig(bandId, gigId);
@@ -120,7 +127,8 @@ export function GigDrawer({
   return (
     <>
       <BottomDrawer
-        open
+        open={open}
+        className={beside ? BESIDE_SHEET : undefined}
         onOpenChange={(open) => !open && onClose()}
         dismissible={!dirty}
         onDismissAttempt={requestClose}

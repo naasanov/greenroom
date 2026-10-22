@@ -3,6 +3,7 @@
 import {
   keepPreviousData,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -52,6 +53,12 @@ export const eventKeys = {
     ["bands", bandId, "places", q] as const,
 };
 
+const fetchEvents = (bandId: string, range: { from: string; to: string }) =>
+  api(
+    `/bands/${bandId}/events?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+    { schema: typed<CalendarEvent[]>() },
+  );
+
 /** Events (gigs plus expanded practice occurrences) between two instants. */
 export function useEvents(
   bandId: string | undefined,
@@ -59,13 +66,29 @@ export function useEvents(
 ) {
   return useQuery({
     queryKey: eventKeys.range(bandId ?? "", range?.from ?? "", range?.to ?? ""),
-    queryFn: () =>
-      api(
-        `/bands/${bandId}/events?from=${encodeURIComponent(range!.from)}&to=${encodeURIComponent(range!.to)}`,
-        { schema: typed<CalendarEvent[]>() },
-      ),
+    queryFn: () => fetchEvents(bandId!, range!),
     enabled: !!bandId && !!range,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Several event ranges at once (the agenda's chunks), sharing the calendar's cache keys. */
+export function useEventRanges(
+  bandId: string | undefined,
+  ranges: readonly { from: string; to: string }[],
+) {
+  return useQueries({
+    queries: ranges.map((range) => ({
+      queryKey: eventKeys.range(bandId ?? "", range.from, range.to),
+      queryFn: () => fetchEvents(bandId!, range),
+      enabled: !!bandId,
+    })),
+    combine: (results) =>
+      results.map((r) => ({
+        events: r.data,
+        pending: r.isPending,
+        failed: r.isError,
+      })),
   });
 }
 

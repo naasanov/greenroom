@@ -25,6 +25,7 @@ import { SegmentedToggle } from "@/components/app/segmented-toggle";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
+import { BESIDE_SHEET } from "@/components/events/beside-sheet";
 import {
   PracticeForm,
   type PracticeInitial,
@@ -117,6 +118,8 @@ export function PracticeDrawer({
   occurrenceKey,
   occ,
   fallbackTitle,
+  open = true,
+  beside = false,
   onClose,
   onEdited,
 }: {
@@ -125,6 +128,10 @@ export function PracticeDrawer({
   occurrenceKey: string;
   occ: PracticeOccurrence | undefined;
   fallbackTitle?: string;
+  /** False while the drawer slides away after being replaced or closed. */
+  open?: boolean;
+  /** Sits left of the agenda sheet on wide screens instead of centering on the page. */
+  beside?: boolean;
   onClose: () => void;
   /** Called with the edit result so the caller can follow the occurrence. */
   onEdited: (result: PracticeEditResult) => void;
@@ -182,7 +189,8 @@ export function PracticeDrawer({
   return (
     <>
       <BottomDrawer
-        open
+        open={open}
+        className={beside ? BESIDE_SHEET : undefined}
         onOpenChange={(open) => !open && onClose()}
         dismissible={!dirty}
         onDismissAttempt={requestClose}

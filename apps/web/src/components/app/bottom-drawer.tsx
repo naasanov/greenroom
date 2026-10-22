@@ -80,6 +80,7 @@ export function BottomDrawer({
     <Root open={isOpen} onOpenChange={setOpen} dismissible={dismissible}>
       {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
       <DrawerContent
+        data-exiting={open === false ? "" : undefined}
         onPointerDownOutside={dismissible ? requestClose : undefined}
         onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
         onEscapeKeyDown={(e) => {
