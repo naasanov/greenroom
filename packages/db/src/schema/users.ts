@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
+  calendarEmail: text("calendar_email"),
   googleSub: text("google_sub").unique(),
   lastBandId: uuid("last_band_id").references((): AnyPgColumn => bands.id, {
     onDelete: "set null",

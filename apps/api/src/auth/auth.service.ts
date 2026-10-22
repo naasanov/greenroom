@@ -115,11 +115,17 @@ export class AuthService {
 
   async updateProfile(
     userId: string,
-    patch: { displayName?: string; avatarUrl?: string | null },
+    patch: {
+      displayName?: string;
+      avatarUrl?: string | null;
+      calendarEmail?: string | null;
+    },
   ): Promise<User> {
     const set: Partial<typeof users.$inferInsert> = {};
     if (patch.displayName !== undefined) set.displayName = patch.displayName;
     if (patch.avatarUrl !== undefined) set.avatarUrl = patch.avatarUrl;
+    if (patch.calendarEmail !== undefined)
+      set.calendarEmail = patch.calendarEmail;
     if (Object.keys(set).length === 0) {
       const [u] = await this.db
         .select()
@@ -133,6 +139,11 @@ export class AuthService {
       .where(eq(users.id, userId))
       .returning();
     return await toUser(this.db, updated!);
+  }
+
+  /** Address Google Calendar invites go to: the calendar email, else sign-in email. */
+  inviteEmailFor(user: Pick<User, "email" | "calendarEmail">): string {
+    return user.calendarEmail ?? user.email;
   }
 
   newNonce(): string {

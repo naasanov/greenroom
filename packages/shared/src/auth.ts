@@ -5,6 +5,7 @@ export const userSchema = z.object({
   email: z.string(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
+  calendarEmail: z.string().nullable(),
   lastBandId: z.string().uuid().nullable(),
 });
 export type User = z.infer<typeof userSchema>;
@@ -27,9 +28,16 @@ export const authResultSchema = z.object({
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
 
+/** Optional address for calendar invites; blank clears it, stored lowercase. */
+export const calendarEmailSchema = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+  z.string().trim().toLowerCase().email().max(254).nullable(),
+);
+
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(100).optional(),
   avatarUrl: z.string().url().max(2048).nullable().optional(),
+  calendarEmail: calendarEmailSchema.optional(),
 });
 export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 

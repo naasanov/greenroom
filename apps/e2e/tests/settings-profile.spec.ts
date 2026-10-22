@@ -107,3 +107,41 @@ test("admin edits the band name and public profile", async ({
     page.getByTestId("settings-band").getByLabel("Instagram"),
   ).toHaveValue("https://instagram.com/hawks");
 });
+
+test("member sets, rejects, and clears a calendar email", async ({
+  page,
+  testApi,
+  loginAs,
+  db,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.dev.email);
+  await page.goto("/settings");
+  const field = page.getByLabel("Calendar email");
+  const save = page.getByRole("button", { name: "Save profile" });
+  const stored = async () =>
+    (await db.select().from(users).where(eq(users.id, USERS.dev.id)))[0]
+      ?.calendarEmail;
+
+  await expect(field).toHaveValue("");
+  await expect(field).toHaveAttribute("placeholder", USERS.dev.email);
+
+  await field.fill("not-an-email");
+  await save.click();
+  await expect(page.getByText("Enter a valid email address.")).toBeVisible();
+  expect(await stored()).toBeNull();
+
+  await field.fill("  Dev@Outlook.Test ");
+  await save.click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  expect(await stored()).toBe("dev@outlook.test");
+  await page.reload();
+  await expect(page.getByLabel("Calendar email")).toHaveValue(
+    "dev@outlook.test",
+  );
+
+  await page.getByLabel("Calendar email").fill("");
+  await save.click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  expect(await stored()).toBeNull();
+});

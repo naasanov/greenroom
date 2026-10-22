@@ -16,6 +16,11 @@ import { useMyInstruments, useSaveProfile, useSignOut } from "@/lib/queries";
 
 const personalSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
+  calendarEmail: z
+    .string()
+    .trim()
+    .max(254)
+    .refine((v) => v === "" || z.string().email().safeParse(v).success),
 });
 
 const sameSet = (a: string[], b: string[]) =>
@@ -34,7 +39,10 @@ function PersonalForm({
   const [instruments, setInstruments] = useState(initialInstruments);
   const form = useForm({
     resolver: zodResolver(personalSchema),
-    defaultValues: { displayName: user.displayName },
+    defaultValues: {
+      displayName: user.displayName,
+      calendarEmail: user.calendarEmail ?? "",
+    },
   });
   const dirty = form.formState.isDirty || !sameSet(instruments, baseline);
 
@@ -42,7 +50,10 @@ function PersonalForm({
     setSaved(false);
     save.mutate(
       {
-        profile: { displayName: v.displayName },
+        profile: {
+          displayName: v.displayName,
+          calendarEmail: v.calendarEmail === "" ? null : v.calendarEmail,
+        },
         instruments: {
           presets: instruments.filter((i) =>
             findInstrument(i),
@@ -52,7 +63,10 @@ function PersonalForm({
       },
       {
         onSuccess: (updated) => {
-          form.reset({ displayName: updated.displayName });
+          form.reset({
+            displayName: updated.displayName,
+            calendarEmail: updated.calendarEmail ?? "",
+          });
           setBaseline(instruments);
           setSaved(true);
         },
@@ -73,6 +87,30 @@ function PersonalForm({
         {form.formState.errors.displayName ? (
           <p role="alert" className="text-sm text-destructive">
             Enter the name your bandmates know you by.
+          </p>
+        ) : null}
+      </FormField>
+
+      <FormField
+        label="Calendar email"
+        htmlFor="settings-calendar-email"
+        hint="Gig and practice invites go here. Leave empty to use your sign-in email."
+      >
+        <Input
+          id="settings-calendar-email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          maxLength={254}
+          placeholder={user.email}
+          aria-invalid={!!form.formState.errors.calendarEmail}
+          {...form.register("calendarEmail", {
+            onChange: () => setSaved(false),
+          })}
+        />
+        {form.formState.errors.calendarEmail ? (
+          <p role="alert" className="text-sm text-destructive">
+            Enter a valid email address.
           </p>
         ) : null}
       </FormField>

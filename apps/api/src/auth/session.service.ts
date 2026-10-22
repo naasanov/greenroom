@@ -106,6 +106,7 @@ export async function toUser(
     email: row.email,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
+    calendarEmail: row.calendarEmail,
     lastBandId,
   };
 }
