@@ -13,13 +13,13 @@ Things the orchestrator cannot fully do itself. Rule: hand work to the orchestra
 
 **User does manually (browser consoles, payments, identity):**
 - **Domain:** buy/confirm the domain and put it on Cloudflare. `greenroom.fyi`, registered on Cloudflare 2026-10-19. Status: Done
-- **Google Cloud project:** create the project; enable Drive, Calendar, Picker, and Places APIs; configure the OAuth consent screen (keep it in Testing mode and add the band members as test users, which avoids Google verification for the full drive scope); create OAuth client IDs and a Places/Picker API key. Status: Not started
-- **Spotify developer app:** create the app; set the redirect URIs; copy the client id and secret. Status: Not started
-- **Magic-link email provider:** decided: Resend. Create the account and verify the sending domain. The DNS records can then go to the orchestrator. Status: Not started
-- **Sentry:** create the org and projects and copy the DSNs. Status: Not started
+- **Google Cloud project:** create the project; enable Drive, Calendar, Picker, and Places APIs; configure the OAuth consent screen; create the OAuth client, a Places server key, and a Picker browser key. Steps and Keychain names in [manual-setup.md](./manual-setup.md#google-cloud-project). Status: Not started
+- **Spotify developer app:** create the app; set the redirect URIs; copy the client id and secret. Steps in [manual-setup.md](./manual-setup.md#spotify-developer-app). Status: Not started
+- **Magic-link email provider:** decided: Resend. Create the account and API key; the orchestrator adds the DNS records. Steps in [manual-setup.md](./manual-setup.md#magic-link-email-provider). Status: Not started
+- **Sentry:** create the org and projects and copy the DSNs. Steps in [manual-setup.md](./manual-setup.md#sentry). Status: Not started
 - **Accounts + logins:** create accounts for Fly.io, Cloudflare, and GitHub with billing set up, then log in to the CLIs once on the dev machine (`fly auth login`, `gh auth login`) and create a scoped Cloudflare API token. GitHub + `gh` login done; Fly.io + `fly` login done (flyctl in `~/.fly/bin`, not Homebrew); Cloudflare API token in Keychain (`CLOUDFLARE_API_TOKEN`) with zone access verified. Status: Done
-- **Secrets:** put the keys above in a local .env / Fly secrets, or hand them to the orchestrator to set. Status: Not started
-- **Real test accounts for Phase 8:** a Google account and a Spotify account the walkthrough agent can use, with any 2FA prompts handled by the user. Status: Not started
+- **Secrets:** store each value in the Keychain under its env var name; the orchestrator loads them into .env and Fly. Steps in [manual-setup.md](./manual-setup.md#secrets). Status: Not started
+- **Real test accounts for Phase 8:** a Google account and a Spotify account the walkthrough agent can use, with any 2FA prompts handled by the user. Steps in [manual-setup.md](./manual-setup.md#real-test-accounts-for-phase-8). Status: Not started
 
 **Orchestrator does via CLI once logged in:**
 - GitHub repo (done: `naasanov/greenroom`, public), branch protection, Actions secrets (`gh`).
@@ -95,6 +95,7 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
+- Google consent screen publishing status. Testing mode (the earlier plan) makes Drive and Calendar refresh tokens expire after 7 days, so the band's link would break weekly. Recommended: publish to Production without verification; sign-in (basic scopes) has no warning, and only the admin linking Drive/Calendar sees Google's "unverified app" screen once (100-user cap, fine for a band).
 - Photos live in the band's Drive (decided 2026-10-22, see design.md). Open: a user in several bands has one photo per band's Drive. Upload once and copy to every band, or set it per band?
 
 # Temporary
