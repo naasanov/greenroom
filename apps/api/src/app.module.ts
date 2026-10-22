@@ -10,6 +10,8 @@ import { LineupsModule } from "./lineups/lineups.module.js";
 import { LinksModule } from "./links/links.module.js";
 import { SetlistsModule } from "./setlists/setlists.module.js";
 import { SongsModule } from "./songs/songs.module.js";
+import { stagingLoginEnabled } from "./staging-login/staging-login.enabled.js";
+import { StagingLoginModule } from "./staging-login/staging-login.module.js";
 import { testingEnabled } from "./testing/testing.enabled.js";
 import { TestingModule } from "./testing/testing.module.js";
 
@@ -27,6 +29,8 @@ import { TestingModule } from "./testing/testing.module.js";
     LinksModule,
     // The test-control API is only registered with fakes outside production.
     ...(testingEnabled() ? [TestingModule] : []),
+    // Passcode sign-in stands in for Google when fakes run with a passcode secret.
+    ...(stagingLoginEnabled() ? [StagingLoginModule] : []),
   ],
   controllers: [HealthController],
 })

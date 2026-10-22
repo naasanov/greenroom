@@ -6,6 +6,9 @@ import type {
   RefreshResult,
 } from "./google-oauth.adapter.js";
 
+import { apiPublicUrl } from "../../auth/auth.constants.js";
+import { stagingLoginEnabled } from "../../staging-login/staging-login.enabled.js";
+
 const CODE_PREFIX = "fake-code:";
 
 export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
@@ -20,6 +23,13 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
       scope: (input.scopes ?? ["openid", "email", "profile"]).join(" "),
       access_type: input.offline ? "offline" : "online",
     });
+    // With a staging passcode set, the API serves its own sign-in page.
+    if (stagingLoginEnabled()) {
+      return `${apiPublicUrl()}/fake-google/authorize?${new URLSearchParams({
+        redirect_uri: input.redirectUri,
+        state: input.state,
+      })}`;
+    }
     return `https://fake-accounts.google.test/o/oauth2/v2/auth?${params}`;
   }
 

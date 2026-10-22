@@ -119,3 +119,13 @@ Restore by creating a new volume from a snapshot (`fly volumes create pgdata --s
 | Total | about $3 to $4 |
 
 A dedicated IPv4 would add $2 per app; not needed.
+
+## Staging sign-in
+
+Staging runs fake integrations, so Google sign-in and magic-link email do not work. Instead, setting a passcode secret makes "Sign in with Google" open a built-in page at `/fake-google/authorize` (email, passcode, and an option to create a "Demo Band" with sample members, gigs, songs and a weekly practice when the user has no band).
+
+```sh
+fly secrets set STAGING_LOGIN_PASSCODE=<passcode> -a greenroom-staging-api
+```
+
+The route exists only when `INTEGRATIONS_MODE=fake` and the secret is non-empty, both read at startup. Never set it on prod: prod runs real integrations, so the route never exists there. Wrong passcodes are limited to 10 per IP per 15 minutes.
