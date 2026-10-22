@@ -274,7 +274,8 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 ## Playlists & Spotify auth
 - Import playlist: paste a playlist link. Songs already in the library are skipped (no duplicates).
 - Export: whole library or a setlist can be exported as a Spotify playlist.
-- **Spotify auth is lazy.** Track lookup, search, and public playlist import use app-level credentials, so no user login is needed. User Spotify login is only requested when actually needed (first export, or importing a private playlist). Never at signup.
+- **Spotify auth is lazy.** Track lookup and search use app-level credentials, so no user login is needed. User Spotify login is requested when actually needed: the first playlist import (any playlist) or the first export. Never at signup.
+  - **Playlist import needs Spotify login (decided 2026-10-22):** Spotify's Web API no longer returns playlist contents to app-level credentials (the playlist's tracks are omitted, and the items endpoint answers "Valid user authentication required"), so every playlist import goes through the lazy login. Each member who imports must be listed in the Spotify app's User Management while the app is in development mode.
 - **Private playlist import:** private playlists require the user's Spotify login. If a pasted playlist can't be found while logged out, show "Can't see this playlist — it might be private" with a "Log in with Spotify" button (private and nonexistent look the same to the API, so the copy covers both). After login, automatically retry the same link. If it still fails, show a plain "playlist not found."
 - Possible follow-up once logged in: a "pick from my playlists" list as an alternative to pasting links.
 
