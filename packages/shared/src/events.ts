@@ -282,6 +282,8 @@ export interface GigEvent {
   endsAt: string | null;
   timeZone: string;
   venueName: string | null;
+  /** User ids of the people in the gig's lineup. */
+  lineupUserIds: string[];
 }
 
 export interface PracticeEvent {

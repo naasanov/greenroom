@@ -1,7 +1,9 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { and, between, eq, isNull, lte, or } from "drizzle-orm";
+import { and, between, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import {
+  gigLineup,
   gigs,
+  memberships,
   practiceOccurrenceOverrides as overridesTable,
   practiceSeries,
   type Database,
@@ -70,9 +72,30 @@ export class EventsService {
             between(gigs.date, fromDate, toDate),
           ),
         );
-      for (const g of rows) {
+      const inRange = rows.filter((g) => {
         const span = gigSpan(g);
-        if (!overlaps(span.start, span.end, from, to)) continue;
+        return overlaps(span.start, span.end, from, to);
+      });
+      const lineups = new Map<string, string[]>();
+      if (inRange.length > 0) {
+        const lineupRows = await this.db
+          .select({ gigId: gigLineup.gigId, userId: memberships.userId })
+          .from(gigLineup)
+          .innerJoin(memberships, eq(memberships.id, gigLineup.membershipId))
+          .where(
+            inArray(
+              gigLineup.gigId,
+              inRange.map((g) => g.id),
+            ),
+          );
+        for (const r of lineupRows) {
+          const list = lineups.get(r.gigId) ?? [];
+          if (!list.includes(r.userId)) list.push(r.userId);
+          lineups.set(r.gigId, list);
+        }
+      }
+      for (const g of inRange) {
+        const span = gigSpan(g);
         const ev: GigEvent = {
           type: "gig",
           id: g.id,
@@ -83,6 +106,7 @@ export class EventsService {
           endsAt: g.endsAt?.toISOString() ?? null,
           timeZone: g.timeZone,
           venueName: g.venueName,
+          lineupUserIds: lineups.get(g.id) ?? [],
         };
         items.push({
           sort: span.start.getTime(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarX2, List, Loader2 } from "lucide-react";
+import { CalendarX2, ChevronDown, List, Loader2, User } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -9,12 +9,21 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CalendarEvent } from "@greenroom/shared";
+import type { BandMember, CalendarEvent } from "@greenroom/shared";
 import { EmptyState } from "@/components/app/empty-state";
 import { EVENT_TYPES } from "@/components/app/event-types";
 import { RightSheet } from "@/components/app/right-sheet";
 import { SegmentedToggle } from "@/components/app/segmented-toggle";
 import { dayLabel, time12, wallClock } from "@/components/events/time";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useMe, useMembers } from "@/lib/queries";
 import { useEventRanges } from "@/lib/queries/events";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
@@ -25,6 +34,15 @@ const useAgendaFilter = createLocalChoice<AgendaFilter>(
   "greenroom:agenda-filter",
   ["all", "gig", "practice"],
   "all",
+);
+
+type PersistedMember = "everyone" | "me";
+
+// Only "Everyone" and "Me" persist; another member's choice lasts until close.
+const useAgendaMember = createLocalChoice<PersistedMember>(
+  "greenroom:agenda-member",
+  ["everyone", "me"],
+  "everyone",
 );
 
 const FILTERS = [
@@ -160,6 +178,68 @@ function AgendaCard({
   );
 }
 
+function MemberAvatar({ member }: { member: BandMember }) {
+  return (
+    <Avatar aria-hidden="true" className="size-6">
+      {member.avatarUrl ? <AvatarImage src={member.avatarUrl} alt="" /> : null}
+      <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
+        {member.displayName.slice(0, 1).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+/** Header dropdown choosing whose gigs the agenda shows. */
+function MemberMenu({
+  value,
+  label,
+  others,
+  onValueChange,
+}: {
+  value: string;
+  label: string;
+  others: BandMember[];
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-testid="agenda-member"
+          aria-label={`Show gigs for: ${label}`}
+          className="flex h-9 max-w-[9.5rem] min-w-0 items-center gap-1.5 rounded-xl px-2 text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=open]:bg-muted"
+        >
+          <User className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{label}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-56 max-w-[calc(100vw-1.5rem)]"
+      >
+        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
+          <DropdownMenuRadioItem value="everyone">
+            Everyone
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="me">Me</DropdownMenuRadioItem>
+          {others.map((m) => (
+            <DropdownMenuRadioItem
+              key={m.userId}
+              value={m.userId}
+              className="gap-2.5"
+            >
+              <MemberAvatar member={m} />
+              <span className="min-w-0 truncate">{m.displayName}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function Spinner() {
   return (
     <div className="flex h-8 shrink-0 items-center justify-center">
@@ -202,6 +282,10 @@ export function AgendaSheet({
   onSelect: (event: CalendarEvent) => void;
 }) {
   const [filter, setFilterRaw] = useAgendaFilter();
+  const [persistedMember, setPersistedMember] = useAgendaMember();
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const members = useMembers(bandId).data;
+  const meId = useMe().data?.id;
   const [start, setStart] = useState(startOfToday);
   const [pastCount, setPastCount] = useState(1);
   const [futureCount, setFutureCount] = useState(1);
@@ -211,6 +295,7 @@ export function AgendaSheet({
   // Each open starts from a fresh "today" and the initial window.
   if (open !== wasOpen) {
     setWasOpen(open);
+    if (!open) setOtherUserId(null);
     if (open) {
       setTouched(true);
       setStart(startOfToday());
@@ -250,12 +335,32 @@ export function AgendaSheet({
   const ready =
     !!bandId && !pastChunks[0]?.pending && !futureChunks[0]?.pending;
 
+  const other = otherUserId
+    ? (members?.find((m) => m.userId === otherUserId) ?? null)
+    : null;
+  const memberValue = other
+    ? other.userId
+    : persistedMember === "me"
+      ? "me"
+      : "everyone";
+  // The user id whose lineup must include a gig; null shows every gig.
+  const memberId = other ? other.userId : memberValue === "me" ? meId : null;
+  const memberLabel = other
+    ? (other.displayName.split(" ")[0] ?? other.displayName)
+    : memberValue === "me"
+      ? "Me"
+      : "Everyone";
+  const otherMembers = (members ?? []).filter((m) => m.userId !== meId);
+
   const todayStr = localIsoDate(start);
   const { past, upcoming } = useMemo(() => {
     const byId = new Map<string, CalendarEvent>();
     for (const c of chunks) {
       for (const e of c.events ?? []) {
-        if (filter === "all" || e.type === filter) byId.set(e.id, e);
+        if (filter !== "all" && e.type !== filter) continue;
+        if (memberId && e.type === "gig" && !e.lineupUserIds.includes(memberId))
+          continue;
+        byId.set(e.id, e);
       }
     }
     const sorted = [...byId.values()].sort((a, b) =>
@@ -265,7 +370,7 @@ export function AgendaSheet({
       past: sorted.filter((e) => e.date < todayStr),
       upcoming: sorted.filter((e) => e.date >= todayStr),
     };
-  }, [chunks, filter, todayStr]);
+  }, [chunks, filter, memberId, todayStr]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLDivElement>(null);
@@ -276,6 +381,16 @@ export function AgendaSheet({
   const setFilter = (next: AgendaFilter) => {
     positioned.current = false;
     setFilterRaw(next);
+  };
+
+  const setMember = (next: string) => {
+    positioned.current = false;
+    if (next === "everyone" || next === "me") {
+      setOtherUserId(null);
+      setPersistedMember(next);
+    } else {
+      setOtherUserId(next);
+    }
   };
 
   // Scroll position: land on the today line once data is in, then keep the
@@ -343,6 +458,14 @@ export function AgendaSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Agenda"
+      headerActions={
+        <MemberMenu
+          value={memberValue}
+          label={memberLabel}
+          others={otherMembers}
+          onValueChange={setMember}
+        />
+      }
       bodyRef={scrollRef}
       bodyClassName="p-0 [overflow-anchor:none]"
     >
@@ -370,9 +493,11 @@ export function AgendaSheet({
             icon={CalendarX2}
             title="No events yet"
             description={
-              filter === "all"
-                ? "Gigs and practices you add will show up here."
-                : `No ${filter === "gig" ? "gigs" : "practices"} to show.`
+              memberId
+                ? `No gigs for ${other ? memberLabel : "you"}.`
+                : filter === "all"
+                  ? "Gigs and practices you add will show up here."
+                  : `No ${filter === "gig" ? "gigs" : "practices"} to show.`
             }
           />
         ) : (

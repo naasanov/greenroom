@@ -306,7 +306,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Reached from the profile icon (not a nav tab). Split into two sections:
 
 ## Personal settings (every user)
-- Name, photo, instruments, Spotify connection, log out.
+- Name, photo, instruments, calendar email (where event invites go; defaults to the sign-in email), Spotify connection, log out.
 
 ## Band settings (admins only)
 - Band name and photo.
@@ -346,6 +346,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Same lazy pattern as Drive: the Events tab works fully without Google Calendar. An unlinked band shows a small banner on the Events tab offering to connect (also available in Band settings).
 - On connect, the app creates a **new dedicated calendar named after the band** in the connecting account, rather than writing into anyone's personal calendar.
 - Every practice and gig on that calendar invites band members as attendees by email. Members RSVP from their own Google Calendar, which is what drives the two-way decline/RSVP sync.
+- **Calendar email (decided 2026-10-22):** each user has an optional "calendar email" in personal settings, and invites go there instead of the sign-in email. This covers members on other calendars (e.g. Outlook): they get standard invites that update automatically and RSVP from their own calendar, with replies flowing back through Google. Subscribing to the band calendar is not the main path because it has no per-person RSVP.
 - Ownership follows the same rule as Drive: the band chooses whose account (dedicated band account or a member's).
 
 # Multiple bands & leaving

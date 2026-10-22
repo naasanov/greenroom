@@ -10,7 +10,7 @@ All routes sit under `/bands/:bandId/...` behind `@BandMember()` (non-members ge
 - `PUT /practices/:seriesId/occurrences/:key/setlist` `{setlistId, scope: this | this_and_following, onConflict?: replace | keep}`.
 - `POST .../setlist` `{scope, onConflict?, sourceSetlistId?, copyCurrent?}` creates a new setlist (optionally pre-filled from another setlist or the one in force) and assigns it; returns the assignment result plus `newSetlistId`.
 - `DELETE .../setlist?scope=&onConflict=` clears the occurrence's setlist (same scopes and conflict flags).
-- `GET /events?from=&to=&type=gig|practice` (ISO instants, at most 400 days). Gigs plus expanded occurrences, time ordered, each with a `type` discriminator.
+- `GET /events?from=&to=&type=gig|practice` (ISO instants, at most 400 days). Gigs plus expanded occurrences, time ordered, each with a `type` discriminator. Gig events carry `lineupUserIds` (user ids from `gig_lineup`, loaded in one query for the range); practices do not.
 - `GET /places/autocomplete?q=` and `GET /places/:placeId` through the Places adapter; 30 requests per minute per user.
 
 ## Occurrence key
