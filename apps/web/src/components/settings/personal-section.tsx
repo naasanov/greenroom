@@ -8,6 +8,7 @@ import type { PresetInstrumentKey, User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
 import { InstrumentPicker } from "@/components/app/instrument-picker";
 import { findInstrument } from "@/components/app/instruments";
+import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -189,6 +190,8 @@ export function PersonalSection({ user }: { user: User }) {
           Loading...
         </p>
       )}
+
+      <SpotifyRow />
 
       <Button
         variant="outline"

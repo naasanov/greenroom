@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ListMusic } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ImportProgress } from "@greenroom/shared";
 import { SONG_ERROR_CODES } from "@greenroom/shared";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
+import { connectSpotify, useSpotifyStatus } from "@/lib/queries/spotify";
 import { useImportProgress, useStartImport } from "@/lib/queries/songs";
 
 function summary(p: ImportProgress): string {
@@ -49,13 +50,57 @@ function Progress({ progress }: { progress: ImportProgress | undefined }) {
   );
 }
 
+function ConnectPrompt({
+  url,
+  notice,
+  onCancel,
+}: {
+  url: string;
+  notice?: string;
+  onCancel: () => void;
+}) {
+  const target = url.trim() ? `?import=${encodeURIComponent(url.trim())}` : "";
+  return (
+    <div className="flex flex-col gap-4" data-testid="import-connect">
+      <p className="text-base font-medium">
+        Connect Spotify to import playlists
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Spotify only shares playlist contents with a signed-in account, so you
+        need to connect yours once.
+      </p>
+      {notice ? (
+        <p
+          role="alert"
+          data-testid="import-connect-error"
+          className="text-sm text-destructive"
+        >
+          {notice}
+        </p>
+      ) : null}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={() => connectSpotify(`/library${target}`)}>
+          Connect Spotify
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ImportBody({
   bandId,
   initialUrl,
+  autoStart,
+  connectError,
   onDone,
 }: {
   bandId: string;
   initialUrl: string;
+  autoStart: boolean;
+  connectError: boolean;
   onDone: () => void;
 }) {
   const [url, setUrl] = useState(initialUrl);
@@ -64,6 +109,28 @@ function ImportBody({
   const progress = useImportProgress(bandId, importId);
   const data = progress.data;
   const finished = data?.status === "completed" || data?.status === "failed";
+
+  const status = useSpotifyStatus();
+  const [needsLogin, setNeedsLogin] = useState(connectError);
+  const startedRef = useRef(false);
+  const begin = (value: string) =>
+    start.mutate(value, {
+      onSuccess: (p) => setImportId(p.importId),
+      onError: (e) => {
+        if (
+          isApiError(e, 409) &&
+          e.code === SONG_ERROR_CODES.spotifyLoginRequired
+        ) {
+          setNeedsLogin(true);
+        }
+      },
+    });
+  useEffect(() => {
+    if (!autoStart || startedRef.current || !initialUrl.trim()) return;
+    startedRef.current = true;
+    begin(initialUrl.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const error = start.error;
   const privateOrMissing =
@@ -89,13 +156,29 @@ function ImportBody({
 
   if (importId) return <Progress progress={data} />;
 
+  if (needsLogin) {
+    return (
+      <ConnectPrompt
+        url={url}
+        notice={
+          connectError ? "Couldn't connect Spotify. Try again." : undefined
+        }
+        onCancel={onDone}
+      />
+    );
+  }
+
   return (
     <form
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         if (!url.trim()) return;
-        start.mutate(url.trim(), { onSuccess: (p) => setImportId(p.importId) });
+        if (status.data && !status.data.connected) {
+          setNeedsLogin(true);
+          return;
+        }
+        begin(url.trim());
       }}
     >
       <Input
@@ -136,11 +219,17 @@ export function ImportDialog({
   open,
   onOpenChange,
   initialUrl = "",
+  autoStart = false,
+  connectError = false,
 }: {
   bandId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialUrl?: string;
+  /** Starts the import as soon as the dialog opens (after a Spotify return). */
+  autoStart?: boolean;
+  /** Opens on the connect prompt with a failed-connection notice. */
+  connectError?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,6 +247,8 @@ export function ImportDialog({
           <ImportBody
             bandId={bandId}
             initialUrl={initialUrl}
+            autoStart={autoStart}
+            connectError={connectError}
             onDone={() => onOpenChange(false)}
           />
         ) : null}

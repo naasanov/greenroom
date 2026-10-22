@@ -1,8 +1,8 @@
 "use client";
 
 import { ListMusic, Music, Plus, Search, X } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongSort } from "@greenroom/shared";
 import { SONG_SORTS } from "@greenroom/shared";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useSongs } from "@/lib/queries/songs";
+import { pathWithout } from "@/lib/queries/spotify";
 import { cn } from "@/lib/utils";
 import { ImportDialog } from "./import-dialog";
 import { SongSheet, type SheetTarget } from "./song-sheet";
@@ -55,6 +56,30 @@ export function LibraryView({ bandId }: { bandId: string }) {
   const [adding, setAdding] = useState<number | null>(null);
   const nonce = useRef(0);
   const [importing, setImporting] = useState<string | null>(null);
+  const [resume, setResume] = useState<"start" | "error" | null>(null);
+  const router = useRouter();
+  const urlParams = useSearchParams();
+  const spotifyParam = urlParams.get("spotify");
+  const importParam = urlParams.get("import");
+  // Returning from the Spotify login resumes the import, then clears the params.
+  const returnKey =
+    spotifyParam === "connected" || spotifyParam === "error"
+      ? `${spotifyParam}|${importParam ?? ""}`
+      : null;
+  const [handledKey, setHandledKey] = useState<string | null>(null);
+  if (returnKey !== handledKey && (returnKey || handledKey)) {
+    setHandledKey(returnKey);
+    if (returnKey) {
+      const ok = spotifyParam === "connected" && !!importParam;
+      setResume(ok ? "start" : spotifyParam === "error" ? "error" : null);
+      if (ok || spotifyParam === "error") setImporting(importParam ?? "");
+    }
+  }
+  useEffect(() => {
+    if (returnKey) {
+      router.replace(pathWithout(pathname, urlParams, ["spotify", "import"]));
+    }
+  }, [returnKey, pathname, router, urlParams]);
   const [search, setSearch] = useState("");
   const q = useDebounced(search.trim(), 250);
   const [sort, setSort] = useState<SongSort>("recent");
@@ -257,8 +282,14 @@ export function LibraryView({ bandId }: { bandId: string }) {
       <ImportDialog
         bandId={bandId}
         open={importing !== null}
-        onOpenChange={(o) => !o && setImporting(null)}
+        onOpenChange={(o) => {
+          if (o) return;
+          setImporting(null);
+          setResume(null);
+        }}
         initialUrl={importing ?? ""}
+        autoStart={resume === "start"}
+        connectError={resume === "error"}
       />
       <DiscardChangesDialog
         open={discard !== null}

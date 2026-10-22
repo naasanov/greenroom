@@ -1,4 +1,8 @@
-import { request as pwRequest, type APIRequestContext } from "@playwright/test";
+import {
+  request as pwRequest,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 import { API_URL } from "../src/env.js";
 import { expect } from "../src/fixtures.js";
 
@@ -39,4 +43,31 @@ export async function connectSpotify(
   });
   expect(cb.status()).toBe(302);
   expect(cb.headers()["location"]).toContain("spotify=connected");
+}
+
+/**
+ * Stands in for Spotify's consent page. Playwright cannot route the dead
+ * authorize host after a server redirect, so the API's start redirect is
+ * fetched here and answered with the real callback URL (fake code or denial).
+ */
+export async function fakeSpotifyConsent(
+  page: Page,
+  outcome: "approve" | "deny" = "approve",
+): Promise<void> {
+  await page
+    .context()
+    .route("**/integrations/spotify/start*", async (route) => {
+      const res = await route.fetch({ maxRedirects: 0 });
+      const authorize = new URL(res.headers()["location"]!);
+      const cb = new URL(authorize.searchParams.get("redirect_uri")!);
+      cb.searchParams.set("state", authorize.searchParams.get("state")!);
+      if (outcome === "approve")
+        cb.searchParams.set("code", "fake-code:tester");
+      else cb.searchParams.set("error", "access_denied");
+      // WebKit rejects fulfilled redirects, so a tiny page performs the hop.
+      await route.fulfill({
+        contentType: "text/html",
+        body: `<script>location.replace(${JSON.stringify(cb.toString())})</script>`,
+      });
+    });
 }
