@@ -175,6 +175,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - On each card: title, date, time, and a type indicator (gig vs. practice). Time is worth including (identifying — afternoon vs. evening gig — and tiny). Maybe venue NAME on gigs; NOT the full address (address is post-open detail, not scan-time).
 - Tapping a card opens the SAME event drawer, populated. On desktop it opens beside the sheet (to its left); on a narrow phone screen there's no room side-by-side, so it comes up over the sheet (consistent with the drawer elsewhere).
 - Gig/practice/both filter lives HERE (a list genuinely benefits from "just gigs"), which is the same filter consciously deferred on the calendar itself — kept here, calendar stays unfiltered.
+- **Member filter (decided 2026-10-22):** a dropdown in the agenda: Everyone (default), Me at the top, then every other member. Picking a member shows only gigs whose lineup includes them; practices are whole-band and always stay listed. This is where "a member's upcoming gigs" lives, not the roster detail sheet.
 - Creating an event: click a day → a drawer slides up from the bottom. First choice inside the drawer is gig vs. practice, presented as a split: the drawer is cut vertically in half — left half is "Practice," right half is "Gig." Tapping a half slides the drawer horizontally to that side's form (gig form or practice form). Gives each type its own "room."
   - Must be easy to go back if you pick the wrong side: both a back arrow AND swipe-back to return to the split. The return trip has to be cheap so the choice never feels like a one-way trapdoor.
 - Floating FAB (+ button) in the corner that opens the SAME event drawer — a way to add an event without first clicking a day on the calendar. More discoverable (universal "new thing" gesture) and handles the case where you don't have a specific date in mind yet (tentative gig). The drawer covers the FAB when open.
@@ -288,7 +289,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 # Roster tab
 - List of band members as cards (same card style as the Music Library): name, photo, instrument icons.
-- Tapping a card opens the same right-hand detail sheet (full-screen on mobile) with contact info and possibly their upcoming gigs.
+- Tapping a card opens the same right-hand detail sheet (full-screen on mobile) with contact info. A member's upcoming gigs are found through the agenda's member filter instead (decided 2026-10-22).
 - **Invite link button takes the place of the plus/create button** used on the other tabs.
 - **Deferred:** subs / fill-in players who aren't full members. It's an edge case; leave it out of the first implementation.
 - **Roles:** the band creator is an admin. Admins can promote other members to admin, remove members, and reset (regenerate) the invite link. Everyone else is a regular member.
@@ -336,6 +337,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 # Linking Google Drive
 - A band starts in an **unlinked** state. The first time anyone interacts with media, they see "This band hasn't been linked to a Google Drive yet" with a button to link it now (also available in Band settings).
 - Linking flow: Google sign-in, then the **Google Picker** to choose which folder the band's media lives in (never dumped in the Drive root). The app builds the Gigs structure inside that folder.
+- **Photos live in Drive too (decided 2026-10-22):** the band photo and member profile photos are stored in a top-level "Profile photos" folder inside the band's linked folder, next to Gigs. Until Drive is linked, avatars fall back to the Google profile photo or initials.
 - **Decided scope: full Drive access** (`drive` scope), not `drive.file`. Researched: with `drive.file`, picking a folder does NOT grant access to its contents, so files added directly in Drive would be invisible to the app and the changes poller. Full access lets the poller see outside-the-app uploads too. Trade-off accepted: since it's essentially just our band using it, users will see Google's "unverified app" warning rather than going through Google's restricted-scope review. Revisit if the app is ever opened to other bands. The picked folder is still where the app stores media and the scope it watches.
 - **Ownership is the band's choice:** a dedicated band Google account or a member's personal account. The app doesn't enforce either. (Risk to note: if the linked account's owner leaves, media access goes with them.)
 - Files added directly in the Drive folder outside the app DO show up in the app (via the changes poller), landing in the matching folder section, or Unsorted if they're not in a known folder.

@@ -56,7 +56,7 @@ Parallel group 3A
 - **3.3 Music Library.** Smart add input (Spotify/YouTube links, Spotify search, manual), progressive disclosure, song detail sheet (view/edit, links with favicons, notes, used-in, delete warning), list, search, sorts, duplicate check, playlist import with progress + summary, Songsterr suggestion. App-level Spotify credentials only. Status: Done (2026-10-21: library list, smart add sheet, song detail sheet, playlist import, real YouTube and Songsterr adapters; real Spotify adapter for search, track lookup, and public playlists built 2026-10-21 against stubbed responses; live check waits for the Spotify app credentials)
 - **3.4 Roster + Settings.** Member cards, member detail sheet, invite link button, admin actions (promote, remove, reset link), leave band + last-admin rules, personal and band settings. Status: Done (2026-10-20: roster cards, member sheet with email and instruments, invite link button in the FAB spot, promote/demote/remove and invite reset for admins, leave band with last-admin and delete-band rules, personal settings (name, instruments, sign out) and admin band settings (name, bio, booking email, social links); no photo upload or per-member upcoming gigs yet)
 
-🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Awaiting review (2026-10-22, staging runs fake integrations; full e2e suite green)
+🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Awaiting review (2026-10-22, staging runs fake integrations; full e2e suite green. Feedback round 1: agenda member filter in progress)
 
 # Phase 4: Setlists + lineup
 - **4.1 Setlists.** Library drawer beside the event drawer with drag-in, phone tap-to-add fallback, drag-to-reorder, running total time, duplicate a past setlist (search gig history), add-song-in-place (adds to library and setlist), practice setlists with this-and-following + custom-setlist warning. Status: In progress (backend API built 2026-10-20: setlists, gig history copy, add-song-in-place, practice setlist create/clear; UI waits for Gates 1-2)
@@ -67,7 +67,7 @@ Parallel group 3A
 # Phase 5: Integrations
 Parallel group 5A
 - **5.1 Google Calendar sync.** Lazy link banner, dedicated band calendar, members as attendees, two-way sync with etags and last-write-wins, delete wins, recurrence round-trip, RSVPs mapped to attendee status (accepted / tentative / declined / needs action), single RSVP list in the practice drawer. Status: Not started
-- **5.2 Google Drive link.** Unlinked state, Google sign-in + Picker, full drive scope, Gigs folder structure, file-ID references, changes-API poller, missing-file placeholders. Status: Not started
+- **5.2 Google Drive link.** Unlinked state, Google sign-in + Picker, full drive scope, Gigs folder structure, file-ID references, changes-API poller, missing-file placeholders, band and member photo upload into the "Profile photos" folder. Status: Not started
 - **5.3 Spotify user auth.** Add a Spotify user-OAuth adapter + fake (auth URL, code exchange, refresh; not in the 0.4 adapter set). Lazy login, export library/setlist to playlist (skipped-songs message), private playlist import with retry flow. Status: Not started
 
 # Phase 6: Media
@@ -95,7 +95,7 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
-- Where do user and band photos live (personal/band settings)? Options: Google profile photo URL only, a small object store (e.g. Tigris on Fly), or the band's Drive. Blocks photo upload in 3.4 (built without upload: avatar or initials only); not urgent.
+- Photos live in the band's Drive (decided 2026-10-22, see design.md). Open: a user in several bands has one photo per band's Drive. Upload once and copy to every band, or set it per band?
 
 # Temporary
 - **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (live)
