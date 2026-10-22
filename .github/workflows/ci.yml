@@ -20,9 +20,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+  e2e:
+    name: e2e (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:17
@@ -47,17 +67,28 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm build
       - name: Create test database
         run: PGPASSWORD=greenroom psql -h localhost -U greenroom -d greenroom -c "CREATE DATABASE greenroom_test"
-      - run: pnpm --filter @greenroom/e2e exec playwright install --with-deps chromium webkit
-      - run: pnpm test:e2e
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @greenroom/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright browsers and system deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @greenroom/e2e exec playwright install --with-deps chromium webkit
+      - name: Install Playwright system deps (browsers cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @greenroom/e2e exec playwright install-deps chromium webkit
+      - run: pnpm test:e2e -- --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/e2e/playwright-report
             apps/e2e/test-results
