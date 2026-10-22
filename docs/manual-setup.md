@@ -26,7 +26,7 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - App name `Greenroom`, user support email: yours. Audience: **External**. Contact email: yours. Agree and **Create**.
    - **Branding**: app home page `https://greenroom.fyi`, authorized domain `greenroom.fyi`. Save.
    - **Data access > Add or remove scopes**: add `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `https://www.googleapis.com/auth/drive`, `https://www.googleapis.com/auth/calendar`. Save.
-   - **Audience > Publishing status**: see the open question in execution-plan.md before choosing. Testing mode makes Drive and Calendar logins expire every 7 days. If you stay in Testing, add every band member's Google email under **Test users**.
+   - **Audience > Publishing status**: click **Publish app** to move it to **In production**. Do not submit it for verification. Testing mode would make Drive and Calendar logins expire every 7 days. Sign-in shows no warning; the admin who links Drive or Calendar sees Google's "unverified app" screen once (click **Advanced > Go to Greenroom**). Unverified apps are capped at 100 users.
 5. Create the OAuth client: **Clients** (or **Credentials > Create credentials > OAuth client ID**) > type **Web application**, name `Greenroom web`.
    - Authorized JavaScript origins: `https://staging.greenroom.fyi`, `https://greenroom.fyi`, `http://localhost:3000`
    - Authorized redirect URIs (all six):
@@ -93,7 +93,7 @@ Done by following "How to hand over secrets" above for each item. Mark this done
 ## Real test accounts for Phase 8
 An agent walks through the real app on staging in Phase 8 with real Google and Spotify accounts.
 
-1. Create (or pick) a Google account for testing, e.g. a new Gmail. If the Google Cloud project stays in Testing mode, add it under **Test users**.
+1. Create (or pick) a Google account for testing, e.g. a new Gmail.
 2. Create (or pick) a free Spotify account and add its email under the Spotify app's **User Management**.
 3. Keep your phone nearby during the walkthrough: you'll be asked to complete sign-ins and any 2FA prompts yourself. Passwords are never handed over.
 4. Tell the orchestrator the two account emails (not secrets).

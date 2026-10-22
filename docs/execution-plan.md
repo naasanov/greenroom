@@ -95,7 +95,6 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
-- Google consent screen publishing status. Testing mode (the earlier plan) makes Drive and Calendar refresh tokens expire after 7 days, so the band's link would break weekly. Recommended: publish to Production without verification; sign-in (basic scopes) has no warning, and only the admin linking Drive/Calendar sees Google's "unverified app" screen once (100-user cap, fine for a band).
 - Photos live in the band's Drive (decided 2026-10-22, see design.md). Open: a user in several bands has one photo per band's Drive. Upload once and copy to every band, or set it per band?
 
 # Temporary
