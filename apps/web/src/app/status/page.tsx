@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { ExternalLink, TriangleAlert } from "lucide-react";
 import { parsePlan } from "@/lib/plan";
+import { parseSetupDoc, type SetupSection } from "@/lib/setup-doc";
+import { ManualSetup } from "@/components/status/manual-setup";
 import { PlanTree } from "@/components/status/plan-tree";
 import { Summary } from "@/components/status/summary";
 
@@ -24,6 +26,19 @@ async function loadPlan() {
     return plan.phases.length > 0 ? plan : null;
   } catch {
     return null;
+  }
+}
+
+const SETUP_URL =
+  "https://raw.githubusercontent.com/naasanov/greenroom/main/docs/manual-setup.md";
+
+async function loadSetupDoc(): Promise<SetupSection[]> {
+  try {
+    const res = await fetch(SETUP_URL, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    return parseSetupDoc(await res.text());
+  } catch {
+    return [];
   }
 }
 
@@ -50,7 +65,7 @@ export default function StatusPage() {
 // Rendered per request (the fetch itself is cached for 60s), never at build time.
 async function StatusContent() {
   await connection();
-  const plan = await loadPlan();
+  const [plan, setupSections] = await Promise.all([loadPlan(), loadSetupDoc()]);
   const fetchedAt = new Date().toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -81,6 +96,7 @@ async function StatusContent() {
         <div className="space-y-8">
           <Summary plan={plan} />
           <PlanTree plan={plan} />
+          <ManualSetup plan={plan} sections={setupSections} />
         </div>
       ) : (
         <div className="rounded-2xl border bg-card p-6 text-center">
