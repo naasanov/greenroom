@@ -35,3 +35,4 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Non-modal drawer gotchas](drawer-nonmodal-gotchas.md) — Radix stays modal under Vaul; close event drawers by id; focus trap and aria-hidden caveats
 - [E2E test scope](e2e-test-scope.md) — targeted specs + smoke during work; full suite only at ticket end or gates
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting
+- [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together
