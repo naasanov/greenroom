@@ -386,7 +386,7 @@ export function PracticeForm({
       </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Date" htmlFor={id("date")}>
+        <FormField label="Date" htmlFor={id("date")} className="col-span-2">
           <Input
             id={id("date")}
             type="date"

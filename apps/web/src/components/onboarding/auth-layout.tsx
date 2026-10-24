@@ -23,7 +23,7 @@ export function AuthLayout({
   className?: string;
 }) {
   return (
-    <main className="pt-safe pb-safe flex flex-1 flex-col items-center justify-center bg-background px-4 py-10">
+    <main className="flex flex-1 flex-col items-center justify-center bg-background px-4 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))]">
       <div className={cn("flex w-full max-w-md flex-col gap-6", className)}>
         {children}
       </div>

@@ -144,7 +144,9 @@ export function RightSheet({
         {children}
       </div>
       {footer ? (
-        <div className="pb-safe border-t px-5 pt-3 pb-3">{footer}</div>
+        <div className="border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {footer}
+        </div>
       ) : (
         <div className="pb-safe" />
       )}
