@@ -5,6 +5,7 @@ import type { CreateGig } from "@greenroom/shared";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EVENT_TYPES } from "@/components/app/event-types";
 import { SplitDrawer } from "@/components/app/split-drawer";
+import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import {
   PracticeForm,
@@ -20,6 +21,7 @@ export function CreateEventDrawer({
   defaultDate,
   onOpenChange,
   onCreated,
+  beside = false,
 }: {
   bandId: string;
   open: boolean;
@@ -28,6 +30,8 @@ export function CreateEventDrawer({
   onOpenChange: (open: boolean) => void;
   /** Called with the local date of the first created event. */
   onCreated: (date: string) => void;
+  /** Sits left of the agenda sheet on wide screens. */
+  beside?: boolean;
 }) {
   const createGig = useCreateGig(bandId);
   const createPractice = useCreatePractice(bandId);
@@ -70,6 +74,7 @@ export function CreateEventDrawer({
       <SplitDrawer
         open={open}
         onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+        className={eventDrawerClass(beside)}
         dismissible={!isDirty}
         onDismissAttempt={() => setDiscardOpen(true)}
         title="New event"

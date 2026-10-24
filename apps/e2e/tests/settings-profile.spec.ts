@@ -27,6 +27,7 @@ test("member edits their name and instruments", async ({
   await page.getByRole("button", { name: "Guitar" }).click();
   await page.getByLabel("Custom instrument").fill("Cowbell");
   await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await save.click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await expect(page.getByTestId("settings-name")).toHaveText("Dev Deluxe");
@@ -43,6 +44,61 @@ test("member edits their name and instruments", async ({
     .getByTestId("member-card")
     .filter({ hasText: "Dev Deluxe" });
   await expect(mine).toContainText("Drums, Guitar, Cowbell");
+});
+
+test("instrument changes autosave without pressing Save", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.dev.email);
+  await page.goto("/settings");
+  const save = page.getByRole("button", { name: "Save profile" });
+  await expect(save).toBeDisabled();
+
+  await page.getByRole("button", { name: "Guitar" }).click();
+  await page.getByRole("button", { name: "Drums" }).click();
+  await page.getByLabel("Custom instrument").fill("Cowbell");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(save).toBeDisabled();
+
+  await page.reload();
+  const pressed = (name: string) =>
+    page.getByRole("button", { name, exact: true });
+  await expect(pressed("Guitar")).toHaveAttribute("aria-pressed", "true");
+  await expect(pressed("Drums")).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    page.getByLabel("Custom instruments").getByText("Cowbell"),
+  ).toBeVisible();
+});
+
+test("a failed instrument autosave shows an error and retries", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.dev.email);
+  await page.goto("/settings");
+  let fail = true;
+  await page.route("**/me/instruments", async (route) => {
+    if (route.request().method() === "PUT" && fail) {
+      await route.fulfill({ status: 500, body: "{}" });
+    } else await route.continue();
+  });
+  await page.getByRole("button", { name: "Guitar" }).click();
+  await expect(
+    page.getByText("We could not save your instruments"),
+  ).toBeVisible();
+  fail = false;
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Guitar", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("band section is hidden for regular members", async ({

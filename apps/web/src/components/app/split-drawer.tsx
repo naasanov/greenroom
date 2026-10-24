@@ -196,7 +196,7 @@ export function SplitDrawer({
               aria-label={left.label}
               inert={view !== "left"}
               data-testid="split-left"
-              className="h-full w-1/3 overflow-y-auto overscroll-contain px-5 pb-safe"
+              className="h-full w-1/3 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
             >
               {left.content}
             </section>
@@ -245,7 +245,7 @@ export function SplitDrawer({
               aria-label={right.label}
               inert={view !== "right"}
               data-testid="split-right"
-              className="h-full w-1/3 overflow-y-auto overscroll-contain px-5 pb-safe"
+              className="h-full w-1/3 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
             >
               {right.content}
             </section>

@@ -108,3 +108,25 @@ export function addMinutes(hhmm: string, minutes: number): string {
   const total = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
+
+/** Minutes from `start` to `end` (`HH:mm`); an end at or before the start is the next day. */
+export function minutesBetween(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const diff = eh * 60 + em - (sh * 60 + sm);
+  return diff <= 0 ? diff + 1440 : diff;
+}
+
+/** Whole days from local date `a` to local date `b` (`YYYY-MM-DD`). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round(
+    (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000,
+  );
+}
+
+/** Local date `YYYY-MM-DD` plus `days`. */
+export function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

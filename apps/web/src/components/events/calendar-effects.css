@@ -1,0 +1,30 @@
+/* Selected event ring and the one-off pulse when an event becomes selected. */
+.gr-cal .fc .fc-event.gr-event.gr-selected {
+  z-index: 3;
+  box-shadow:
+    0 0 0 2px var(--card),
+    0 0 0 4px var(--gr-accent);
+  animation: gr-selected-pulse 600ms ease-out;
+}
+@keyframes gr-selected-pulse {
+  0% {
+    box-shadow:
+      0 0 0 2px var(--card),
+      0 0 0 2px var(--gr-accent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--card),
+      0 0 0 8px color-mix(in oklch, var(--gr-accent) 45%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px var(--card),
+      0 0 0 4px var(--gr-accent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-cal .fc .fc-event.gr-event.gr-selected {
+    animation: none;
+  }
+}

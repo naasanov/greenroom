@@ -2,10 +2,12 @@
 
 import {
   keepPreviousData,
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { z } from "zod";
 import {
   SONG_ERROR_CODES,
@@ -64,14 +66,49 @@ export function useSongs(
   });
 }
 
+const DETAIL_STALE_MS = 30_000;
+
+const songDetailOptions = (bandId: string, songId: string) =>
+  queryOptions({
+    queryKey: keys.song(bandId, songId),
+    queryFn: () =>
+      api(`/bands/${bandId}/songs/${songId}`, { schema: typed<SongDetail>() }),
+    staleTime: DETAIL_STALE_MS,
+  });
+
 /** Song detail; idle while `songId` is null (the add sheet). */
 export function useSongDetail(bandId: string, songId: string | null) {
   return useQuery({
-    queryKey: keys.song(bandId, songId ?? ""),
-    queryFn: () =>
-      api(`/bands/${bandId}/songs/${songId}`, { schema: typed<SongDetail>() }),
+    ...songDetailOptions(bandId, songId ?? ""),
     enabled: !!songId,
   });
+}
+
+/** Finds a song's summary in any cached list query, for instant rendering. */
+export function useSongSummary(
+  bandId: string,
+  songId: string | null,
+): SongSummary | undefined {
+  const qc = useQueryClient();
+  if (!songId) return undefined;
+  for (const [, list] of qc.getQueriesData<SongSummary[]>({
+    queryKey: [...songsRoot(bandId), "list"],
+  })) {
+    const found = list?.find((s) => s.id === songId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** Returns a function that warms the detail cache for a song id. */
+export function usePrefetchSong(bandId: string) {
+  const qc = useQueryClient();
+  return useCallback(
+    (songId: string) => {
+      void qc.prefetchQuery(songDetailOptions(bandId, songId));
+    },
+    [qc, bandId],
+  );
 }
 
 /** Smart-add lookup for the add sheet's single input. */

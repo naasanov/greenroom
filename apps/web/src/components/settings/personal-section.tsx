@@ -4,16 +4,33 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import type { PresetInstrumentKey, User } from "@greenroom/shared";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { userSchema, type UpdateProfile, type User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
-import { InstrumentPicker } from "@/components/app/instrument-picker";
-import { findInstrument } from "@/components/app/instruments";
+import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
 import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMyInstruments, useSaveProfile, useSignOut } from "@/lib/queries";
+import { api } from "@/lib/api";
+import { keys, useMyInstruments, useSignOut } from "@/lib/queries";
+
+/** Saves name and calendar email only; instruments autosave separately. */
+function useSaveProfileFields() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profile: UpdateProfile) =>
+      api("/auth/me", { method: "PATCH", body: profile, schema: userSchema }),
+    onSuccess: (user) => {
+      qc.setQueryData(keys.me, user);
+      void qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "bands" && q.queryKey[2] === "members",
+      });
+    },
+  });
+}
 
 const personalSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
@@ -24,20 +41,9 @@ const personalSchema = z.object({
     .refine((v) => v === "" || z.string().email().safeParse(v).success),
 });
 
-const sameSet = (a: string[], b: string[]) =>
-  a.length === b.length && a.every((v, i) => v === b[i]);
-
-function PersonalForm({
-  user,
-  initialInstruments,
-}: {
-  user: User;
-  initialInstruments: string[];
-}) {
-  const save = useSaveProfile();
+function PersonalForm({ user }: { user: User }) {
+  const save = useSaveProfileFields();
   const [saved, setSaved] = useState(false);
-  const [baseline, setBaseline] = useState(initialInstruments);
-  const [instruments, setInstruments] = useState(initialInstruments);
   const form = useForm({
     resolver: zodResolver(personalSchema),
     defaultValues: {
@@ -45,22 +51,14 @@ function PersonalForm({
       calendarEmail: user.calendarEmail ?? "",
     },
   });
-  const dirty = form.formState.isDirty || !sameSet(instruments, baseline);
+  const dirty = form.formState.isDirty;
 
   const submit = form.handleSubmit((v) => {
     setSaved(false);
     save.mutate(
       {
-        profile: {
-          displayName: v.displayName,
-          calendarEmail: v.calendarEmail === "" ? null : v.calendarEmail,
-        },
-        instruments: {
-          presets: instruments.filter((i) =>
-            findInstrument(i),
-          ) as PresetInstrumentKey[],
-          custom: instruments.filter((i) => !findInstrument(i)),
-        },
+        displayName: v.displayName,
+        calendarEmail: v.calendarEmail === "" ? null : v.calendarEmail,
       },
       {
         onSuccess: (updated) => {
@@ -68,7 +66,6 @@ function PersonalForm({
             displayName: updated.displayName,
             calendarEmail: updated.calendarEmail ?? "",
           });
-          setBaseline(instruments);
           setSaved(true);
         },
       },
@@ -115,17 +112,6 @@ function PersonalForm({
           </p>
         ) : null}
       </FormField>
-
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium">What do you play?</p>
-        <InstrumentPicker
-          value={instruments}
-          onChange={(v) => {
-            setSaved(false);
-            setInstruments(v);
-          }}
-        />
-      </div>
 
       {save.isError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -177,10 +163,12 @@ export function PersonalSection({ user }: { user: User }) {
       </div>
 
       {mine.data ? (
-        <PersonalForm
-          user={user}
-          initialInstruments={[...mine.data.presets, ...mine.data.custom]}
-        />
+        <>
+          <PersonalForm user={user} />
+          <InstrumentsAutosave
+            initial={[...mine.data.presets, ...mine.data.custom]}
+          />
+        </>
       ) : mine.isError ? (
         <p role="alert" className="text-sm text-destructive">
           Could not load your instruments.

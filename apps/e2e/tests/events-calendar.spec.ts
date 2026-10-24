@@ -93,3 +93,72 @@ for (const view of ["Month", "Week"] as const) {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+test("the gig opened from a deep link is highlighted on the calendar", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  await expect(page.getByRole("dialog", { name: gig.title })).toBeVisible();
+  const chip = calendar(page).locator(".fc-event.gr-selected", {
+    hasText: gig.title,
+  });
+  await expect(chip).toBeVisible();
+  await expect(chip.locator("[data-selected='true']")).toHaveCount(1);
+  await expect(calendar(page).locator("[data-selected='true']")).toHaveCount(1);
+});
+
+test("a horizontal swipe pages the calendar and a vertical one does not", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName === "webkit",
+    "WebKit cannot construct synthetic touches",
+  );
+  await page.goto("/events");
+  const title = page.getByTestId("calendar-title");
+  const start = (await title.textContent()) ?? "";
+  const swipe = (dx: number, dy: number) =>
+    calendar(page)
+      .locator(".fc-view-harness")
+      .first()
+      .evaluate(
+        (el, d) => {
+          const box = el.getBoundingClientRect();
+          const x = box.left + box.width / 2;
+          const y = box.top + 60;
+          const touch = (px: number, py: number) =>
+            new Touch({
+              identifier: 1,
+              target: el,
+              clientX: px,
+              clientY: py,
+            });
+          const fire = (type: string, t: Touch, list: Touch[]) =>
+            el.dispatchEvent(
+              new TouchEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                touches: list,
+                changedTouches: [t],
+              }),
+            );
+          const a = touch(x, y);
+          fire("touchstart", a, [a]);
+          const b = touch(x + d.dx, y + d.dy);
+          fire("touchend", b, []);
+        },
+        { dx, dy },
+      );
+  await swipe(-30, 0);
+  await expect(title).toHaveText(start);
+  await swipe(-120, 150);
+  await expect(title).toHaveText(start);
+  await swipe(-120, 10);
+  await expect(title).not.toHaveText(start);
+  const next = (await title.textContent()) ?? "";
+  await swipe(120, 10);
+  await expect(title).toHaveText(start);
+  expect(next).not.toBe(start);
+});

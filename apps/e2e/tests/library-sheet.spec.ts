@@ -103,3 +103,37 @@ test("mobile arrows move through the list order", async ({
   await s.getByRole("button", { name: "Previous" }).click();
   await expect(s).toContainText("Harbor Lights");
 });
+
+test("sheet shows the summary immediately while detail loads", async ({
+  page,
+}) => {
+  await openLibrary(page);
+  await page.route("**/bands/*/songs/*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    await new Promise((r) => setTimeout(r, 1500));
+    return route.continue();
+  });
+  await cards(page).filter({ hasText: "Skyline Drive" }).click();
+  const s = sheet(page);
+  await expect(s.getByTestId("song-view")).toContainText("Skyline Drive");
+  await expect(s.getByTestId("song-detail-skeleton")).toBeVisible();
+  await expect(s.getByRole("img", { name: "Loading" })).toHaveCount(0);
+  await expect(s.getByTestId("reference-link").first()).toBeVisible();
+  await expect(s.getByTestId("song-detail-skeleton")).toHaveCount(0);
+});
+
+test("edit mode stacks the reference label above the link", async ({
+  page,
+}) => {
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Skyline Drive" }).click();
+  const s = sheet(page);
+  await s.getByRole("button", { name: "Edit" }).click();
+  const label = s.getByLabel("Reference label").first();
+  const value = s.getByLabel("Reference value").first();
+  const l = (await label.boundingBox())!;
+  const v = (await value.boundingBox())!;
+  expect(v.y).toBeGreaterThan(l.y + l.height - 1);
+  expect(Math.abs(v.x - l.x)).toBeLessThan(2);
+  expect(l.width).toBeGreaterThan(v.width * 0.6);
+});

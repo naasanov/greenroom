@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { useSongs } from "@/lib/queries/songs";
+import { usePrefetchSong, useSongs } from "@/lib/queries/songs";
 import { pathWithout } from "@/lib/queries/spotify";
 import { cn } from "@/lib/utils";
 import { ImportDialog } from "./import-dialog";
@@ -88,6 +88,7 @@ export function LibraryView({ bandId }: { bandId: string }) {
     setSortReady(true);
     setSort(loadSort());
   }
+  const prefetchSong = usePrefetchSong(bandId);
   const songs = useSongs(bandId, { q, sort }, sortReady);
 
   const dirtyRef = useRef(false);
@@ -203,7 +204,12 @@ export function LibraryView({ bandId }: { bandId: string }) {
           list.length > 0 ? (
             <ul className="flex flex-col gap-2.5" aria-label="Songs">
               {list.map((s) => (
-                <li key={s.id}>
+                <li
+                  key={s.id}
+                  onPointerEnter={() => prefetchSong(s.id)}
+                  onPointerDown={() => prefetchSong(s.id)}
+                  onFocus={() => prefetchSong(s.id)}
+                >
                   <ListCard
                     title={s.title}
                     subtitle={s.artist ?? undefined}

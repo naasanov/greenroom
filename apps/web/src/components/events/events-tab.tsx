@@ -19,6 +19,7 @@ import {
 import { GigDrawer } from "@/components/events/gig-drawer";
 import { PracticeDrawer } from "@/components/events/practice-drawer";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
+import { cn } from "@/lib/utils";
 import { useCurrentBand } from "@/lib/current-band";
 import { useDrawerStack } from "@/lib/use-drawer-stack";
 import { createLocalChoice } from "@/lib/use-local-choice";
@@ -193,6 +194,14 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
   };
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [jumpDate, setJumpDate] = useState<string | undefined>();
+  // Agenda taps blank the focus for one commit, then jump, so a repeat tap re-navigates.
+  const pendingJump = useRef<string | null>(null);
+  useEffect(() => {
+    if (jumpDate !== "" || !pendingJump.current) return;
+    const next = pendingJump.current;
+    pendingJump.current = null;
+    setJumpDate(next);
+  }, [jumpDate]);
 
   // Event drawers stay mounted while sliding away so a replacement overlaps them.
   const [instantKey, setInstantKey] = useState<string | null>(null);
@@ -240,6 +249,18 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
     }
   }
 
+  /** Agenda taps always bring the event's date into view, even when re-selecting. */
+  function selectFromAgenda(ev: CalendarEvent) {
+    pendingJump.current = ev.date;
+    setJumpDate("");
+    openEvent(ev);
+  }
+
+  function selectFromCalendar(ev: CalendarEvent) {
+    setJumpDate(undefined);
+    openEvent(ev);
+  }
+
   function followEdit(result: PracticeEditResult) {
     const next = result.occurrence;
     if (!bandId || !next) return go(null, "replace");
@@ -260,92 +281,109 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
   if (link.isError && sel) return <NoAccess error={link.error} tab="events" />;
 
   const focusDate =
-    jumpDate ??
-    (sel?.kind === "gig"
-      ? gig.data?.date
-      : sel?.kind === "practice"
-        ? (occ.data?.date ?? sel.date ?? undefined)
-        : undefined) ??
-    focusProp;
+    jumpDate === ""
+      ? undefined
+      : (jumpDate ??
+        (sel?.kind === "gig"
+          ? gig.data?.date
+          : sel?.kind === "practice"
+            ? (occ.data?.date ?? sel.date ?? undefined)
+            : undefined) ??
+        focusProp);
 
   return (
     <div
-      data-testid="events-tab"
-      data-focus-date={focusDate}
-      className="mx-auto w-full max-w-5xl px-3 py-4 pb-28 md:pb-24"
-    >
-      {practiceLink.data && sel?.kind === "practice" && occKey === null ? (
-        <p
-          role="status"
-          className="mx-auto mb-3 w-fit rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground"
-        >
-          This practice has no occurrence on that date.
-        </p>
-      ) : null}
-
-      <EventCalendar
-        mode={mode}
-        onModeChange={setMode}
-        focusDate={focusDate}
-        events={eventList}
-        onRangeChange={onRangeChange}
-        onDayClick={openCreate}
-        onEventClick={openEvent}
-      />
-
-      {agendaOpen ? null : (
-        <>
-          <AgendaButton onClick={() => setAgendaOpen(true)} />
-          <Fab label="Add event" onClick={() => openCreate("")} />
-        </>
+      className={cn(
+        "transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+        agendaOpen && "md:pr-[26rem]",
       )}
+    >
+      <div
+        data-testid="events-tab"
+        data-focus-date={focusDate}
+        className="mx-auto w-full max-w-5xl px-3 py-4 pb-28 md:pb-24"
+      >
+        {practiceLink.data && sel?.kind === "practice" && occKey === null ? (
+          <p
+            role="status"
+            className="mx-auto mb-3 w-fit rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground"
+          >
+            This practice has no occurrence on that date.
+          </p>
+        ) : null}
 
-      <AgendaSheet
-        open={agendaOpen}
-        onOpenChange={setAgendaOpen}
-        bandId={bandId}
-        onSelect={openEvent}
-      />
-
-      {bandId ? (
-        <CreateEventDrawer
-          key={create.nonce}
-          bandId={bandId}
-          open={create.open}
-          defaultDate={create.date}
-          onOpenChange={(open) => setCreate((c) => ({ ...c, open }))}
-          onCreated={setJumpDate}
+        <EventCalendar
+          mode={mode}
+          onModeChange={setMode}
+          focusDate={focusDate}
+          events={eventList}
+          onRangeChange={onRangeChange}
+          onDayClick={openCreate}
+          onEventClick={selectFromCalendar}
+          selectedEvent={
+            sel?.kind === "gig"
+              ? { type: "gig", id: sel.gigId }
+              : sel
+                ? { type: "practice", seriesId: sel.seriesId, date: sel.date }
+                : null
+          }
         />
-      ) : null}
 
-      {drawerEntries.map((entry) => {
-        const { sel: target, bandId: drawerBand } = entry.data;
-        return target.kind === "gig" ? (
-          <GigDrawer
-            key={entry.id}
-            open={entry.open}
+        {agendaOpen ? null : (
+          <>
+            <AgendaButton onClick={() => setAgendaOpen(true)} />
+            <Fab label="Add event" onClick={() => openCreate("")} />
+          </>
+        )}
+
+        <AgendaSheet
+          open={agendaOpen}
+          onOpenChange={setAgendaOpen}
+          bandId={bandId}
+          onSelect={selectFromAgenda}
+        />
+
+        {bandId ? (
+          <CreateEventDrawer
+            key={create.nonce}
+            bandId={bandId}
+            open={create.open}
+            defaultDate={create.date}
             beside={agendaOpen}
-            bandId={drawerBand}
-            gigId={target.gigId}
-            gig={entry.data.gig}
-            fallbackTitle={entry.data.fallbackTitle}
-            onClose={() => close(target)}
+            onOpenChange={(open) => setCreate((c) => ({ ...c, open }))}
+            onCreated={setJumpDate}
           />
-        ) : (
-          <PracticeDrawer
-            key={entry.id}
-            open={entry.open}
-            beside={agendaOpen}
-            bandId={drawerBand}
-            seriesId={target.seriesId}
-            occurrenceKey={entry.data.occurrenceKey!}
-            occ={entry.data.occ}
-            fallbackTitle={entry.data.fallbackTitle}
-            onClose={() => close(target)}
-            onEdited={followEdit}
-          />
-        );
-      })}
+        ) : null}
+
+        {drawerEntries.map((entry) => {
+          const { sel: target, bandId: drawerBand } = entry.data;
+          return target.kind === "gig" ? (
+            <GigDrawer
+              key={entry.id}
+              open={entry.open}
+              beside={agendaOpen}
+              bandId={drawerBand}
+              gigId={target.gigId}
+              gig={entry.data.gig}
+              fallbackTitle={entry.data.fallbackTitle}
+              onClose={() => close(target)}
+            />
+          ) : (
+            <PracticeDrawer
+              key={entry.id}
+              open={entry.open}
+              beside={agendaOpen}
+              bandId={drawerBand}
+              seriesId={target.seriesId}
+              occurrenceKey={entry.data.occurrenceKey!}
+              occ={entry.data.occ}
+              fallbackTitle={entry.data.fallbackTitle}
+              onClose={() => close(target)}
+              onEdited={followEdit}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

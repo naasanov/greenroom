@@ -107,11 +107,18 @@ export function EditScopeDialog({
   onOpenChange,
   onConfirm,
   action = "edit",
+  hide = [],
 }: DialogBase & {
   onConfirm: (scope: EditScope) => void;
   action?: "edit" | "cancel";
+  /** Scopes that do not apply to this change and are not offered. */
+  hide?: EditScope[];
 }) {
-  const [scope, setScope] = useState<EditScope>("this");
+  const options = SCOPES.filter((s) => !hide.includes(s.value));
+  const [picked, setScope] = useState<EditScope>("this");
+  const scope = options.some((s) => s.value === picked)
+    ? picked
+    : (options[0]?.value ?? "all");
   const verb = action === "edit" ? "Edit" : "Cancel";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,7 +136,7 @@ export function EditScopeDialog({
           onValueChange={(v) => setScope(v as EditScope)}
           className="gap-1"
         >
-          {SCOPES.map((s) => (
+          {options.map((s) => (
             <Label
               key={s.value}
               htmlFor={`scope-${s.value}`}

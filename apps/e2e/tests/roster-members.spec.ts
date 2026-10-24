@@ -200,3 +200,30 @@ test("admin resets the invite link and the old one stops working", async ({
   expect((await anon.get(`/invites/${token(next)}`)).status()).toBe(200);
   await anon.dispose();
 });
+
+test("invite button is a symmetric pill clear of the tab bar", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto("/roster");
+  const btn = page.getByRole("button", { name: "Invite link" });
+  await expect(btn).toBeVisible();
+  const box = (await btn.boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(box.x + box.width).toBeLessThanOrEqual(vp.width - 8);
+  const pad = await btn.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.paddingLeft, s.paddingRight];
+  });
+  expect(pad[0]).toBe(pad[1]);
+  const tabs = page.getByRole("navigation").last();
+  if (await tabs.isVisible()) {
+    const t = await tabs.boundingBox();
+    if (t && t.y > vp.height / 2) {
+      expect(box.y + box.height).toBeLessThanOrEqual(t.y);
+    }
+  }
+});

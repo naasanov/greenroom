@@ -2,11 +2,12 @@
 
 import { Loader2, Music2, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   SongCandidate,
   SongCreated,
   SongDetail,
+  SongSummary,
   SuggestedReference,
 } from "@greenroom/shared";
 import {
@@ -23,7 +24,9 @@ import {
   DuplicateSongError,
   useCreateSong,
   useDeleteSong,
+  usePrefetchSong,
   useSongDetail,
+  useSongSummary,
   useUpdateSong,
 } from "@/lib/queries/songs";
 import { SmartInput } from "./smart-input";
@@ -109,7 +112,39 @@ const dayLabel = (date: string) =>
     timeZone: "UTC",
   }).format(new Date(`${date}T12:00:00Z`));
 
-function SongView({ song }: { song: SongDetail }) {
+function DetailSkeleton({ error }: { error: boolean }) {
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        Could not load the rest of this song.
+      </p>
+    );
+  }
+  return (
+    <div
+      data-testid="song-detail-skeleton"
+      aria-busy="true"
+      className="flex flex-col gap-5"
+    >
+      {["Reference", "Notes", "Used in"].map((label) => (
+        <Section key={label} label={label}>
+          <div className="h-10 animate-pulse rounded-xl bg-muted" />
+        </Section>
+      ))}
+    </div>
+  );
+}
+
+/** Renders the summary fields at once; detail-only sections fill in later. */
+function SongView({
+  song,
+  detail,
+  detailError,
+}: {
+  song: SongSummary;
+  detail: SongDetail | undefined;
+  detailError: boolean;
+}) {
   const duration = formatDuration(song.durationSeconds);
   return (
     <div className="flex flex-col gap-5" data-testid="song-view">
@@ -130,66 +165,74 @@ function SongView({ song }: { song: SongDetail }) {
       <Section label="Duration">
         <p className="text-sm">{duration ?? "Not set"}</p>
       </Section>
-      <Section label="Reference">
-        <LinkList
-          rows={song.references.map((r) => ({
-            id: r.id,
-            label: r.label,
-            value: r.value,
-          }))}
-        />
-      </Section>
-      <Section label="Notes">
-        {song.notes ? (
-          <p className="text-sm whitespace-pre-wrap">{song.notes}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">No notes.</p>
-        )}
-      </Section>
-      <Section label="Used in">
-        {song.usedIn.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Not in any setlist yet.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-1.5" data-testid="used-in">
-            {song.usedIn.map((u) => (
-              <li
-                key={u.setlistId + (u.kind === "gig" ? u.gigId : u.seriesId)}
-                className="flex items-baseline justify-between gap-3 rounded-xl border bg-card px-3 py-2 text-sm"
-              >
-                {u.kind === "gig" ? (
-                  <>
-                    <Link
-                      href={`/gigs/${u.gigId}`}
-                      className="min-w-0 truncate font-medium hover:underline"
-                    >
-                      {u.title}
-                    </Link>
-                    <span className="shrink-0 text-muted-foreground">
-                      {dayLabel(u.date)}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="min-w-0 truncate font-medium">
-                      {u.title}
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">
-                      Practice
-                    </span>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {song.lastPlayedDate ? (
-          <p className="text-xs text-muted-foreground">
-            Last played {dayLabel(song.lastPlayedDate)}
-          </p>
-        ) : null}
-      </Section>
+      {detail ? (
+        <>
+          <Section label="Reference">
+            <LinkList
+              rows={detail.references.map((r) => ({
+                id: r.id,
+                label: r.label,
+                value: r.value,
+              }))}
+            />
+          </Section>
+          <Section label="Notes">
+            {detail.notes ? (
+              <p className="text-sm whitespace-pre-wrap">{detail.notes}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">No notes.</p>
+            )}
+          </Section>
+          <Section label="Used in">
+            {detail.usedIn.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Not in any setlist yet.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5" data-testid="used-in">
+                {detail.usedIn.map((u) => (
+                  <li
+                    key={
+                      u.setlistId + (u.kind === "gig" ? u.gigId : u.seriesId)
+                    }
+                    className="flex items-baseline justify-between gap-3 rounded-xl border bg-card px-3 py-2 text-sm"
+                  >
+                    {u.kind === "gig" ? (
+                      <>
+                        <Link
+                          href={`/gigs/${u.gigId}`}
+                          className="min-w-0 truncate font-medium hover:underline"
+                        >
+                          {u.title}
+                        </Link>
+                        <span className="shrink-0 text-muted-foreground">
+                          {dayLabel(u.date)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="min-w-0 truncate font-medium">
+                          {u.title}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          Practice
+                        </span>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {detail.lastPlayedDate ? (
+              <p className="text-xs text-muted-foreground">
+                Last played {dayLabel(detail.lastPlayedDate)}
+              </p>
+            ) : null}
+          </Section>
+        </>
+      ) : (
+        <DetailSkeleton error={detailError} />
+      )}
     </div>
   );
 }
@@ -261,6 +304,9 @@ export function SongSheet({
 
   const detail = useSongDetail(bandId, songId);
   const song = detail.data;
+  const summary = useSongSummary(bandId, songId);
+  const prefetch = usePrefetchSong(bandId);
+  const shown: SongSummary | undefined = song ?? summary;
   const create = useCreateSong(bandId);
   const update = useUpdateSong(bandId, songId ?? "");
   const remove = useDeleteSong(bandId);
@@ -322,13 +368,20 @@ export function SongSheet({
   }
 
   const index = songId ? siblings.indexOf(songId) : -1;
+  const prevId = index > 0 ? siblings[index - 1] : undefined;
+  const nextId = index >= 0 ? siblings[index + 1] : undefined;
+  useEffect(() => {
+    if (!open) return;
+    if (prevId) prefetch(prevId);
+    if (nextId) prefetch(nextId);
+  }, [open, prevId, nextId, prefetch]);
   const showNav = !adding && !editing && !desktop && index >= 0;
   const formId = adding ? "add-song-form" : "edit-song-form";
   const showForm = adding ? draft !== null : editing && !!song;
   const saving = create.isPending || update.isPending;
 
-  const title = adding ? "Add song" : (song?.title ?? "Song");
-  const subtitle = adding ? undefined : (song?.artist ?? undefined);
+  const title = adding ? "Add song" : (shown?.title ?? "Song");
+  const subtitle = adding ? undefined : (shown?.artist ?? undefined);
 
   let body: React.ReactNode;
   if (adding && !draft) {
@@ -401,7 +454,7 @@ export function SongSheet({
         }
       />
     );
-  } else if (!song) {
+  } else if (!shown) {
     body = detail.isError ? (
       <p role="alert" className="text-sm text-destructive">
         Could not load this song.
@@ -414,7 +467,7 @@ export function SongSheet({
         />
       </div>
     );
-  } else if (editing) {
+  } else if (editing && song) {
     body = (
       <SongForm
         key={`${song.id}-${song.updatedAt}`}
@@ -446,7 +499,7 @@ export function SongSheet({
   } else {
     body = (
       <div className="flex flex-col gap-5">
-        {offer && offer.songId === song.id ? (
+        {song && offer && offer.songId === song.id ? (
           <div
             data-testid="songsterr-offer"
             className="flex items-center gap-2 rounded-2xl bg-gig-soft px-3 py-2 text-sm text-gig-soft-foreground"
@@ -465,7 +518,7 @@ export function SongSheet({
             </Button>
           </div>
         ) : null}
-        <SongView song={song} />
+        <SongView song={shown} detail={song} detailError={detail.isError} />
       </div>
     );
   }

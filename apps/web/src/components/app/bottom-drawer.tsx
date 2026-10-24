@@ -107,15 +107,13 @@ export function BottomDrawer({
             ) : null}
           </>
         ) : (
-          <DrawerHeader className="relative px-5 pt-3 pb-2 text-left">
-            <DrawerTitle
-              className={cn(
-                "text-lg font-semibold",
-                headerAction ? "pr-24" : "pr-12",
-              )}
-            >
-              {title}
-            </DrawerTitle>
+          <DrawerHeader
+            className={cn(
+              "relative pt-3 pb-2 text-center md:text-center",
+              headerAction ? "px-24" : "px-12",
+            )}
+          >
+            <DrawerTitle className="text-lg font-semibold">{title}</DrawerTitle>
             {description ? (
               <DrawerDescription>{description}</DrawerDescription>
             ) : null}
@@ -135,15 +133,15 @@ export function BottomDrawer({
         )}
         <div
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6",
-            !footer && "pb-safe",
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5",
+            footer ? "pb-6" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
             bodyClassName,
           )}
         >
           {children}
         </div>
         {footer ? (
-          <div className="pb-safe border-t bg-popover px-5 pt-3 pb-4">
+          <div className="border-t bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {footer}
           </div>
         ) : null}
@@ -196,7 +194,7 @@ export function SideDrawer({
             }
           />
           <DrawerDescription className="sr-only">{title}</DrawerDescription>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pb-safe">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             {children}
           </div>
         </DrawerContent>

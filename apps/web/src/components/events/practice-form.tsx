@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -26,6 +26,12 @@ import {
   NativeSelect,
 } from "@/components/events/form-parts";
 import {
+  addMinutes,
+  daysBetween,
+  minutesBetween,
+  shiftDate,
+} from "@/components/events/time";
+import {
   WEEKDAY_INITIAL,
   WEEKDAY_ORDER,
   WEEKDAY_SHORT,
@@ -35,22 +41,13 @@ import {
 } from "@/components/events/recurrence";
 import { cn } from "@/lib/utils";
 
-const DURATIONS = [30, 45, 60, 90, 120, 150, 180, 240, 300];
-
-function durationLabel(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
-}
-
 const practiceFormSchema = z
   .object({
     title: z.string().trim().min(1, "Give the practice a title."),
     location: z.string().trim().max(500),
     startDate: localDateSchema,
     startTime: localTimeSchema,
-    durationMinutes: z.coerce.number().int().min(1).max(1440),
+    endTime: localTimeSchema,
     freq: z.enum(["none", "weekly", "monthly"]),
     interval: z.coerce.number().int().min(1).max(52),
     byWeekday: z.array(weekdaySchema),
@@ -124,6 +121,13 @@ export interface PracticeInitial {
   recurrence?: Recurrence;
 }
 
+/** What the user changed in an edit, and how to turn it into a request for a scope. */
+export interface PracticeEditDraft {
+  recurrenceChanged: boolean;
+  dateChanged: boolean;
+  build: (scope: EditScope) => UpdatePractice;
+}
+
 function defaultsFor(
   initial: PracticeInitial | undefined,
   defaultDate: string,
@@ -135,7 +139,10 @@ function defaultsFor(
     location: initial?.location ?? "",
     startDate,
     startTime: initial?.startTime ?? "19:00",
-    durationMinutes: initial?.durationMinutes ?? 120,
+    endTime: addMinutes(
+      initial?.startTime ?? "19:00",
+      initial?.durationMinutes ?? 120,
+    ),
     freq: r?.freq ?? "none",
     interval: r?.interval ?? 1,
     byWeekday: r?.byWeekday?.length
@@ -152,15 +159,17 @@ function defaultsFor(
 
 export type PracticeSubmit =
   | { kind: "create"; body: CreatePractice }
-  | { kind: "update"; body: UpdatePractice };
+  | { kind: "edit"; draft: PracticeEditDraft };
 
 /**
- * Create a practice series, or edit an occurrence with a scope. The scope decides
- * which fields apply: "this" hides recurrence, "this_and_following" locks the date.
+ * Create a practice series, or edit an occurrence. An edit hands back a draft so the
+ * caller can ask the scope and build the request body for it.
  */
 export function PracticeForm({
   initial,
-  scope,
+  editing = false,
+  seriesStartDate,
+  externalError,
   defaultDate = "",
   timeZone,
   idPrefix = "practice",
@@ -170,8 +179,12 @@ export function PracticeForm({
   onDirtyChange,
 }: {
   initial?: PracticeInitial;
-  /** Present when editing an existing occurrence. */
-  scope?: EditScope;
+  /** True when editing an existing occurrence. */
+  editing?: boolean;
+  /** Local start date of the whole series, shifted when "all" changes the date. */
+  seriesStartDate?: string;
+  /** Error from the caller's save, shown with the form's own. */
+  externalError?: string | null;
   defaultDate?: string;
   timeZone: string;
   idPrefix?: string;
@@ -186,6 +199,7 @@ export function PracticeForm({
   });
   const { errors, isDirty, isSubmitting } = form.formState;
   const [serverError, setServerError] = useState<string | null>(null);
+  const [baseline] = useState(() => defaultsFor(initial, defaultDate));
   const weekdaysTouched = useRef(!!initial);
 
   useEffect(() => {
@@ -203,9 +217,6 @@ export function PracticeForm({
   const endDate = useWatch({ control: form.control, name: "endDate" });
   const endCount =
     Number(useWatch({ control: form.control, name: "endCount" })) || 1;
-  const duration = Number(
-    useWatch({ control: form.control, name: "durationMinutes" }),
-  );
 
   // Until the user picks days, the weekly default follows the start date.
   useEffect(() => {
@@ -218,17 +229,7 @@ export function PracticeForm({
     form.setValue("byWeekday", [weekdayOf(startDate)], { shouldDirty: false });
   }, [startDate, form]);
 
-  const showRecurrence = scope !== "this";
-  const dateLocked = scope === "this_and_following";
   const validDate = localDateSchema.safeParse(startDate).success;
-
-  const durations = useMemo(
-    () =>
-      DURATIONS.includes(duration) || !duration
-        ? DURATIONS
-        : [...DURATIONS, duration].sort((a, b) => a - b),
-    [duration],
-  );
 
   const summary = validDate
     ? recurrenceSummary(
@@ -259,42 +260,103 @@ export function PracticeForm({
     });
   }
 
+  // Moving the start keeps the duration by moving the end with it.
+  const startField = form.register("startTime");
+  function onStartChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { startTime, endTime } = form.getValues();
+    const next = e.target.value;
+    if (
+      localTimeSchema.safeParse(startTime).success &&
+      localTimeSchema.safeParse(endTime).success &&
+      localTimeSchema.safeParse(next).success
+    ) {
+      form.setValue(
+        "endTime",
+        addMinutes(next, minutesBetween(startTime, endTime)),
+        { shouldDirty: true },
+      );
+    }
+    return startField.onChange(e);
+  }
+
+  function draftFor(v: PracticeFormOutput): PracticeEditDraft {
+    const base = practiceFormSchema.parse(baseline);
+    const recurrence = recurrenceOf(v);
+    const durationMinutes = minutesBetween(v.startTime, v.endTime);
+    const recurrenceChanged =
+      JSON.stringify(recurrence) !== JSON.stringify(recurrenceOf(base));
+    const dateChanged = v.startDate !== base.startDate;
+    const all = {
+      ...(v.title !== base.title ? { title: v.title } : {}),
+      ...(v.location !== base.location
+        ? { location: v.location === "" ? null : v.location }
+        : {}),
+      ...(v.startTime !== base.startTime ? { startTime: v.startTime } : {}),
+      ...(durationMinutes !== minutesBetween(base.startTime, base.endTime)
+        ? { durationMinutes }
+        : {}),
+      ...(recurrenceChanged ? { recurrence } : {}),
+      timeZone,
+    };
+    return {
+      recurrenceChanged,
+      dateChanged,
+      build: (scope) => {
+        const body: UpdatePractice =
+          scope === "this"
+            ? {
+                scope,
+                title: v.title,
+                location: v.location === "" ? null : v.location,
+                startDate: v.startDate,
+                startTime: v.startTime,
+                durationMinutes,
+              }
+            : scope === "this_and_following"
+              ? {
+                  scope,
+                  title: v.title,
+                  location: v.location === "" ? null : v.location,
+                  startTime: v.startTime,
+                  durationMinutes,
+                  timeZone,
+                  recurrence,
+                }
+              : {
+                  scope,
+                  ...all,
+                  ...(dateChanged && seriesStartDate
+                    ? {
+                        startDate: shiftDate(
+                          seriesStartDate,
+                          daysBetween(base.startDate, v.startDate),
+                        ),
+                      }
+                    : {}),
+                };
+        return updatePracticeSchema.parse(body);
+      },
+    };
+  }
+
   async function submit(v: PracticeFormOutput) {
     setServerError(null);
-    const base = {
-      title: v.title,
-      location: v.location === "" ? null : v.location,
-      startTime: v.startTime,
-      durationMinutes: v.durationMinutes,
-    };
     try {
-      if (!scope) {
-        await onSubmit({
-          kind: "create",
-          body: createPracticeSchema.parse({
-            ...base,
-            startDate: v.startDate,
-            timeZone,
-            recurrence: recurrenceOf(v),
-          }),
-        });
+      if (editing) {
+        await onSubmit({ kind: "edit", draft: draftFor(v) });
         return;
       }
-      const body: UpdatePractice =
-        scope === "this"
-          ? { scope, ...base, startDate: v.startDate }
-          : scope === "this_and_following"
-            ? { scope, ...base, timeZone, recurrence: recurrenceOf(v) }
-            : {
-                scope,
-                ...base,
-                startDate: v.startDate,
-                timeZone,
-                recurrence: recurrenceOf(v),
-              };
       await onSubmit({
-        kind: "update",
-        body: updatePracticeSchema.parse(body),
+        kind: "create",
+        body: createPracticeSchema.parse({
+          title: v.title,
+          location: v.location === "" ? null : v.location,
+          startTime: v.startTime,
+          durationMinutes: minutesBetween(v.startTime, v.endTime),
+          startDate: v.startDate,
+          timeZone,
+          recurrence: recurrenceOf(v),
+        }),
       });
     } catch (e) {
       setServerError(
@@ -324,14 +386,10 @@ export function PracticeForm({
       </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField
-          label={scope === "this" || !scope ? "Date" : "Start date"}
-          htmlFor={id("date")}
-        >
+        <FormField label="Date" htmlFor={id("date")}>
           <Input
             id={id("date")}
             type="date"
-            disabled={dateLocked}
             aria-invalid={!!errors.startDate}
             {...form.register("startDate")}
           />
@@ -342,143 +400,137 @@ export function PracticeForm({
             id={id("time")}
             type="time"
             aria-invalid={!!errors.startTime}
-            {...form.register("startTime")}
+            {...startField}
+            onChange={onStartChange}
           />
           {errors.startTime ? <FieldError message="Pick a time." /> : null}
         </FormField>
+        <FormField label="End time" htmlFor={id("end")}>
+          <Input
+            id={id("end")}
+            type="time"
+            aria-invalid={!!errors.endTime}
+            {...form.register("endTime")}
+          />
+          {errors.endTime ? <FieldError message="Pick a time." /> : null}
+        </FormField>
       </div>
 
-      <FormField label="Duration" htmlFor={id("duration")}>
-        <NativeSelect id={id("duration")} {...form.register("durationMinutes")}>
-          {durations.map((d) => (
-            <option key={d} value={d}>
-              {durationLabel(d)}
-            </option>
-          ))}
-        </NativeSelect>
-      </FormField>
+      <div className="flex flex-col gap-3">
+        <FormField label="Repeat" htmlFor={id("freq")}>
+          <NativeSelect id={id("freq")} {...form.register("freq")}>
+            <option value="none">Does not repeat</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </NativeSelect>
+        </FormField>
 
-      {showRecurrence ? (
-        <div className="flex flex-col gap-3">
-          <FormField label="Repeat" htmlFor={id("freq")}>
-            <NativeSelect id={id("freq")} {...form.register("freq")}>
-              <option value="none">Does not repeat</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </NativeSelect>
-          </FormField>
+        {freq !== "none" ? (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              <span>Every</span>
+              <Input
+                aria-label="Repeat interval"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={52}
+                className="w-20"
+                {...form.register("interval")}
+              />
+              <span>{freq === "weekly" ? "week(s)" : "month(s)"}</span>
+            </div>
 
-          {freq !== "none" ? (
-            <>
-              <div className="flex items-center gap-2 text-sm">
-                <span>Every</span>
-                <Input
-                  aria-label="Repeat interval"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={52}
-                  className="w-20"
-                  {...form.register("interval")}
-                />
-                <span>{freq === "weekly" ? "week(s)" : "month(s)"}</span>
-              </div>
-
-              {freq === "weekly" ? (
-                <div className="flex flex-col gap-1.5">
-                  <div
-                    role="group"
-                    aria-label="Repeat on"
-                    className="flex justify-between gap-1"
-                  >
-                    {WEEKDAY_ORDER.map((d) => {
-                      const on = byWeekday.includes(d);
-                      return (
-                        <button
-                          key={d}
-                          type="button"
-                          aria-pressed={on}
-                          aria-label={WEEKDAY_SHORT[d]}
-                          onClick={() => toggleDay(d)}
-                          className={cn(
-                            "flex size-10 items-center justify-center rounded-full border text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                            on
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-input text-muted-foreground hover:bg-muted",
-                          )}
-                        >
-                          {WEEKDAY_INITIAL[d]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <FieldError message={errors.byWeekday?.message} />
-                </div>
-              ) : (
-                <NativeSelect
-                  aria-label="Monthly repeat"
-                  {...form.register("monthlyMode")}
+            {freq === "weekly" ? (
+              <div className="flex flex-col gap-1.5">
+                <div
+                  role="group"
+                  aria-label="Repeat on"
+                  className="flex justify-between gap-1"
                 >
-                  <option value="dayOfMonth">
-                    {`On day ${validDate ? Number(startDate.slice(8, 10)) : "of the month"}`}
-                  </option>
-                  <option value="nthWeekday">
-                    {validDate
-                      ? `On the ${nthWeekdayLabel(startDate)}`
-                      : "On the same weekday"}
-                  </option>
-                </NativeSelect>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <NativeSelect aria-label="Ends" {...form.register("endType")}>
-                  <option value="never">Never ends</option>
-                  <option value="until">Ends on a date</option>
-                  <option value="count">Ends after a number of times</option>
-                </NativeSelect>
-                {endType === "until" ? (
-                  <>
-                    <Input
-                      aria-label="End date"
-                      type="date"
-                      aria-invalid={!!errors.endDate}
-                      {...form.register("endDate")}
-                    />
-                    <FieldError message={errors.endDate?.message} />
-                  </>
-                ) : null}
-                {endType === "count" ? (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Input
-                      aria-label="Number of occurrences"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={520}
-                      className="w-24"
-                      {...form.register("endCount")}
-                    />
-                    <span>occurrences</span>
-                  </div>
-                ) : null}
+                  {WEEKDAY_ORDER.map((d) => {
+                    const on = byWeekday.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={on}
+                        aria-label={WEEKDAY_SHORT[d]}
+                        onClick={() => toggleDay(d)}
+                        className={cn(
+                          "flex size-10 items-center justify-center rounded-full border text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                          on
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input text-muted-foreground hover:bg-muted",
+                        )}
+                      >
+                        {WEEKDAY_INITIAL[d]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <FieldError message={errors.byWeekday?.message} />
               </div>
-            </>
-          ) : null}
+            ) : (
+              <NativeSelect
+                aria-label="Monthly repeat"
+                {...form.register("monthlyMode")}
+              >
+                <option value="dayOfMonth">
+                  {`On day ${validDate ? Number(startDate.slice(8, 10)) : "of the month"}`}
+                </option>
+                <option value="nthWeekday">
+                  {validDate
+                    ? `On the ${nthWeekdayLabel(startDate)}`
+                    : "On the same weekday"}
+                </option>
+              </NativeSelect>
+            )}
 
-          {summary && freq !== "none" ? (
-            <p
-              data-testid="recurrence-summary"
-              className="rounded-xl bg-practice-soft px-3 py-2 text-sm text-practice-soft-foreground"
-            >
-              {summary}
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Changes apply to this practice only.
-        </p>
-      )}
+            <div className="flex flex-col gap-2">
+              <NativeSelect aria-label="Ends" {...form.register("endType")}>
+                <option value="never">Never ends</option>
+                <option value="until">Ends on a date</option>
+                <option value="count">Ends after a number of times</option>
+              </NativeSelect>
+              {endType === "until" ? (
+                <>
+                  <Input
+                    aria-label="End date"
+                    type="date"
+                    aria-invalid={!!errors.endDate}
+                    {...form.register("endDate")}
+                  />
+                  <FieldError message={errors.endDate?.message} />
+                </>
+              ) : null}
+              {endType === "count" ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <Input
+                    aria-label="Number of occurrences"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={520}
+                    className="w-24"
+                    {...form.register("endCount")}
+                  />
+                  <span>occurrences</span>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+
+        {summary && freq !== "none" ? (
+          <p
+            data-testid="recurrence-summary"
+            className="rounded-xl bg-practice-soft px-3 py-2 text-sm text-practice-soft-foreground"
+          >
+            {summary}
+          </p>
+        ) : null}
+      </div>
 
       <FormField label="Location" htmlFor={id("location")}>
         <Input
@@ -489,7 +541,7 @@ export function PracticeForm({
         />
       </FormField>
 
-      <FormActions error={serverError}>
+      <FormActions error={serverError ?? externalError}>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel

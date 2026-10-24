@@ -6,12 +6,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { FormField } from "@/components/app/form-field";
-import { LinkList } from "@/components/app/link-list";
 import { Thumbnail } from "@/components/app/list-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSuggestTab } from "@/lib/queries/songs";
+import { SongLinkEditor } from "./song-link-editor";
 import { useDebounced } from "./use-debounced";
 import { parseDuration, type SongFormValues } from "./song-utils";
 
@@ -133,8 +133,7 @@ export function SongForm({
       </FormField>
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">Reference</span>
-        <LinkList
-          editing
+        <SongLinkEditor
           rows={references}
           onChange={(rows) =>
             form.setValue("references", rows, { shouldDirty: true })

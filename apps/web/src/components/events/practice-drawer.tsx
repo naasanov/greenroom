@@ -25,9 +25,10 @@ import { SegmentedToggle } from "@/components/app/segmented-toggle";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
-import { BESIDE_SHEET } from "@/components/events/beside-sheet";
+import { eventDrawerClass } from "@/components/events/beside-sheet";
 import {
   PracticeForm,
+  type PracticeEditDraft,
   type PracticeInitial,
   type PracticeSubmit,
 } from "@/components/events/practice-form";
@@ -138,50 +139,56 @@ export function PracticeDrawer({
 }) {
   const update = useUpdatePractice(bandId, seriesId, occurrenceKey);
   const remove = useDeletePractice(bandId, seriesId, occurrenceKey);
-  const [scopeFor, setScopeFor] = useState<"edit" | "delete" | null>(null);
-  const [editScope, setEditScope] = useState<ApiScope | null>(null);
+  const [deleteScopeOpen, setDeleteScopeOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [pendingSave, setPendingSave] = useState<PracticeEditDraft | null>(
+    null,
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [discard, setDiscard] = useState<"close" | "cancel" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const onDirty = useCallback((d: boolean) => setDirty(d), []);
-  const series = usePracticeSeries(bandId, seriesId, editScope !== null);
+  const series = usePracticeSeries(bandId, seriesId, editing);
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
-  const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditScope(null));
+  const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
 
-  async function save(submit: PracticeSubmit) {
-    if (submit.kind !== "update") return;
-    const result = await update.mutateAsync(submit.body);
-    setDirty(false);
-    setEditScope(null);
-    onEdited(result);
+  async function applyScope(draft: PracticeEditDraft, scope: ApiScope) {
+    setSaveError(null);
+    try {
+      const result = await update.mutateAsync(draft.build(scope));
+      setDirty(false);
+      setEditing(false);
+      onEdited(result);
+    } catch (e) {
+      setSaveError(
+        e instanceof Error ? e.message : "Could not save the practice.",
+      );
+    }
   }
 
-  function initialFor(scope: ApiScope): PracticeInitial | undefined {
+  async function save(submit: PracticeSubmit) {
+    if (submit.kind !== "edit") return;
+    if (occ?.recurring) setPendingSave(submit.draft);
+    else await applyScope(submit.draft, "all");
+  }
+
+  // The form shows this occurrence's values alongside the series recurrence.
+  function initialFor(): PracticeInitial | undefined {
     if (!occ || !series.data) return undefined;
-    const s = series.data;
-    if (scope === "all") {
-      return {
-        title: s.title,
-        location: s.location,
-        startDate: s.startDate,
-        startTime: s.startTime,
-        durationMinutes: s.durationMinutes,
-        recurrence: s.recurrence,
-      };
-    }
     return {
       title: occ.title,
       location: occ.location,
       startDate: occ.date,
       startTime: wallClock(occ.startsAt, occ.timeZone).time,
       durationMinutes: occ.durationMinutes,
-      recurrence: s.recurrence,
+      recurrence: series.data.recurrence,
     };
   }
 
   const title = occ?.title ?? fallbackTitle ?? "Practice";
-  const editInitial = editScope ? initialFor(editScope) : undefined;
+  const editInitial = editing ? initialFor() : undefined;
   const path = occ
     ? `/practices/${seriesId}?date=${occ.date}`
     : `/practices/${seriesId}`;
@@ -190,7 +197,7 @@ export function PracticeDrawer({
     <>
       <BottomDrawer
         open={open}
-        className={beside ? BESIDE_SHEET : undefined}
+        className={eventDrawerClass(beside)}
         onOpenChange={(open) => !open && onClose()}
         dismissible={!dirty}
         onDismissAttempt={requestClose}
@@ -198,21 +205,24 @@ export function PracticeDrawer({
         description={EVENT_TYPES.practice.label}
         headerAction={<ShareButton path={path} title={title} />}
         footer={
-          occ && !editScope ? (
+          occ && !editing ? (
             <div className="flex gap-2">
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() =>
-                  occ.recurring ? setScopeFor("edit") : setEditScope("all")
-                }
+                onClick={() => {
+                  setSaveError(null);
+                  setEditing(true);
+                }}
               >
                 Edit
               </Button>
               <Button
                 variant="destructive"
                 onClick={() =>
-                  occ.recurring ? setScopeFor("delete") : setConfirmDelete(true)
+                  occ.recurring
+                    ? setDeleteScopeOpen(true)
+                    : setConfirmDelete(true)
                 }
               >
                 Delete
@@ -228,12 +238,14 @@ export function PracticeDrawer({
               className="size-5 animate-spin text-muted-foreground"
             />
           </div>
-        ) : editScope ? (
+        ) : editing ? (
           editInitial ? (
             <PracticeForm
               idPrefix="practice-edit"
               initial={editInitial}
-              scope={editScope}
+              editing
+              seriesStartDate={series.data?.startDate}
+              externalError={saveError}
               timeZone={series.data?.timeZone ?? occ.timeZone}
               submitLabel="Save changes"
               onSubmit={save}
@@ -254,14 +266,23 @@ export function PracticeDrawer({
       </BottomDrawer>
 
       <EditScopeDialog
-        open={scopeFor !== null}
-        onOpenChange={(open) => !open && setScopeFor(null)}
-        action={scopeFor === "delete" ? "cancel" : "edit"}
+        open={deleteScopeOpen}
+        onOpenChange={setDeleteScopeOpen}
+        action="cancel"
+        onConfirm={(scope) =>
+          remove.mutate(SCOPE_TO_API[scope], { onSuccess: onClose })
+        }
+      />
+      <EditScopeDialog
+        open={pendingSave !== null}
+        onOpenChange={(open) => !open && setPendingSave(null)}
+        action="edit"
+        hide={[
+          ...(pendingSave?.recurrenceChanged ? (["this"] as const) : []),
+          ...(pendingSave?.dateChanged ? (["following"] as const) : []),
+        ]}
         onConfirm={(scope) => {
-          if (scopeFor === "edit") setEditScope(SCOPE_TO_API[scope]);
-          else {
-            remove.mutate(SCOPE_TO_API[scope], { onSuccess: onClose });
-          }
+          if (pendingSave) void applyScope(pendingSave, SCOPE_TO_API[scope]);
         }}
       />
       <ConfirmDialog
@@ -281,7 +302,7 @@ export function PracticeDrawer({
           setDiscard(null);
           setDirty(false);
           if (action === "close") onClose();
-          else setEditScope(null);
+          else setEditing(false);
         }}
       />
     </>

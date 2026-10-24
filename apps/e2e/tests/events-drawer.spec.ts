@@ -1,7 +1,16 @@
 import type { BandSeedResult } from "@greenroom/db";
-import { WEB_URL } from "../src/env.js";
+import { practiceSeries, type Database } from "@greenroom/db";
+import { request as pwRequest, type Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { API_URL, WEB_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
-import { AVA, calendar, eventIn, showGigDate } from "./events-helpers.js";
+import {
+  AVA,
+  calendar,
+  eventIn,
+  isoDay,
+  showGigDate,
+} from "./events-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -132,25 +141,141 @@ test("practice occurrence shows attendees and saves an RSVP", async ({
   ).toBeChecked();
 });
 
-test("editing one occurrence with scope 'This event' leaves the series alone", async ({
-  page,
-}) => {
+const scopeDialog = (page: Page) =>
+  page.getByRole("dialog", { name: "Edit recurring event" });
+
+async function openMovedPracticeEdit(page: Page) {
   const date = seed.practice.moved.startsAt.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   const drawer = dialog(page, seed.practice.title);
   await drawer.getByRole("button", { name: "Edit" }).click();
-  const scope = page.getByRole("dialog", { name: "Edit recurring event" });
-  await expect(scope).toBeVisible();
-  await scope.getByRole("button", { name: "OK" }).click();
-  await expect(drawer.getByLabel("Repeat", { exact: true })).toHaveCount(0);
+  await expect(drawer.getByLabel("Title")).toHaveValue(seed.practice.title);
+  return drawer;
+}
+
+const seriesRow = async (db: Database) =>
+  (
+    await db
+      .select()
+      .from(practiceSeries)
+      .where(eq(practiceSeries.id, seed.practice.seriesId))
+  )[0];
+
+test("editing a recurring practice opens the form without asking the scope", async ({
+  page,
+}) => {
+  const drawer = await openMovedPracticeEdit(page);
+  await expect(scopeDialog(page)).toHaveCount(0);
+  await expect(drawer.getByLabel("Start time")).toHaveValue("19:00");
+  await expect(drawer.getByLabel("End time")).toHaveValue("21:00");
+  await expect(drawer.getByLabel("Duration")).toHaveCount(0);
+  await expect(drawer.getByLabel("Repeat", { exact: true })).toHaveValue(
+    "weekly",
+  );
+});
+
+test("saving a recurring practice asks the scope; This event leaves the series alone", async ({
+  page,
+}) => {
+  const drawer = await openMovedPracticeEdit(page);
   await drawer.getByLabel("Title").fill("Special rehearsal");
   await drawer.getByRole("button", { name: "Save changes" }).click();
+  await scopeDialog(page).getByRole("button", { name: "OK" }).click();
   await expect(dialog(page, "Special rehearsal")).toBeVisible();
   await dialog(page, "Special rehearsal")
     .getByRole("button", { name: "Close" })
     .click();
   await expect(eventIn(page, "Special rehearsal")).toHaveCount(1);
   await expect(eventIn(page, seed.practice.title).first()).toBeVisible();
+});
+
+test("cancelling the scope dialog keeps the edits in the form", async ({
+  page,
+}) => {
+  const drawer = await openMovedPracticeEdit(page);
+  await drawer.getByLabel("Title").fill("Unsaved title");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await scopeDialog(page).getByRole("button", { name: "Back" }).click();
+  await expect(scopeDialog(page)).toHaveCount(0);
+  await expect(drawer.getByLabel("Title")).toHaveValue("Unsaved title");
+});
+
+test("changing the recurrence hides the 'This event' scope", async ({
+  page,
+}) => {
+  const drawer = await openMovedPracticeEdit(page);
+  await drawer.getByLabel("Repeat", { exact: true }).selectOption("monthly");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  const scope = scopeDialog(page);
+  await expect(scope).toBeVisible();
+  await expect(scope.getByLabel("This event")).toHaveCount(0);
+  await expect(scope.getByLabel("This and following events")).toBeVisible();
+  await expect(scope.getByLabel("All events")).toBeVisible();
+});
+
+test("'All events' with an untouched date keeps the series start", async ({
+  page,
+  db,
+}) => {
+  // The seeded rrule lacks the RRULE: prefix the update path parses.
+  await db
+    .update(practiceSeries)
+    .set({ rrule: "RRULE:FREQ=WEEKLY;BYDAY=TU" })
+    .where(eq(practiceSeries.id, seed.practice.seriesId));
+  const before = await seriesRow(db);
+  const drawer = await openMovedPracticeEdit(page);
+  await drawer.getByLabel("Title").fill("Renamed practice");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await scopeDialog(page).getByLabel("All events").click();
+  await scopeDialog(page).getByRole("button", { name: "OK" }).click();
+  await expect
+    .poll(async () => (await seriesRow(db)).title)
+    .toBe("Renamed practice");
+  const after = await seriesRow(db);
+  expect(after.dtstart.toISOString()).toBe(before.dtstart.toISOString());
+});
+
+test("an end time before the start runs past midnight", async ({ page }) => {
+  const drawer = await openMovedPracticeEdit(page);
+  await drawer.getByLabel("Start time").fill("22:00");
+  await expect(drawer.getByLabel("End time")).toHaveValue("00:00");
+  await drawer.getByLabel("End time").fill("01:00");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await scopeDialog(page).getByRole("button", { name: "OK" }).click();
+  await expect(dialog(page, seed.practice.title)).toContainText(
+    "10:00 PM - 1:00 AM",
+  );
+});
+
+test("a one-off practice saves without a scope dialog", async ({
+  page,
+  testApi,
+}) => {
+  const { cookie } = await testApi.login(AVA);
+  const api = await pwRequest.newContext({
+    baseURL: API_URL,
+    extraHTTPHeaders: { Cookie: `${cookie.name}=${cookie.value}` },
+  });
+  const date = isoDay(3);
+  const res = await api.post(`/bands/${seed.bands.nightOwls.id}/practices`, {
+    data: {
+      title: "One-off jam",
+      startDate: date,
+      startTime: "18:00",
+      durationMinutes: 90,
+      timeZone: "UTC",
+    },
+  });
+  expect(res.status()).toBe(201);
+  const series = await res.json();
+  await page.goto(`/practices/${series.id}?date=${date}`);
+  const drawer = dialog(page, "One-off jam");
+  await drawer.getByRole("button", { name: "Edit" }).click();
+  await expect(drawer.getByLabel("End time")).toHaveValue("19:30");
+  await drawer.getByLabel("Title").fill("One-off jam v2");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await expect(scopeDialog(page)).toHaveCount(0);
+  await expect(dialog(page, "One-off jam v2")).toBeVisible();
 });
 
 test("deleting a recurring practice asks for a scope", async ({ page }) => {

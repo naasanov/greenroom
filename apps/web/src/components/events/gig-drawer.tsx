@@ -12,7 +12,7 @@ import { EVENT_TYPES } from "@/components/app/event-types";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
-import { BESIDE_SHEET } from "@/components/events/beside-sheet";
+import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
 import { useDeleteGig, useUpdateGig } from "@/lib/queries/events";
@@ -102,7 +102,7 @@ export function GigDrawer({
   fallbackTitle?: string;
   /** False while the drawer slides away after being replaced or closed. */
   open?: boolean;
-  /** Sits left of the agenda sheet on wide screens instead of centering on the page. */
+  /** Sits left of the agenda sheet on wide screens instead of left of the FAB column. */
   beside?: boolean;
   onClose: () => void;
 }) {
@@ -128,7 +128,7 @@ export function GigDrawer({
     <>
       <BottomDrawer
         open={open}
-        className={beside ? BESIDE_SHEET : undefined}
+        className={eventDrawerClass(beside)}
         onOpenChange={(open) => !open && onClose()}
         dismissible={!dirty}
         onDismissAttempt={requestClose}

@@ -102,14 +102,16 @@ export function RosterTab({ band }: { band: BandSummary }) {
         </p>
       )}
 
-      {/* Sits where the FAB does on the other tabs. */}
-      <button
-        type="button"
-        onClick={() => setInviteOpen(true)}
-        className="pr-safe fixed right-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)] z-30 flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground shadow-lift outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95 md:bottom-6"
-      >
-        <Link2 className="size-5" /> Invite link
-      </button>
+      {/* Same spot as the FAB. The wrapper carries the safe-area inset so the pill keeps symmetric padding. */}
+      <div className="pr-safe fixed right-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)] z-30 md:bottom-6">
+        <button
+          type="button"
+          onClick={() => setInviteOpen(true)}
+          className="flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-base font-medium whitespace-nowrap text-primary-foreground shadow-lift outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
+        >
+          <Link2 className="size-5 shrink-0" /> Invite link
+        </button>
+      </div>
 
       <MemberSheet
         bandId={band.id}
