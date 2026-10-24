@@ -317,7 +317,7 @@ export async function seedBand(
     bandId,
     title: "Weekly practice",
     location: "Rehearsal room B",
-    rrule: "FREQ=WEEKLY;BYDAY=TU",
+    rrule: "RRULE:FREQ=WEEKLY;BYDAY=TU",
     dtstart,
     timeZone: "UTC",
     durationMinutes: 120,
