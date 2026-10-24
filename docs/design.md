@@ -26,7 +26,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - **RSVPs mirror Google Calendar's native RSVP system:** each member's response maps to the attendee response status on the Calendar event (accepted / tentative / declined / needs action), so the same check marks show in Google Calendar and in the app, synced both ways.
 - Practices are cancelable.
 - A single practice can be moved to a different day without moving the rest of the recurring series.
-- **Editing or canceling a recurring practice works like Google Calendar:** when you change details (time, location, etc.) or cancel, you're asked to apply it to "This event," "This and following events," or "All events." This maps cleanly onto RRULE/Calendar sync. (Setlists keep their own "this and following" rule described under Practice form fields.)
+- **Editing or canceling a recurring practice works like Google Calendar:** when you change details (time, location, etc.) or cancel, you're asked to apply it to "This event," "This and following events," or "All events." For edits the question comes when you save, not when you tap Edit; if the recurrence itself changed, "This event" is not offered (decided 2026-10-24). This maps cleanly onto RRULE/Calendar sync. (Setlists keep their own "this and following" rule described under Practice form fields.)
 
 # Open Questions
 - (Resolved) Delegating media storage entirely to Google Drive: yes, see Storage, Upload Brokering, and Linking Google Drive.
@@ -162,6 +162,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Week mode: light time grid (so you can see e.g. a practice at 7pm Tuesday), with the all-day strip on top.
   - Day mode: explicitly SKIPPED. Only pays off when a single day is crowded, which won't happen here; week already gives the time-of-day view. Don't build unless it's ever actually missed.
 - Tapping an existing event: opens the SAME drawer, now populated, to view/manage it — edit the setlist, see the lineup, reach the media. This is the everyday action once the band is using the app, and the calendar is a main front door into a gig (the duplicate-past-setlist and media features all assume you can reach a gig).
+- **Period changes slide (decided 2026-10-24):** moving to the next/previous month or week slides the grid like a swipe, and on touch a horizontal swipe changes the period.
 - "Today": a clear today marker on the calendar plus a quick "jump to today" button to snap back after scrolling off to another month.
 - Filtering (gigs-only / practices-only view): consciously DEFERRED — for a small band the color-coding is enough and the calendar is never crowded. Decided against rather than left open.
 - Explicitly NOT adding (general-calendar bloat that doesn't serve a band): external calendar overlays, weather, travel-time.
@@ -173,7 +174,8 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Signal that past is upward: show a sliver/peek of the most recent past card above the today line (a half-visible card is a universal "scroll up for more" cue). Chosen over an up-arrow + "past" caption, which is more explicit but more clutter.
 - Cards: time-ordered rectangle cards stacked vertically. Summary view only — can't show everything.
   - On each card: title, date, time, and a type indicator (gig vs. practice). Time is worth including (identifying — afternoon vs. evening gig — and tiny). Maybe venue NAME on gigs; NOT the full address (address is post-open detail, not scan-time).
-- Tapping a card opens the SAME event drawer, populated. On desktop it opens beside the sheet (to its left); on a narrow phone screen there's no room side-by-side, so it comes up over the sheet (consistent with the drawer elsewhere).
+- **On desktop the open sheet pushes the calendar left (decided 2026-10-24)** so both are fully visible; on phones it slides over the calendar.
+- Tapping a card opens the SAME event drawer, populated, and the calendar navigates to that event's month/week and highlights it (decided 2026-10-24). On desktop the drawer opens beside the sheet (to its left); on a narrow phone screen there's no room side-by-side, so it comes up over the sheet (consistent with the drawer elsewhere).
 - Gig/practice/both filter lives HERE (a list genuinely benefits from "just gigs"), which is the same filter consciously deferred on the calendar itself — kept here, calendar stays unfiltered.
 - **Member filter (decided 2026-10-22):** a dropdown in the agenda: Everyone (default), Me at the top, then every other member. Picking a member shows only gigs whose lineup includes them; practices are whole-band and always stay listed. This is where "a member's upcoming gigs" lives, not the roster detail sheet.
 - Creating an event: click a day → a drawer slides up from the bottom. First choice inside the drawer is gig vs. practice, presented as a split: the drawer is cut vertically in half — left half is "Practice," right half is "Gig." Tapping a half slides the drawer horizontally to that side's form (gig form or practice form). Gives each type its own "room."
@@ -182,10 +184,11 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Required fields: because the FAB entry has no day context, the gig form needs its own date field. Title + date are the only two required fields (a gig with no date has nowhere to live on the calendar, so date can't be optional); everything else stays optional, preserving the drop-it-and-flesh-out-later principle.
 - Exiting the drawer discards the in-progress event. Flag (maybe, not now): if the user has actually typed something, show a "discard changes?" confirm so an accidental backdrop tap doesn't throw away a half-filled gig — but NOT on an untouched drawer.
 - Gig form: title field + an (initially empty) setlist with an "Add songs" button (plus the other gig fields from the Gig data class section).
-- Practice form fields: title; start time + duration; recurrence (how often it repeats + which day(s) — e.g. weekly, every 2 weeks, monthly, "every Tue & Thu"); end condition (never / until a date / after N occurrences); location as free text (practices aren't venue gigs); **optional setlist** that works exactly like the gig setlist (same library drawer, add/reorder, duplicate-a-past-setlist).
+- Practice form fields: title; start time + end time (decided 2026-10-24, replacing duration; an end before the start means it ends the next day); recurrence (how often it repeats + which day(s) — e.g. weekly, every 2 weeks, monthly, "every Tue & Thu"); end condition (never / until a date / after N occurrences); location as free text (practices aren't venue gigs); **optional setlist** that works exactly like the gig setlist (same library drawer, add/reorder, duplicate-a-past-setlist).
   - Recurring practices: each occurrence has its own setlist, but they're linked with "this and following" behavior. Changing the setlist on one occurrence (e.g. 10/4) applies that setlist to that occurrence and every later one in the series; earlier occurrences are untouched (past practices keep a record of what was worked on).
   - Conflict rule: by default the change overwrites forward. If any later occurrence has its own custom (individually edited) setlist, warn first, e.g. "10/18 has its own setlist. Replace it or keep it?" No prompt when there's nothing custom to lose.
   - Recurrence must map to what Google Calendar's API can represent (it uses the RRULE recurrence standard). Mirror RRULE's supported options rather than inventing custom recurrence that can't round-trip through Calendar sync.
+- **Event drawers sit on the right on desktop (decided 2026-10-24):** the create, gig, and practice drawers rise from the bottom in the right part of the screen, directly left of the FAB/agenda buttons, or directly left of the agenda sheet when it is open. Drawer titles are centered.
 - Bottom-drawer pattern throughout: chosen deliberately — thumb-reachable, touch/mobile-friendly, feels native when pulling the app up at a venue. Flow reveals only the next decision at each step (no wall of fields).
 - **Drawers are non-modal (decided 2026-10-20):** no dimmed or blurred backdrop, and the page behind stays interactive. A tap outside the drawer closes it AND goes through to what was tapped (e.g. gig A's drawer is open, tapping gig B closes A and opens B). If the drawer has unsaved input, an outside tap shows the discard-changes confirm instead and does not pass through. Inside a stacked drawer, tapping the drawer underneath closes only the top one.
 - **Replacing a drawer animates both at once (decided 2026-10-21):** when an outside tap opens a different drawer (gig A's drawer is open, tap gig B), the content never snaps to B. A's drawer slides down and closes while, at the same moment, B's drawer slides up over it. Both animations run simultaneously, with B on top.
@@ -308,6 +311,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 ## Personal settings (every user)
 - Name, photo, instruments, calendar email (where event invites go; defaults to the sign-in email), Spotify connection, log out.
+- Instruments save automatically as you change them (decided 2026-10-24).
 
 ## Band settings (admins only)
 - Band name and photo.
