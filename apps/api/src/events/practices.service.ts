@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, eq, gt, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import {
   memberships,
   practiceOccurrenceOverrides as overridesTable,
@@ -32,7 +32,7 @@ import {
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { copyItems } from "../setlists/items.js";
-import { resolveAssignment } from "./assignment.js";
+import { resolveAssignment, startsHere } from "./assignment.js";
 import {
   buildOccurrence,
   type OverrideRow,
@@ -226,6 +226,7 @@ export class PracticesService {
         attendees.find((a) => a.userId === userId)?.status ?? "no_response",
       setlistId: resolved.setlistId,
       setlistSource: resolved.source,
+      setlistStartsHere: startsHere(resolved, original),
       laterCustomSetlists: laterCustom(rows, original),
     };
   }
@@ -766,27 +767,15 @@ export class PracticesService {
     const clearing = setlistId === null;
 
     if (opts.scope === "this_and_following") {
-      // The occurrence itself and everything after it follow the new forward row.
+      // Rows at the occurrence are always superseded; later rows only with replace.
       await tx
         .delete(assignmentsTable)
         .where(
           and(
             eq(assignmentsTable.seriesId, seriesId),
-            eq(assignmentsTable.scope, "single"),
             replace
               ? gte(assignmentsTable.effectiveFrom, original)
               : eq(assignmentsTable.effectiveFrom, original),
-          ),
-        );
-      await tx
-        .delete(assignmentsTable)
-        .where(
-          and(
-            eq(assignmentsTable.seriesId, seriesId),
-            eq(assignmentsTable.scope, "forward"),
-            clearing
-              ? gte(assignmentsTable.effectiveFrom, original)
-              : gt(assignmentsTable.effectiveFrom, original),
           ),
         );
     } else if (clearing) {
@@ -837,6 +826,7 @@ export class PracticesService {
     return {
       setlistId: resolved.setlistId,
       source: resolved.setlistId ? resolved.source : null,
+      setlistStartsHere: startsHere(resolved, original),
       conflicts: opts.scope === "this" ? [] : conflicts,
       conflictsReplaced: opts.scope === "this_and_following" && replace,
     };
@@ -851,12 +841,24 @@ function laterCustom(
   }[],
   original: Date,
 ) {
-  return rows
-    .filter((r) => r.scope === "single" && r.effectiveFrom > original)
-    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime())
-    .map((r) => ({
-      occurrenceKey: toOccurrenceKey(r.effectiveFrom),
-      originalStart: r.effectiveFrom.toISOString(),
-      setlistId: r.setlistId,
-    }));
+  return (
+    rows
+      .filter((r) => r.effectiveFrom > original)
+      // A single row wins over a forward row starting at the same occurrence.
+      .sort(
+        (a, b) =>
+          a.effectiveFrom.getTime() - b.effectiveFrom.getTime() ||
+          (a.scope === "single" ? -1 : 1) - (b.scope === "single" ? -1 : 1),
+      )
+      .filter(
+        (r, i, all) =>
+          i === 0 ||
+          r.effectiveFrom.getTime() !== all[i - 1]!.effectiveFrom.getTime(),
+      )
+      .map((r) => ({
+        occurrenceKey: toOccurrenceKey(r.effectiveFrom),
+        originalStart: r.effectiveFrom.toISOString(),
+        setlistId: r.setlistId,
+      }))
+  );
 }

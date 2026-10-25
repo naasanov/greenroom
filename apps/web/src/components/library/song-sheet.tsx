@@ -252,6 +252,7 @@ export function SongSheet({
   onDeleted,
   onImport,
   onDirtyChange,
+  initialText,
 }: {
   bandId: string;
   target: SheetTarget;
@@ -262,8 +263,11 @@ export function SongSheet({
   onRequestClose: () => void;
   onCreated: (song: SongCreated) => void;
   onDeleted: () => void;
-  onImport: (url: string) => void;
+  /** Omit where playlist import is not available; the hint points to the library. */
+  onImport?: (url: string) => void;
   onDirtyChange: (dirty: boolean) => void;
+  /** Prefills the add flow's smart input. */
+  initialText?: string;
 }) {
   const adding = target.kind === "add";
   const songId = target.kind === "song" ? target.id : null;
@@ -388,6 +392,7 @@ export function SongSheet({
     body = (
       <SmartInput
         bandId={bandId}
+        initialText={initialText}
         onPick={(c) => setDraft(draftFromCandidate(c))}
         onManual={(text) => {
           setTyped(text);

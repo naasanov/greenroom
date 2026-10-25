@@ -264,7 +264,9 @@ export interface CustomSetlistOccurrence {
 export interface PracticeSetlistResult {
   setlistId: string | null;
   source: SetlistSource;
-  /** Later occurrences that had their own single setlist before this change. */
+  /** True when the resolved setlist comes from a row starting at this occurrence. */
+  setlistStartsHere: boolean;
+  /** Later occurrences that had their own setlist before this change. */
   conflicts: CustomSetlistOccurrence[];
   /** True when those conflicts were overwritten. */
   conflictsReplaced: boolean;
@@ -322,7 +324,9 @@ export interface PracticeOccurrence extends PracticeEvent {
   myRsvp: RsvpStatus;
   setlistId: string | null;
   setlistSource: SetlistSource;
-  /** Later occurrences with their own single setlist. */
+  /** True when the resolved setlist comes from a row starting at this occurrence. */
+  setlistStartsHere: boolean;
+  /** Later occurrences with their own setlist (forward or single row). */
   laterCustomSetlists: CustomSetlistOccurrence[];
 }
 

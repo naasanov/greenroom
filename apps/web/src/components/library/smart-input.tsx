@@ -26,7 +26,7 @@ export function SmartInput({
   initialText?: string;
   onPick: (candidate: SongCandidate) => void;
   onManual: (text: string) => void;
-  onPlaylist: (url: string) => void;
+  onPlaylist?: (url: string) => void;
   onOpenExisting: (songId: string) => void;
 }) {
   const [text, setText] = useState(initialText);
@@ -63,10 +63,20 @@ export function SmartInput({
           data-testid="playlist-detected"
           className="flex flex-col items-start gap-2 rounded-2xl bg-gig-soft p-4 text-sm text-gig-soft-foreground"
         >
-          <p>That looks like a playlist. Import all of its songs instead?</p>
-          <Button type="button" onClick={() => onPlaylist(text.trim())}>
-            <ListMusic /> Import playlist
-          </Button>
+          {onPlaylist ? (
+            <>
+              <p>
+                That looks like a playlist. Import all of its songs instead?
+              </p>
+              <Button type="button" onClick={() => onPlaylist(text.trim())}>
+                <ListMusic /> Import playlist
+              </Button>
+            </>
+          ) : (
+            <p>
+              That looks like a playlist. Import it from the Music Library tab.
+            </p>
+          )}
         </div>
       ) : null}
 

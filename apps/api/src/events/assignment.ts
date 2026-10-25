@@ -8,6 +8,8 @@ export interface AssignmentRow {
 export interface ResolvedAssignment {
   setlistId: string | null;
   source: "single" | "forward" | null;
+  /** Start of the row the setlist comes from, null when none applies. */
+  effectiveFrom: Date | null;
 }
 
 /**
@@ -22,13 +24,34 @@ export function resolveAssignment(
   const single = rows.find(
     (r) => r.scope === "single" && r.effectiveFrom.getTime() === t,
   );
-  if (single) return { setlistId: single.setlistId, source: "single" };
+  if (single)
+    return {
+      setlistId: single.setlistId,
+      source: "single",
+      effectiveFrom: single.effectiveFrom,
+    };
   let best: AssignmentRow | null = null;
   for (const r of rows) {
     if (r.scope !== "forward" || r.effectiveFrom.getTime() > t) continue;
     if (!best || r.effectiveFrom > best.effectiveFrom) best = r;
   }
   return best
-    ? { setlistId: best.setlistId, source: "forward" }
-    : { setlistId: null, source: null };
+    ? {
+        setlistId: best.setlistId,
+        source: "forward",
+        effectiveFrom: best.effectiveFrom,
+      }
+    : { setlistId: null, source: null, effectiveFrom: null };
+}
+
+/** True when the resolved (non-null) setlist comes from a row starting exactly at `occurrence`. */
+export function startsHere(
+  resolved: ResolvedAssignment,
+  occurrence: Date,
+): boolean {
+  return (
+    resolved.setlistId !== null &&
+    resolved.effectiveFrom !== null &&
+    resolved.effectiveFrom.getTime() === occurrence.getTime()
+  );
 }

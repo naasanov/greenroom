@@ -15,7 +15,15 @@ import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
+import { PickDndProvider } from "@/components/setlists/pick-dnd";
+import { SetlistAside } from "@/components/setlists/setlist-aside";
+import { SetlistSection } from "@/components/setlists/setlist-section";
+import {
+  useSetlistBuilder,
+  type SetlistBuilder,
+} from "@/components/setlists/use-setlist-builder";
 import { useDeleteGig, useUpdateGig } from "@/lib/queries/events";
+import { useGigSetlist } from "@/lib/queries/setlists";
 
 function mapsUrl(gig: Gig): string {
   const query = [gig.venueName, gig.address].filter(Boolean).join(" ");
@@ -25,7 +33,7 @@ function mapsUrl(gig: Gig): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}${place}`;
 }
 
-function GigDetails({ gig }: { gig: Gig }) {
+function GigDetails({ gig, setlist }: { gig: Gig; setlist: SetlistBuilder }) {
   const hasContact = gig.contactName || gig.contactPhone || gig.contactEmail;
   return (
     <div className="flex flex-col gap-5">
@@ -79,8 +87,10 @@ function GigDetails({ gig }: { gig: Gig }) {
           </Fact>
         ) : null}
       </dl>
-      {/* Setlist, Lineup, and Media sections mount here in later tasks. */}
-      <div data-testid="gig-sections" />
+      {/* Lineup and Media sections mount here in later tasks. */}
+      <div data-testid="gig-sections" className="flex flex-col gap-6">
+        <SetlistSection builder={setlist} />
+      </div>
     </div>
   );
 }
@@ -113,6 +123,13 @@ export function GigDrawer({
   const [discard, setDiscard] = useState<"close" | "cancel" | null>(null);
   const [deleting, setDeleting] = useState(false);
   const onDirty = useCallback((d: boolean) => setDirty(d), []);
+  const gigSetlist = useGigSetlist(bandId, gigId);
+  const setlist = useSetlistBuilder({
+    bandId,
+    setlistId: gigSetlist.data?.id,
+    beside,
+    excludeGigId: gigId,
+  });
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
   const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
@@ -126,54 +143,57 @@ export function GigDrawer({
   const title = gig?.title ?? fallbackTitle ?? "Gig";
   return (
     <>
-      <BottomDrawer
-        open={open}
-        className={eventDrawerClass(beside)}
-        onOpenChange={(open) => !open && onClose()}
-        dismissible={!dirty}
-        onDismissAttempt={requestClose}
-        title={title}
-        description={EVENT_TYPES.gig.label}
-        headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}
-        footer={
-          gig && !editing ? (
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                variant="outline"
-                onClick={() => setEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button variant="destructive" onClick={() => setDeleting(true)}>
-                Delete
-              </Button>
+      <PickDndProvider>
+        <BottomDrawer
+          open={open}
+          className={eventDrawerClass(setlist.besideEffective)}
+          aside={<SetlistAside builder={setlist} />}
+          onOpenChange={(open) => !open && onClose()}
+          dismissible={!dirty}
+          onDismissAttempt={requestClose}
+          title={title}
+          description={EVENT_TYPES.gig.label}
+          headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}
+          footer={
+            gig && !editing ? (
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  variant="outline"
+                  onClick={() => setEditing(true)}
+                >
+                  Edit
+                </Button>
+                <Button variant="destructive" onClick={() => setDeleting(true)}>
+                  Delete
+                </Button>
+              </div>
+            ) : undefined
+          }
+        >
+          {!gig ? (
+            <div className="flex justify-center py-10">
+              <Loader2
+                aria-label="Loading"
+                className="size-5 animate-spin text-muted-foreground"
+              />
             </div>
-          ) : undefined
-        }
-      >
-        {!gig ? (
-          <div className="flex justify-center py-10">
-            <Loader2
-              aria-label="Loading"
-              className="size-5 animate-spin text-muted-foreground"
+          ) : editing ? (
+            <GigForm
+              idPrefix="gig-edit"
+              bandId={bandId}
+              gig={gig}
+              timeZone={gig.timeZone}
+              submitLabel="Save changes"
+              onSubmit={save}
+              onCancel={cancelEdit}
+              onDirtyChange={onDirty}
             />
-          </div>
-        ) : editing ? (
-          <GigForm
-            idPrefix="gig-edit"
-            bandId={bandId}
-            gig={gig}
-            timeZone={gig.timeZone}
-            submitLabel="Save changes"
-            onSubmit={save}
-            onCancel={cancelEdit}
-            onDirtyChange={onDirty}
-          />
-        ) : (
-          <GigDetails gig={gig} />
-        )}
-      </BottomDrawer>
+          ) : (
+            <GigDetails gig={gig} setlist={setlist} />
+          )}
+        </BottomDrawer>
+      </PickDndProvider>
 
       <DiscardChangesDialog
         open={discard !== null}

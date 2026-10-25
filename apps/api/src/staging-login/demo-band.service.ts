@@ -145,17 +145,31 @@ export class DemoBandService {
         ),
       );
 
-    const [setlist] = await db.insert(setlists).values({ bandId }).returning();
-    await db.insert(setlistItems).values(
-      songRows.slice(0, 8).map((s, position) => ({
+    // Song indexes per gig: the next gig plus the three past gigs, overlapping.
+    const gigSongs: [number, number[]][] = [
+      [0, [0, 1, 2, 3, 4, 5, 6, 7]],
+      [4, [0, 2, 3, 4, 6, 8]],
+      [5, [1, 2, 4, 5, 7, 9, 3]],
+      [6, [0, 1, 5, 6, 8, 9]],
+    ];
+    for (const [gigIndex, songIdx] of gigSongs) {
+      const [setlist] = await db
+        .insert(setlists)
+        .values({ bandId })
+        .returning();
+      await db.insert(setlistItems).values(
+        songIdx.map((si, position) => ({
+          setlistId: setlist!.id,
+          songId: songRows[si]!.id,
+          position,
+        })),
+      );
+      await db.insert(gigSetlists).values({
+        bandId,
+        gigId: gigRows[gigIndex]!.id,
         setlistId: setlist!.id,
-        songId: s.id,
-        position,
-      })),
-    );
-    await db
-      .insert(gigSetlists)
-      .values({ bandId, gigId: gigRows[0]!.id, setlistId: setlist!.id });
+      });
+    }
 
     // Weekly practice on the Tuesday one to two weeks back, 19:00 UTC.
     const back = at(-10);

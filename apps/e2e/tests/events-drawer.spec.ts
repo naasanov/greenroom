@@ -71,8 +71,9 @@ test("gig deep link opens the calendar at the gig's date", async ({ page }) => {
 test("tapping another event while one is open switches to it", async ({
   page,
 }) => {
-  const a = seed.gigs.upcomingClub;
-  const b = seed.gigs.hidden;
+  // Club Meridian's drawer is tall (seeded setlist), so it is opened second.
+  const a = seed.gigs.hidden;
+  const b = seed.gigs.upcomingClub;
   await showGigDate(page, a.id, a.title);
   await eventIn(page, a.title).click();
   await expect(dialog(page, a.title)).toBeVisible();

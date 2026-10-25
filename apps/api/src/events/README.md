@@ -25,7 +25,11 @@ Series store an RRULE line without DTSTART (`RRULE:FREQ=WEEKLY;BYDAY=TU,TH;UNTIL
 - `all`: updates the series. Changing time, start date, time zone or recurrence deletes overrides, since their keys no longer match. Delete soft-deletes the series.
 
 ## Setlist assignment
-Resolution (`assignment.ts`): a `single` row at exactly the occurrence start wins, else the latest `forward` row with `effective_from <=` it. `this_and_following` writes a forward row and removes later forward rows; later single rows are removed with `onConflict: replace` (default) or kept with `keep`. A row with a null `setlist_id` is an explicit "no setlist" marker: clearing writes one only when an earlier forward row would otherwise still apply (a cleared single still counts as a custom row in `laterCustomSetlists`, with `setlistId: null`). The response and occurrence reads list later occurrences that have their own single setlist (`conflicts`, `laterCustomSetlists`) so the UI can warn.
+Resolution (`assignment.ts`): a `single` row at exactly the occurrence start wins, else the latest `forward` row with `effective_from <=` it. Earlier occurrences are never touched by a change.
+- An occurrence "has its own setlist" when a `forward` row starts exactly at it (or a legacy `single` row). `setlistStartsHere` on occurrence reads and assignment results is true when the resolved non-null setlist comes from a row starting at that occurrence.
+- `this_and_following` at X writes a forward row at X. With `onConflict: replace` (default) later forward and single rows are deleted, so X's setlist runs forward. With `keep`, later rows stay: X's setlist runs until the next occurrence with its own setlist, which keeps its setlist from there on.
+- A null `setlist_id` row is an explicit "no setlist" marker. Clearing at X removes rows at X (and later rows with `replace`), then writes a forward null marker at X only if an earlier forward row would otherwise still apply.
+- `conflicts` (assignment results) and `laterCustomSetlists` (occurrence reads) list later occurrences with their own forward or single row, one per occurrence, sorted, with `setlistId` null for a clear marker.
 
 ## RSVPs
 Attendees are active members; a missing row is `no_response`. Order: going, maybe, no_response, not_going, then by name.
