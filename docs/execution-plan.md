@@ -59,8 +59,8 @@ Parallel group 3A
 🛑 **GATE 2: Core UI review.** Calendar, agenda, library, roster, settings. Status: Approved (2026-10-25, after feedback rounds 1 and 2; staging runs fake integrations, passcode sign-in via STAGING_LOGIN_PASSCODE in the Keychain)
 
 # Phase 4: Setlists + lineup
-- **4.1 Setlists.** Library drawer beside the event drawer with drag-in, phone tap-to-add fallback, drag-to-reorder, running total time, duplicate a past setlist (search gig history), add-song-in-place (adds to library and setlist), practice setlists with this-and-following + custom-setlist warning. Status: In progress (backend API built 2026-10-20: setlists, gig history copy, add-song-in-place, practice setlist create/clear; UI in design 2026-10-25)
-- **4.2 Lineup.** Roster drawer with the same drag/tap mechanic, default full band, copy-from-last-gig button. Status: In progress (backend API built 2026-10-20: default full band, replace, copy from last gig; UI in design 2026-10-25)
+- **4.1 Setlists.** Library drawer beside the event drawer with drag-in, phone tap-to-add fallback, drag-to-reorder, running total time, duplicate a past setlist (search gig history), add-song-in-place (adds to library and setlist), practice setlists with this-and-following + custom-setlist warning. Status: In progress (backend API built 2026-10-20: setlists, gig history copy, add-song-in-place, practice setlist create/clear. 2026-10-25: UI in progress, wave 1 running: gig setlist UI with library drawer, drag and tap-to-add, copy from a past gig, add-song-in-place; backend practice-setlist conflict rule)
+- **4.2 Lineup.** Roster drawer with the same drag/tap mechanic, default full band, copy-from-last-gig button. Status: In progress (backend API built 2026-10-20: default full band, replace, copy from last gig. 2026-10-25: UI queued for wave 2, after the gig setlist mechanic lands)
 
 🛑 **GATE 3: Setlist and lineup feel review** (drag on desktop, tap fallback on phone). Status: Not started
 
