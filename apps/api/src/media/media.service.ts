@@ -22,7 +22,10 @@ import {
   type SongMediaGroup,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
-import type { DriveDownloadResult } from "../integrations/index.js";
+import type {
+  DriveByteRange,
+  DriveDownloadResult,
+} from "../integrations/index.js";
 import {
   DriveStructureService,
   type DriveContext,
@@ -212,6 +215,10 @@ export class MediaService {
   }
 
   // ---- items ----
+
+  getItemRow(bandId: string, itemId: string): Promise<MediaItemRow> {
+    return this.getItem(bandId, itemId);
+  }
 
   private async getItem(bandId: string, itemId: string): Promise<MediaItemRow> {
     const [row] = await this.db
@@ -455,6 +462,7 @@ export class MediaService {
     bandId: string,
     itemId: string,
     kind: "thumbnail" | "content",
+    range?: DriveByteRange,
   ): Promise<{ item: MediaItemRow; result: OkDownload }> {
     const item = await this.getItem(bandId, itemId);
     if (item.missing || item.trashedAt)
@@ -463,7 +471,7 @@ export class MediaService {
     const result =
       kind === "thumbnail"
         ? await this.drive.getThumbnail(ctx.token, item.driveFileId)
-        : await this.drive.download(ctx.token, item.driveFileId);
+        : await this.drive.download(ctx.token, item.driveFileId, range);
     if (result.status === "not-found") {
       const file = await this.drive.getFile(ctx.token, item.driveFileId);
       if (file.status === "not-found") await this.markMissing(item.id);

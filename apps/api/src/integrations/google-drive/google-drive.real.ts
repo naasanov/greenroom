@@ -3,6 +3,7 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { auth as googleAuth, drive, type drive_v3 } from "@googleapis/drive";
 import {
   DRIVE_FOLDER_MIME,
+  type DriveByteRange,
   type DriveChange,
   type DriveChangesResult,
   type DriveDownloadResult,
@@ -253,20 +254,28 @@ export class RealGoogleDriveAdapter implements GoogleDriveAdapter {
   async download(
     accessToken: string,
     fileId: string,
+    range?: DriveByteRange,
   ): Promise<DriveDownloadResult> {
     const meta = await this.getFile(accessToken, fileId);
     if (meta.status === "not-found" || meta.file.mimeType === DRIVE_FOLDER_MIME)
       return { status: "not-found" };
+    const total = meta.file.size;
+    const end = range ? Math.min(range.end ?? total - 1, total - 1) : 0;
+    if (range && range.start > end) return { status: "not-found" };
     try {
       const res = await driveFor(accessToken).files.get(
         { fileId, alt: "media", supportsAllDrives: true },
-        { responseType: "stream" },
+        {
+          responseType: "stream",
+          headers: range ? { Range: `bytes=${range.start}-${end}` } : {},
+        },
       );
       return {
         status: "ok",
         stream: res.data as unknown as Readable,
-        size: meta.file.size,
+        size: total,
         name: meta.file.name,
+        ...(range ? { partial: { start: range.start, end, total } } : {}),
       };
     } catch (err) {
       if (isNotFound(err)) return { status: "not-found" };

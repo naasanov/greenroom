@@ -69,8 +69,22 @@ export type UploadStatusResult =
   | { status: "session-not-found" };
 
 export type DriveDownloadResult =
-  | { status: "ok"; stream: Readable; size: number; name: string }
+  | {
+      status: "ok";
+      stream: Readable;
+      /** Whole-file size, even for a partial response. */
+      size: number;
+      name: string;
+      /** Present when a range was served; inclusive byte offsets. */
+      partial?: { start: number; end: number; total: number };
+    }
   | { status: "not-found" };
+
+/** Inclusive byte range; `end` omitted means through the last byte. */
+export interface DriveByteRange {
+  start: number;
+  end?: number;
+}
 
 /**
  * Every method takes the band's linked Google account access token first.
@@ -121,7 +135,11 @@ export interface GoogleDriveAdapter {
     accessToken: string,
     pageToken: string,
   ): Promise<DriveChangesResult>;
-  download(accessToken: string, fileId: string): Promise<DriveDownloadResult>;
+  download(
+    accessToken: string,
+    fileId: string,
+    range?: DriveByteRange,
+  ): Promise<DriveDownloadResult>;
   /** Thumbnail image bytes (about 400px). Not-found when the file or thumbnail is missing. */
   getThumbnail(
     accessToken: string,

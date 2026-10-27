@@ -125,3 +125,101 @@ export const songMediaGroupSchema = z.object({
   items: z.array(mediaItemSchema),
 });
 export type SongMediaGroup = z.infer<typeof songMediaGroupSchema>;
+
+// ---- resumable uploads ----
+
+export const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+export const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024 * 1024;
+export const MAX_ZIP_ITEMS = 200;
+export const MEMBER_UPLOAD_MIME_PREFIXES = [
+  "image/",
+  "video/",
+  "audio/",
+  "application/pdf",
+] as const;
+
+export const UPLOAD_ERROR_CODES = {
+  typeNotAllowed: "UPLOAD_TYPE_NOT_ALLOWED",
+  offsetMismatch: "UPLOAD_OFFSET_MISMATCH",
+  driveError: "UPLOAD_DRIVE_ERROR",
+  notActive: "UPLOAD_NOT_ACTIVE",
+  tooLarge: "UPLOAD_TOO_LARGE",
+  badChunk: "UPLOAD_BAD_CHUNK",
+} as const;
+
+export const uploadStatusSchema = z.enum([
+  "pending",
+  "uploading",
+  "complete",
+  "failed",
+  "cancelled",
+]);
+export type UploadStatus = z.infer<typeof uploadStatusSchema>;
+
+export const createUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(200),
+  totalBytes: z.number().int().min(1),
+  /** Client-computed name + size + lastModified. */
+  fingerprint: z.string().trim().min(1).max(500),
+  /** Null uploads to Unsorted. */
+  folderId: z.string().uuid().nullable(),
+  songId: z.string().uuid().nullable().optional(),
+});
+export type CreateUpload = z.infer<typeof createUploadSchema>;
+
+export const patchUploadSchema = z
+  .object({
+    folderId: z.string().uuid().nullable().optional(),
+    fileName: z.string().trim().min(1).max(255).optional(),
+    songId: z.string().uuid().nullable().optional(),
+  })
+  .refine(
+    (v) =>
+      v.folderId !== undefined ||
+      v.fileName !== undefined ||
+      v.songId !== undefined,
+    { message: "Nothing to update" },
+  );
+export type PatchUpload = z.infer<typeof patchUploadSchema>;
+
+export const bulkPatchUploadsSchema = z
+  .object({
+    ids: z.array(z.string().uuid()).min(1).max(500),
+    folderId: z.string().uuid().nullable().optional(),
+    songId: z.string().uuid().nullable().optional(),
+  })
+  .refine((v) => v.folderId !== undefined || v.songId !== undefined, {
+    message: "Nothing to update",
+  });
+export type BulkPatchUploads = z.infer<typeof bulkPatchUploadsSchema>;
+
+export const uploadSessionSchema = z.object({
+  id: z.string().uuid(),
+  gigId: z.string().uuid(),
+  status: uploadStatusSchema,
+  bytesReceived: z.number().int(),
+  totalBytes: z.number().int(),
+  chunkSize: z.number().int(),
+  fileName: z.string(),
+  mimeType: z.string().nullable(),
+  fingerprint: z.string(),
+  folderId: z.string().uuid().nullable(),
+  songId: z.string().uuid().nullable(),
+  createdAt: z.string(),
+  /** Set once the upload is complete. */
+  item: mediaItemSchema.nullable(),
+});
+export type UploadSession = z.infer<typeof uploadSessionSchema>;
+
+export const uploadOffsetMismatchSchema = z.object({
+  code: z.literal(UPLOAD_ERROR_CODES.offsetMismatch),
+  bytesReceived: z.number().int(),
+});
+export type UploadOffsetMismatch = z.infer<typeof uploadOffsetMismatchSchema>;
+
+/** True when a member may upload this MIME type. */
+export function memberUploadTypeAllowed(mime: string): boolean {
+  const m = mime.toLowerCase();
+  return MEMBER_UPLOAD_MIME_PREFIXES.some((p) => m.startsWith(p));
+}

@@ -4,6 +4,7 @@ import {
   DRIVE_FOLDER_MIME,
   type DriveChange,
   type DriveChangesResult,
+  type DriveByteRange,
   type DriveDownloadResult,
   type DriveFile,
   type DriveFileResult,
@@ -175,12 +176,25 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
   async download(
     accessToken: string,
     fileId: string,
+    range?: DriveByteRange,
   ): Promise<DriveDownloadResult> {
     this.lastAccessToken = accessToken;
     const f = this.files.get(fileId);
     const data = this.contents.get(fileId);
     if (!f || !data || f.mimeType === DRIVE_FOLDER_MIME)
       return { status: "not-found" };
+    if (range) {
+      const start = range.start;
+      const end = Math.min(range.end ?? data.length - 1, data.length - 1);
+      if (start > end) return { status: "not-found" };
+      return {
+        status: "ok",
+        stream: Readable.from([data.subarray(start, end + 1)]),
+        size: data.length,
+        name: f.name,
+        partial: { start, end, total: data.length },
+      };
+    }
     return {
       status: "ok",
       stream: Readable.from([data]),

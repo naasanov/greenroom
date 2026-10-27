@@ -10,9 +10,10 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
 } from "@nestjs/common";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import {
   createMediaFolderSchema,
   linkMediaSongSchema,
@@ -34,9 +35,11 @@ import {
 import { BandMember } from "../bands/index.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { MediaService } from "./media.service.js";
+import { MediaZipService } from "./media-zip.service.js";
 import {
   contentDisposition,
   inlineSafe,
+  parseRange,
   readAll,
   sendStream,
   sniffImageMime,
@@ -49,7 +52,19 @@ const PRIVATE_CACHE = "private, max-age=60";
 @BandMember()
 @Controller("bands/:bandId")
 export class MediaController {
-  constructor(private readonly media: MediaService) {}
+  constructor(
+    private readonly media: MediaService,
+    private readonly zip: MediaZipService,
+  ) {}
+
+  @Get("media/zip")
+  async zipItems(
+    @Param("bandId") bandId: string,
+    @Query("ids") ids: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.zip.stream(bandId, ids ?? "", res);
+  }
 
   @Get("gigs/:gigId/media")
   gigMedia(
@@ -158,18 +173,38 @@ export class MediaController {
     @Param("bandId") bandId: string,
     @Param("itemId", uuid()) itemId: string,
     @Query("download") download: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
+    const item0 = await this.media.getItemRow(bandId, itemId);
+    const parsed = parseRange(req.headers.range, item0.sizeBytes);
+    if (parsed === "unsatisfiable") {
+      res
+        .status(416)
+        .setHeader("Content-Range", `bytes */${item0.sizeBytes ?? 0}`)
+        .end();
+      return;
+    }
     const { item, result } = await this.media.openItem(
       bandId,
       itemId,
       "content",
+      parsed ?? undefined,
     );
     const mime = item.mimeType ?? "application/octet-stream";
     const attachment = download === "1" || !inlineSafe(mime);
+    const partial = result.partial;
+    if (partial) {
+      res.status(206);
+      res.setHeader(
+        "Content-Range",
+        `bytes ${partial.start}-${partial.end}/${partial.total}`,
+      );
+    }
     sendStream(res, result.stream, {
       "Content-Type": mime,
-      "Content-Length": result.size,
+      "Content-Length": partial ? partial.end - partial.start + 1 : result.size,
+      "Accept-Ranges": "bytes",
       "Content-Disposition": contentDisposition(
         attachment ? "attachment" : "inline",
         item.name,

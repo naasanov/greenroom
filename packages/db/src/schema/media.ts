@@ -143,6 +143,17 @@ export const uploadSessions = pgTable(
     // Client-computed (name, size, lastModified) fingerprint used to resume or skip re-uploads.
     fileFingerprint: text("file_fingerprint").notNull(),
     driveSessionUrl: text("drive_session_url"),
+    // Drive parent chosen when the session started; used to detect a later folder change.
+    driveParentId: text("drive_parent_id"),
+    // Edits made while uploading, applied to the media item on completion.
+    songId: uuid("song_id").references(() => songs.id, {
+      onDelete: "set null",
+    }),
+    nameCustomized: boolean("name_customized").notNull().default(false),
+    mediaItemId: uuid("media_item_id").references(() => mediaItems.id, {
+      onDelete: "set null",
+    }),
+    driveFileId: text("drive_file_id"),
     bytesReceived: bigint("bytes_received", { mode: "number" })
       .notNull()
       .default(0),
@@ -154,5 +165,6 @@ export const uploadSessions = pgTable(
   (t) => [
     index("upload_sessions_band_id_idx").on(t.bandId),
     index("upload_sessions_gig_fingerprint_idx").on(t.gigId, t.fileFingerprint),
+    index("upload_sessions_gig_status_idx").on(t.gigId, t.status),
   ],
 );

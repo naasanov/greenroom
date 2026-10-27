@@ -93,3 +93,26 @@ export function sendStream(
 
 export const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Parses a single-range `Range` header. Returns null when absent, malformed,
+ * multi-range, or a suffix range without a known size (served as a full 200).
+ */
+export function parseRange(
+  header: string | undefined,
+  size: number | null,
+): { start: number; end?: number } | "unsatisfiable" | null {
+  const m = /^bytes=(\d*)-(\d*)$/.exec((header ?? "").trim());
+  if (!m || (m[1] === "" && m[2] === "")) return null;
+  if (m[1] === "") {
+    if (size === null) return null;
+    const n = Number(m[2]);
+    if (n === 0) return "unsatisfiable";
+    return { start: Math.max(size - n, 0), end: size - 1 };
+  }
+  const start = Number(m[1]);
+  const end = m[2] === "" ? undefined : Number(m[2]);
+  if (end !== undefined && end < start) return null;
+  if (size !== null && start >= size) return "unsatisfiable";
+  return { start, end };
+}
