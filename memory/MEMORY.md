@@ -34,6 +34,6 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Fly infra gotchas](fly-infra-gotchas.md) — merged FlyV1 deploy token format, deploy from repo root, DNS-only CNAMEs, db is private
 - [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first
 - [Non-modal drawer gotchas](drawer-nonmodal-gotchas.md) — Radix stays modal under Vaul; close event drawers by id; focus trap and aria-hidden caveats
-- [E2E test scope](e2e-test-scope.md) — targeted specs + smoke during work; full suite only at ticket end or gates
+- [E2E test scope](e2e-test-scope.md) — locally only targeted specs + smoke, never the full suite; CI runs the full suite on push
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting
 - [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together

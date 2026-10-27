@@ -1,11 +1,11 @@
 ---
 name: e2e-test-scope
-description: Run targeted e2e specs or the smoke spec during work; the full suite only at milestones (end of a ticket, before a gate)
+description: Never run the full e2e suite locally; run targeted specs plus smoke, and let CI run the full suite on push
 type: feedback
 ---
 
-Day-to-day validation runs only the specs that cover the change, plus `tests/smoke.spec.ts`, e.g. `pnpm test:e2e -- events- smoke.spec` from the repo root (args are Playwright path regex filters, not shell globs). Never use `pnpm --filter @greenroom/e2e test:e2e`: it skips the turbo rebuild and silently tests a stale `.next` build, which produced false failures on 2026-10-21 (inside the e2e lock). The full `pnpm test:e2e` suite runs only at important milestones: the end of a ticket, before a 🛑 gate, or before marking a task Done. CI still runs everything on push.
+Local validation (orchestrator and subagents) runs only the specs that cover the change plus `tests/smoke.spec.ts`, e.g. `pnpm test:e2e -- events- smoke.spec` from the repo root (args are Playwright path regex filters, not shell globs). Never run the full `pnpm test:e2e` locally, not even at the end of a ticket or before a gate: CI runs the whole suite (4 shards, desktop + iPhone) on every code push to `main`, and that run is the full-suite check. Never use `pnpm --filter @greenroom/e2e test:e2e`: it skips the turbo rebuild and silently tests a stale `.next` build (false failures on 2026-10-21).
 
-**Why:** the user said on 2026-10-21 that the full suite is too slow to run after every wave or subagent step.
+**Why:** the user said on 2026-10-21 that the full suite is too slow to run after every wave, and on 2026-10-27, after a local full run was followed by the same full run in CI: "we should never run all e2e tests locally. That's CI's job."
 
-**How to apply:** the orchestrator follows this when validating, and every subagent brief tells the agent to run only its own specs plus smoke, never the full suite. Related: [[parallel-agent-coordination]], [[orchestrator-role]].
+**How to apply:** before a gate, push the validated work and wait for CI green (plus the staging deploy) instead of running the suite locally; fix CI failures with targeted local reruns of the failing specs. Every subagent brief says to run only its own specs plus smoke. Related: [[parallel-agent-coordination]], [[batch-pushes]], [[orchestrator-role]].
