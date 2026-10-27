@@ -19,6 +19,8 @@ import {
   EventCalendar,
   type CalendarMode,
 } from "@/components/events/event-calendar";
+import { CalendarBanner } from "@/components/google/calendar-banner";
+import { GoogleLinkReturn } from "@/components/google/google-link-return";
 import { GigDrawer } from "@/components/events/gig-drawer";
 import { PracticeDrawer } from "@/components/events/practice-drawer";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
@@ -328,6 +330,12 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         data-focus-date={focusDate}
         className="mx-auto w-full max-w-5xl px-3 py-4 pb-28 md:pb-24"
       >
+        {bandId ? (
+          <>
+            <CalendarBanner bandId={bandId} />
+            <GoogleLinkReturn bandId={bandId} />
+          </>
+        ) : null}
         {practiceLink.data && sel?.kind === "practice" && occKey === null ? (
           <p
             role="status"

@@ -143,9 +143,7 @@ test("admin edits the band name and public profile", async ({
   await band.getByLabel("YouTube").fill("https://youtube.com/@hawks");
   await save.click();
   await expect(band.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("settings-band-name")).toHaveText(
-    "The Night Hawks",
-  );
+  await expect(page.getByLabel("Band name")).toHaveValue("The Night Hawks");
 
   const row = (
     await db.select().from(bands).where(eq(bands.id, seeded.bands.nightOwls.id))

@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { tabPath, useLastTab } from "@/components/app/routed-shell";
+import { GoogleLinkReturn } from "@/components/google/google-link-return";
 import { BandSection } from "@/components/settings/band-section";
 import { LeaveBandSection } from "@/components/settings/leave-band-section";
 import { PersonalSection } from "@/components/settings/personal-section";
@@ -28,6 +29,7 @@ export function SettingsView() {
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
       </div>
 
+      {currentBand ? <GoogleLinkReturn bandId={currentBand.id} /> : null}
       <PersonalSection user={me} />
       {currentBand?.role === "admin" ? (
         <BandSection key={currentBand.id} band={currentBand} />

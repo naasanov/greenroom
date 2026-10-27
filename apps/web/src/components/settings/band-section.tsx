@@ -5,8 +5,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { BandDetail, BandSummary } from "@greenroom/shared";
-import { BandAvatar } from "@/components/app/band-switcher";
 import { FormField } from "@/components/app/form-field";
+import { GoogleSettings } from "@/components/google/google-settings";
+import { BandPhotoRow } from "@/components/settings/band-photo-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,18 +209,7 @@ export function BandSection({ band }: { band: BandSummary }) {
   const detail = useBandDetail(band.id);
   return (
     <SectionCard id="settings-band" title="Band" testId="settings-band">
-      <div className="flex items-center gap-4">
-        <BandAvatar
-          band={{ id: band.id, name: band.name, imageUrl: band.photoUrl }}
-          className="size-16 text-xl"
-        />
-        <span
-          data-testid="settings-band-name"
-          className="truncate text-lg font-semibold"
-        >
-          {band.name}
-        </span>
-      </div>
+      <BandPhotoRow bandId={band.id} />
       {detail.data ? (
         <BandForm detail={detail.data} />
       ) : detail.isError ? (
@@ -231,6 +221,7 @@ export function BandSection({ band }: { band: BandSummary }) {
           Loading...
         </p>
       )}
+      <GoogleSettings bandId={band.id} />
     </SectionCard>
   );
 }

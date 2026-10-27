@@ -147,9 +147,7 @@ test("Band section shows for admins and is hidden for members", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/settings");
   await expect(page.getByTestId("settings-band")).toBeVisible();
-  await expect(page.getByTestId("settings-band-name")).toHaveText(
-    "The Night Owls",
-  );
+  await expect(page.getByLabel("Band name")).toHaveValue("The Night Owls");
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);

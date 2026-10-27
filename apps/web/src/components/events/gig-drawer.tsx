@@ -15,6 +15,7 @@ import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
+import { MediaSection } from "@/components/media/media-section";
 import { LineupAside } from "@/components/lineups/lineup-aside";
 import { LineupSection } from "@/components/lineups/lineup-section";
 import {
@@ -40,10 +41,12 @@ function mapsUrl(gig: Gig): string {
 }
 
 function GigDetails({
+  bandId,
   gig,
   setlist,
   lineup,
 }: {
+  bandId: string;
   gig: Gig;
   setlist: SetlistBuilder;
   lineup: LineupBuilder;
@@ -101,10 +104,10 @@ function GigDetails({
           </Fact>
         ) : null}
       </dl>
-      {/* The Media section mounts here in a later task. */}
       <div data-testid="gig-sections" className="flex flex-col gap-6">
         <SetlistSection builder={setlist} />
         <LineupSection builder={lineup} />
+        <MediaSection bandId={bandId} gigId={gig.id} />
       </div>
     </div>
   );
@@ -227,7 +230,12 @@ export function GigDrawer({
               onDirtyChange={onDirty}
             />
           ) : (
-            <GigDetails gig={gig} setlist={setlist} lineup={lineup} />
+            <GigDetails
+              bandId={bandId}
+              gig={gig}
+              setlist={setlist}
+              lineup={lineup}
+            />
           )}
         </BottomDrawer>
       </PickDndProvider>
