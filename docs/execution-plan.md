@@ -75,7 +75,7 @@ Parallel group 5A
 - **6.2 Media UI.** Drawer preview strip, full-screen view (static pop first), folder sections, collapsible headers, density toggle, Unsorted, upload tray with per-item border progress and batch bar, selection model + action bar, move/rename, single-item viewer with share/download, multi-download (share sheet on mobile, zip on desktop), delete to Drive trash, wake lock, keep-open note. Status: Not started
 - **6.3 Public upload links.** Scoped, expiring, revocable, rate limited, type and size limits, lands in Unsorted. Status: Not started
 
-- **6.5 Media linked to songs.** Song picker in the upload tray (per item and bulk) and a "Link to song" gallery action, setlist songs first; linking renames items that have not been manually renamed to the song title (app and Drive); song tile label and viewer; "Videos" section on the song detail sheet grouped by gig. Schema and read shape land with 5.2. Status: Not started
+- **6.5 Media linked to songs.** Song picker in the upload tray (per item and bulk) and a "Link to song" gallery action, built on the setlist library drawer components (`components/setlists/setlist-aside.tsx`, `song-row.tsx`) in single-pick mode with setlist songs first; linking renames items that have not been manually renamed to the song title (app and Drive); song tile label and viewer; "Videos" section on the song detail sheet grouped by gig. Schema and read shape land with 5.2. Status: Not started
 
 🛑 **GATE 4: Media experience review** (try a real upload from an iPhone). Status: Not started
 
