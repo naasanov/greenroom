@@ -217,6 +217,9 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     () => ({ active, insertAt, register }),
     [active, insertAt, register],
   );
+  // Picks use a thin edge zone so a row near the list's edge is not scrolled away.
+  const autoScroll =
+    active?.type === "pick" ? { threshold: { x: 0.2, y: 0.05 } } : true;
   const droppingIn = active?.type === "pick" && insertAt !== null;
 
   return (
@@ -224,6 +227,7 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
+        autoScroll={autoScroll}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragOver={onDragMove}
