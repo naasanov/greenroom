@@ -14,15 +14,24 @@ const CODE_PREFIX = "fake-code:";
 export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
   private codes = new Map<string, GoogleProfile>();
   private refreshTokens = new Map<string, GoogleProfile>();
+  private requestedScopes = new Map<string, string[]>();
   private counter = 0;
 
   buildAuthUrl(input: BuildAuthUrlInput): string {
+    this.requestedScopes.set(
+      input.state,
+      input.scopes ?? ["openid", "email", "profile"],
+    );
     const params = new URLSearchParams({
       redirect_uri: input.redirectUri,
       state: input.state,
       scope: (input.scopes ?? ["openid", "email", "profile"]).join(" "),
       access_type: input.offline ? "offline" : "online",
     });
+    if (input.prompt) params.set("prompt", input.prompt);
+    if (input.loginHint) params.set("login_hint", input.loginHint);
+    if (input.includeGrantedScopes !== undefined)
+      params.set("include_granted_scopes", String(input.includeGrantedScopes));
     // With a staging passcode set, the API serves its own sign-in page.
     if (stagingLoginEnabled()) {
       return `${apiPublicUrl()}/fake-google/authorize?${new URLSearchParams({
@@ -36,6 +45,7 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
   async exchangeCode(input: {
     code: string;
     redirectUri: string;
+    state?: string;
   }): Promise<ExchangeCodeResult> {
     let profile = this.codes.get(input.code);
     // Unseeded codes of the form "fake-code:<email>" derive a profile from the email.
@@ -55,7 +65,11 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
         accessToken: `fake-access-${n}`,
         refreshToken,
         expiresAt: this.expiry(),
-        scopes: ["openid", "email", "profile"],
+        scopes: (input.state && this.requestedScopes.get(input.state)) || [
+          "openid",
+          "email",
+          "profile",
+        ],
       },
     };
   }
@@ -68,6 +82,10 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
       accessToken: `fake-access-${++this.counter}`,
       expiresAt: this.expiry(),
     };
+  }
+
+  async revokeToken(token: string): Promise<void> {
+    this.refreshTokens.delete(token);
   }
 
   // ---- test controls ----
@@ -86,6 +104,7 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
   reset(): void {
     this.codes.clear();
     this.refreshTokens.clear();
+    this.requestedScopes.clear();
     this.counter = 0;
   }
 

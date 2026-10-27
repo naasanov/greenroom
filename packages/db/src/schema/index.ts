@@ -6,3 +6,4 @@ export * from "./music.js";
 export * from "./media.js";
 export * from "./sync.js";
 export * from "./feedback.js";
+export * from "./google-links.js";

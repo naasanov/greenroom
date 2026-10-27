@@ -8,6 +8,7 @@ import type {
   CalendarEventResult,
   GoogleCalendarAdapter,
 } from "./google-calendar.adapter.js";
+import { instanceId, isDateOnly } from "./google-calendar.mapping.js";
 
 interface CalendarState {
   events: Map<string, CalendarEvent>;
@@ -25,7 +26,8 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
 
   // ---- adapter ----
 
-  async createCalendar(): Promise<{ calendarId: string }> {
+  async createCalendar(accessToken: string): Promise<{ calendarId: string }> {
+    this.lastAccessToken = accessToken;
     const calendarId = `fake-cal-${++this.calCounter}@group.calendar.test`;
     this.calendars.set(calendarId, {
       events: new Map(),
@@ -36,9 +38,11 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   }
 
   async createEvent(
+    accessToken: string,
     calendarId: string,
     input: CalendarEventInput,
   ): Promise<CalendarEvent> {
+    this.lastAccessToken = accessToken;
     const cal = this.cal(calendarId);
     const event: CalendarEvent = {
       id: `fake-evt-${++this.eventCounter}`,
@@ -54,6 +58,10 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
       })),
       cancelled: false,
       etag: "",
+      updated: "",
+      allDay: input.allDay ?? isDateOnly(input.start),
+      timeZone: input.timeZone ?? null,
+      privateProperties: { ...input.privateProperties },
       recurringEventId: null,
       originalStart: null,
     };
@@ -61,11 +69,13 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   }
 
   async updateEvent(
+    accessToken: string,
     calendarId: string,
     eventId: string,
     patch: CalendarEventPatch,
     ifMatchEtag?: string,
   ): Promise<CalendarEventResult> {
+    this.lastAccessToken = accessToken;
     const cal = this.cal(calendarId);
     const existing = cal.events.get(eventId);
     if (!existing || existing.cancelled) return { status: "not-found" };
@@ -76,9 +86,11 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   }
 
   async deleteEvent(
+    accessToken: string,
     calendarId: string,
     eventId: string,
   ): Promise<CalendarDeleteResult> {
+    this.lastAccessToken = accessToken;
     const cal = this.cal(calendarId);
     const existing = cal.events.get(eventId);
     if (!existing || existing.cancelled) return { status: "not-found" };
@@ -87,24 +99,16 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   }
 
   async patchInstance(
+    accessToken: string,
     calendarId: string,
     recurringEventId: string,
     originalStart: string,
     patch: CalendarEventPatch & { cancelled?: boolean },
   ): Promise<CalendarEventResult> {
+    this.lastAccessToken = accessToken;
     const cal = this.cal(calendarId);
-    const parent = cal.events.get(recurringEventId);
-    if (!parent || parent.cancelled || parent.recurrence.length === 0) {
-      return { status: "not-found" };
-    }
-    const id = `${recurringEventId}_${originalStart.replace(/[-:.]/g, "")}`;
-    const existing: CalendarEvent = cal.events.get(id) ?? {
-      ...clone(parent),
-      id,
-      recurrence: [],
-      recurringEventId,
-      originalStart,
-    };
+    const existing = this.instance(cal, recurringEventId, originalStart);
+    if (!existing) return { status: "not-found" };
     const { cancelled, ...rest } = patch;
     return {
       status: "ok",
@@ -113,14 +117,16 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   }
 
   async listChanges(
+    accessToken: string,
     calendarId: string,
     syncToken?: string,
   ): Promise<CalendarChangesResult> {
+    this.lastAccessToken = accessToken;
     const cal = this.cal(calendarId);
     const nextSyncToken = `fake-sync-${cal.log.length}`;
     if (syncToken === undefined) {
       const events = [...cal.events.values()]
-        .filter((e) => !e.cancelled)
+        .filter((e) => !e.cancelled || e.recurringEventId !== null)
         .map(clone);
       return { status: "ok", events, nextSyncToken };
     }
@@ -138,6 +144,9 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
 
   // ---- test controls ----
 
+  /** Access token passed to the most recent adapter call. */
+  lastAccessToken: string | null = null;
+
   /** Simulates a guest responding in Google Calendar. */
   simulateAttendeeResponse(
     calendarId: string,
@@ -153,6 +162,39 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
         )
       : [...e.attendees, { email, responseStatus }];
     this.write(cal, { ...e, attendees });
+  }
+
+  /** Simulates a guest responding to one instance of a recurring event. */
+  simulateInstanceAttendeeResponse(
+    calendarId: string,
+    recurringEventId: string,
+    originalStart: string,
+    email: string,
+    responseStatus: AttendeeResponse,
+  ): void {
+    const cal = this.cal(calendarId);
+    const e = this.instance(cal, recurringEventId, originalStart);
+    if (!e) throw new Error(`Fake Calendar: unknown event ${recurringEventId}`);
+    const attendees = e.attendees.some((a) => a.email === email)
+      ? e.attendees.map((a) =>
+          a.email === email ? { ...a, responseStatus } : a,
+        )
+      : [...e.attendees, { email, responseStatus }];
+    this.write(cal, { ...e, attendees });
+  }
+
+  /** Simulates an edit (or cancellation) of one instance in the Google Calendar UI. */
+  simulateInstanceEdit(
+    calendarId: string,
+    recurringEventId: string,
+    originalStart: string,
+    patch: CalendarEventPatch & { cancelled?: boolean },
+  ): void {
+    const cal = this.cal(calendarId);
+    const e = this.instance(cal, recurringEventId, originalStart);
+    if (!e) throw new Error(`Fake Calendar: unknown event ${recurringEventId}`);
+    const { cancelled, ...rest } = patch;
+    this.applyPatch(cal, e, rest, cancelled);
   }
 
   /** Simulates an edit made in the Google Calendar UI. */
@@ -181,6 +223,11 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     return e ? clone(e) : undefined;
   }
 
+  /** All stored events of a calendar, including cancelled ones. */
+  listEvents(calendarId: string): CalendarEvent[] {
+    return this.allEvents(calendarId);
+  }
+
   allEvents(calendarId: string): CalendarEvent[] {
     return [...this.cal(calendarId).events.values()].map(clone);
   }
@@ -190,9 +237,32 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     this.calCounter = 0;
     this.eventCounter = 0;
     this.writeCounter = 0;
+    this.lastAccessToken = null;
   }
 
   // ---- internals ----
+
+  /** Existing override, or a materialized copy of the parent for an instance not yet overridden. */
+  private instance(
+    cal: CalendarState,
+    recurringEventId: string,
+    originalStart: string,
+  ): CalendarEvent | undefined {
+    const parent = cal.events.get(recurringEventId);
+    if (!parent || parent.cancelled || parent.recurrence.length === 0) {
+      return undefined;
+    }
+    const id = instanceId(recurringEventId, originalStart);
+    return (
+      cal.events.get(id) ?? {
+        ...clone(parent),
+        id,
+        recurrence: [],
+        recurringEventId,
+        originalStart,
+      }
+    );
+  }
 
   private cal(id: string): CalendarState {
     const c = this.calendars.get(id);
@@ -210,6 +280,9 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     const stored = {
       ...clone(event),
       etag: `"fake-etag-${++this.writeCounter}"`,
+      updated: new Date(
+        Date.UTC(2026, 0, 1) + this.writeCounter * 1000,
+      ).toISOString(),
     };
     cal.events.set(stored.id, stored);
     cal.log.push(stored.id);
@@ -229,6 +302,15 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     if (patch.start !== undefined) next.start = patch.start;
     if (patch.end !== undefined) next.end = patch.end;
     if (patch.recurrence !== undefined) next.recurrence = patch.recurrence;
+    if (patch.timeZone !== undefined) next.timeZone = patch.timeZone;
+    if (patch.allDay !== undefined) next.allDay = patch.allDay;
+    else if (patch.start !== undefined) next.allDay = isDateOnly(patch.start);
+    if (patch.privateProperties !== undefined) {
+      next.privateProperties = {
+        ...next.privateProperties,
+        ...patch.privateProperties,
+      };
+    }
     if (patch.attendeeEmails !== undefined) {
       next.attendees = patch.attendeeEmails.map(
         (email) =>
@@ -248,6 +330,7 @@ function clone(e: CalendarEvent): CalendarEvent {
     ...e,
     recurrence: [...e.recurrence],
     attendees: e.attendees.map((a) => ({ ...a })),
+    privateProperties: { ...e.privateProperties },
   };
 }
 

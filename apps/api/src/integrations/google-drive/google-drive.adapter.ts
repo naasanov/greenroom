@@ -12,7 +12,14 @@ export interface DriveFile {
   parentId: string | null;
   trashed: boolean;
   size: number;
+  /** ISO 8601. */
   modifiedTime: string;
+  /** ISO 8601. */
+  createdTime: string;
+  /** Null for folders and Google-native docs. */
+  md5Checksum: string | null;
+  /** Short-lived URL; fetch through getThumbnail rather than directly. */
+  thumbnailLink: string | null;
 }
 
 export type DriveFileResult =
@@ -43,6 +50,10 @@ export interface UploadChunkInput {
   start: number;
   end: number;
   total: number;
+  /**
+   * Google requires every chunk except the last to be a multiple of
+   * 256 KiB (262144 bytes); the last chunk may be any size.
+   */
   data: Buffer;
 }
 
@@ -61,25 +72,59 @@ export type DriveDownloadResult =
   | { status: "ok"; stream: Readable; size: number; name: string }
   | { status: "not-found" };
 
+/**
+ * Every method takes the band's linked Google account access token first.
+ * Resumable session URIs are bound to the account that started them.
+ */
 export interface GoogleDriveAdapter {
-  createFolder(input: { name: string; parentId: string }): Promise<DriveFile>;
+  createFolder(
+    accessToken: string,
+    input: { name: string; parentId: string },
+  ): Promise<DriveFile>;
   /** Lists non-trashed children of a folder. */
-  listChildren(folderId: string): Promise<DriveFile[]>;
-  getFile(fileId: string): Promise<DriveFileResult>;
-  rename(fileId: string, name: string): Promise<DriveFileResult>;
-  move(fileId: string, newParentId: string): Promise<DriveFileResult>;
+  listChildren(accessToken: string, folderId: string): Promise<DriveFile[]>;
+  getFile(accessToken: string, fileId: string): Promise<DriveFileResult>;
+  rename(
+    accessToken: string,
+    fileId: string,
+    name: string,
+  ): Promise<DriveFileResult>;
+  move(
+    accessToken: string,
+    fileId: string,
+    newParentId: string,
+  ): Promise<DriveFileResult>;
   /** Moves to Drive trash (recoverable). */
-  trash(fileId: string): Promise<DriveFileResult>;
+  trash(accessToken: string, fileId: string): Promise<DriveFileResult>;
   /** Returns an opaque resumable session URI. */
   startResumableUpload(
+    accessToken: string,
     input: StartUploadInput,
   ): Promise<{ sessionUri: string }>;
+  /**
+   * offset-mismatch means the server's received byte count differs from
+   * what this chunk assumed; resume from the returned receivedBytes.
+   */
   uploadChunk(
+    accessToken: string,
     sessionUri: string,
     chunk: UploadChunkInput,
   ): Promise<UploadChunkResult>;
-  getUploadStatus(sessionUri: string): Promise<UploadStatusResult>;
-  getStartPageToken(): Promise<string>;
-  getChanges(pageToken: string): Promise<DriveChangesResult>;
-  download(fileId: string): Promise<DriveDownloadResult>;
+  /** Pass totalSize when known; the status query sends a byte-range header with that total. */
+  getUploadStatus(
+    accessToken: string,
+    sessionUri: string,
+    totalSize?: number,
+  ): Promise<UploadStatusResult>;
+  getStartPageToken(accessToken: string): Promise<string>;
+  getChanges(
+    accessToken: string,
+    pageToken: string,
+  ): Promise<DriveChangesResult>;
+  download(accessToken: string, fileId: string): Promise<DriveDownloadResult>;
+  /** Thumbnail image bytes (about 400px). Not-found when the file or thumbnail is missing. */
+  getThumbnail(
+    accessToken: string,
+    fileId: string,
+  ): Promise<DriveDownloadResult>;
 }

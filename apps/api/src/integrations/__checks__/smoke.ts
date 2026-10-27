@@ -29,6 +29,16 @@ import {
   type SpotifyAdapter,
   type YoutubeAdapter,
 } from "../index.js";
+import {
+  buildEventBody,
+  instanceId,
+  mapCalendarEvent,
+} from "../google-calendar/google-calendar.mapping.js";
+import {
+  chunkContentRange,
+  parseReceivedBytes,
+  thumbnailUrl,
+} from "../google-drive/google-drive.mapping.js";
 
 async function drain(s: AsyncIterable<unknown>): Promise<Buffer> {
   const parts: Buffer[] = [];
@@ -75,19 +85,21 @@ async function main(): Promise<void> {
     "invalid-code",
   );
 
+  const TOKEN = "fake-google-access-token";
+
   // drive: tree, trash, 404
-  const gigs = await drive.createFolder({
+  const gigs = await drive.createFolder(TOKEN, {
     name: "Gigs",
     parentId: FAKE_DRIVE_ROOT_ID,
   });
-  const start = await drive.getStartPageToken();
-  const { sessionUri } = await drive.startResumableUpload({
+  const start = await drive.getStartPageToken(TOKEN);
+  const { sessionUri } = await drive.startResumableUpload(TOKEN, {
     name: "clip.mp4",
     parentId: gigs.id,
     mimeType: "video/mp4",
     totalSize: 10,
   });
-  const first = await drive.uploadChunk(sessionUri, {
+  const first = await drive.uploadChunk(TOKEN, sessionUri, {
     start: 0,
     end: 3,
     total: 10,
@@ -96,16 +108,16 @@ async function main(): Promise<void> {
   assert.deepEqual(first, { status: "incomplete", receivedBytes: 4 });
   reg.googleDrive.interruptUpload(sessionUri, 2);
   await assert.rejects(
-    drive.uploadChunk(sessionUri, {
+    drive.uploadChunk(TOKEN, sessionUri, {
       start: 4,
       end: 9,
       total: 10,
       data: Buffer.from("efghij"),
     }),
   );
-  const st = await drive.getUploadStatus(sessionUri);
+  const st = await drive.getUploadStatus(TOKEN, sessionUri);
   assert.deepEqual(st, { status: "incomplete", receivedBytes: 6 });
-  const done = await drive.uploadChunk(sessionUri, {
+  const done = await drive.uploadChunk(TOKEN, sessionUri, {
     start: 6,
     end: 9,
     total: 10,
@@ -114,42 +126,55 @@ async function main(): Promise<void> {
   assert.equal(done.status, "complete");
   if (done.status !== "complete") throw new Error("unreachable");
   const fileId = done.file.id;
-  const dl = await drive.download(fileId);
+  const dl = await drive.download(TOKEN, fileId);
   assert.equal(dl.status, "ok");
   if (dl.status === "ok")
     assert.equal((await drain(dl.stream)).toString(), "abcdefghij");
-  await drive.rename(fileId, "clip2.mp4");
-  await drive.trash(fileId);
-  assert.equal((await drive.listChildren(gigs.id)).length, 0);
-  const ch = await drive.getChanges(start);
+  await drive.rename(TOKEN, fileId, "clip2.mp4");
+  await drive.trash(TOKEN, fileId);
+  assert.equal((await drive.listChildren(TOKEN, gigs.id)).length, 0);
+  const ch = await drive.getChanges(TOKEN, start);
   assert.ok(ch.changes.some((c) => c.fileId === fileId && c.file?.trashed));
-  assert.deepEqual((await drive.getChanges(ch.newStartPageToken)).changes, []);
+  assert.deepEqual(
+    (await drive.getChanges(TOKEN, ch.newStartPageToken)).changes,
+    [],
+  );
   reg.googleDrive.externalDelete(fileId);
-  assert.equal((await drive.getFile(fileId)).status, "not-found");
+  assert.equal((await drive.getFile(TOKEN, fileId)).status, "not-found");
 
   // calendar: etags, instance, external decline, sync token expiry
-  const { calendarId } = await cal.createCalendar({
+  const { calendarId } = await cal.createCalendar(TOKEN, {
     summary: "Band",
     timeZone: "UTC",
   });
-  const baseline = await cal.listChanges(calendarId);
+  const baseline = await cal.listChanges(TOKEN, calendarId);
   assert.equal(baseline.status, "ok");
   if (baseline.status !== "ok") throw new Error("unreachable");
-  const ev = await cal.createEvent(calendarId, {
+  const ev = await cal.createEvent(TOKEN, calendarId, {
     summary: "Practice",
     start: "2026-11-03T19:00:00Z",
     end: "2026-11-03T21:00:00Z",
     recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=TU"],
     attendeeEmails: ["a@x.test"],
   });
-  const upd = await cal.updateEvent(calendarId, ev.id, { location: "Garage" });
+  const upd = await cal.updateEvent(TOKEN, calendarId, ev.id, {
+    location: "Garage",
+  });
   assert.ok(upd.status === "ok" && upd.event.etag !== ev.etag);
   assert.equal(
-    (await cal.updateEvent(calendarId, ev.id, { location: "Y" }, ev.etag))
-      .status,
+    (
+      await cal.updateEvent(
+        TOKEN,
+        calendarId,
+        ev.id,
+        { location: "Y" },
+        ev.etag,
+      )
+    ).status,
     "etag-mismatch",
   );
   const inst = await cal.patchInstance(
+    TOKEN,
     calendarId,
     ev.id,
     "2026-11-10T19:00:00Z",
@@ -162,7 +187,11 @@ async function main(): Promise<void> {
     "a@x.test",
     "declined",
   );
-  const delta = await cal.listChanges(calendarId, baseline.nextSyncToken);
+  const delta = await cal.listChanges(
+    TOKEN,
+    calendarId,
+    baseline.nextSyncToken,
+  );
   assert.ok(delta.status === "ok");
   if (delta.status === "ok") {
     const e = delta.events.find((x) => x.id === ev.id);
@@ -170,10 +199,86 @@ async function main(): Promise<void> {
   }
   reg.googleCalendar.expireSyncTokens(calendarId);
   assert.equal(
-    (await cal.listChanges(calendarId, baseline.nextSyncToken)).status,
+    (await cal.listChanges(TOKEN, calendarId, baseline.nextSyncToken)).status,
     "sync-token-expired",
   );
-  assert.equal((await cal.deleteEvent(calendarId, ev.id)).status, "ok");
+  assert.equal((await cal.deleteEvent(TOKEN, calendarId, ev.id)).status, "ok");
+
+  // calendar: all-day, private props, instance ids, simulation helpers
+  const day = await cal.createEvent(TOKEN, calendarId, {
+    summary: "Festival",
+    start: "2026-12-01",
+    end: "2026-12-02",
+    allDay: true,
+    privateProperties: { greenroomKind: "gig", greenroomId: "g1" },
+  });
+  assert.ok(day.allDay && day.privateProperties.greenroomId === "g1");
+  assert.ok(day.updated.length > 0);
+  assert.equal(reg.googleCalendar.lastAccessToken, TOKEN);
+  const weekly = await cal.createEvent(TOKEN, calendarId, {
+    summary: "Weekly",
+    start: "2026-11-03T19:00:00Z",
+    end: "2026-11-03T20:00:00Z",
+    timeZone: "UTC",
+    recurrence: ["RRULE:FREQ=WEEKLY"],
+    attendeeEmails: ["b@x.test"],
+  });
+  reg.googleCalendar.simulateInstanceAttendeeResponse(
+    calendarId,
+    weekly.id,
+    "2026-11-10T19:00:00Z",
+    "b@x.test",
+    "declined",
+  );
+  const instEvt = reg.googleCalendar.getEvent(
+    calendarId,
+    instanceId(weekly.id, "2026-11-10T19:00:00Z"),
+  );
+  assert.equal(instEvt?.attendees[0]?.responseStatus, "declined");
+  assert.equal(
+    reg.googleCalendar.getEvent(calendarId, weekly.id)?.attendees[0]
+      ?.responseStatus,
+    "needsAction",
+  );
+  assert.equal(
+    instanceId("abc", "2026-11-10T19:00:00Z"),
+    "abc_20261110T190000Z",
+  );
+  assert.equal(
+    instanceId("abc", "2026-11-10T14:00:00-05:00"),
+    "abc_20261110T190000Z",
+  );
+  assert.equal(instanceId("abc", "2026-11-10"), "abc_20261110");
+  const body = buildEventBody({ start: "2026-12-01", end: "2026-12-02" });
+  assert.equal(body.start?.date, "2026-12-01");
+  assert.equal(parseReceivedBytes("bytes=0-262143"), 262144);
+  assert.equal(parseReceivedBytes(null), 0);
+  assert.equal(chunkContentRange(0, 9, 10), "bytes 0-9/10");
+  assert.equal(chunkContentRange(0, -1, 0), "bytes */0");
+  assert.equal(thumbnailUrl("https://x.test/a=s220"), "https://x.test/a=s400");
+  const mapped = mapCalendarEvent({
+    id: "e",
+    status: "cancelled",
+    start: { date: "2026-12-01" },
+    end: { date: "2026-12-02" },
+    originalStartTime: { date: "2026-12-01" },
+    extendedProperties: { private: { a: "b" } },
+  });
+  assert.ok(
+    mapped.cancelled && mapped.allDay && mapped.privateProperties.a === "b",
+  );
+
+  // drive: external changes and thumbnails
+  const tokenBefore = await drive.getStartPageToken(TOKEN);
+  const added = reg.googleDrive.externalAddFile("pic.png", gigs.id, "x");
+  const thumb = await drive.getThumbnail(TOKEN, added.id);
+  assert.equal(thumb.status, "ok");
+  if (thumb.status === "ok") {
+    assert.ok((await drain(thumb.stream)).toString().includes("pic.png"));
+  }
+  assert.equal((await drive.getThumbnail(TOKEN, gigs.id)).status, "not-found");
+  const ext = await drive.getChanges(TOKEN, tokenBefore);
+  assert.ok(ext.changes.some((c) => c.fileId === added.id && !c.removed));
 
   // places
   const preds = await places.autocomplete("bowery");

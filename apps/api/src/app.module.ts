@@ -3,6 +3,7 @@ import { AuthModule } from "./auth/auth.module.js";
 import { BandsModule } from "./bands/bands.module.js";
 import { DatabaseModule } from "./db/db.module.js";
 import { EventsModule } from "./events/events.module.js";
+import { GoogleConnectModule } from "./google-connect/google-connect.module.js";
 import { HealthController } from "./health.controller.js";
 import { IntegrationsModule } from "./integrations/index.js";
 import { JobsModule } from "./jobs/jobs.module.js";
@@ -26,6 +27,7 @@ import { TestingModule } from "./testing/testing.module.js";
     JobsModule,
     SongsModule,
     SpotifyConnectModule,
+    GoogleConnectModule,
     SetlistsModule,
     LineupsModule,
     LinksModule,

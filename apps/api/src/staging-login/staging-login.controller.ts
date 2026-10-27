@@ -16,6 +16,8 @@ import { AuthService } from "../auth/auth.service.js";
 import { Public } from "../auth/decorators.js";
 import { DemoBandService } from "./demo-band.service.js";
 import { spotifyRedirectUri } from "../spotify-connect/spotify-connections.service.js";
+import { googleLinkRedirectUri } from "../google-connect/google-links.service.js";
+import { renderFakeGoogleLinkPage } from "./fake-google-link.page.js";
 import { renderFakeSpotifyPage } from "./fake-spotify.page.js";
 import { renderLoginPage } from "./staging-login.page.js";
 
@@ -43,6 +45,13 @@ export class StagingLoginController {
     @Query("state") state: unknown,
     @Res() res: Response,
   ): void {
+    // Per-band Drive/Calendar linking shares this URL but returns to its own callback.
+    if (redirectUri === googleLinkRedirectUri()) {
+      if (typeof state !== "string" || !STATE_PATTERN.test(state))
+        throw new HttpException("Invalid request", HttpStatus.BAD_REQUEST);
+      res.type("html").send(renderFakeGoogleLinkPage({ redirectUri, state }));
+      return;
+    }
     const p = this.params(redirectUri, state);
     res.type("html").send(renderLoginPage(p));
   }

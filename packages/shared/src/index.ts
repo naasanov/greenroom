@@ -6,3 +6,4 @@ export * from "./songs.js";
 export * from "./events.js";
 export * from "./setlists.js";
 export * from "./links.js";
+export * from "./google.js";

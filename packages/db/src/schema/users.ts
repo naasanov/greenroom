@@ -82,6 +82,11 @@ export const oauthStates = pgTable("oauth_states", {
     .references(() => users.id, { onDelete: "cascade" }),
   provider: oauthProvider("provider").notNull(),
   redirectTo: text("redirect_to").notNull(),
+  // Set for per-band flows (Google Drive/Calendar linking): the band and the service.
+  bandId: uuid("band_id").references((): AnyPgColumn => bands.id, {
+    onDelete: "cascade",
+  }),
+  purpose: text("purpose"),
   expiresAt: tstz("expires_at").notNull(),
   createdAt: createdAt(),
 });

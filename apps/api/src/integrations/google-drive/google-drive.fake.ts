@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import {
   DRIVE_FOLDER_MIME,
@@ -39,10 +40,11 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
 
   // ---- adapter ----
 
-  async createFolder(input: {
-    name: string;
-    parentId: string;
-  }): Promise<DriveFile> {
+  async createFolder(
+    accessToken: string,
+    input: { name: string; parentId: string },
+  ): Promise<DriveFile> {
+    this.lastAccessToken = accessToken;
     return this.insert(
       input.name,
       DRIVE_FOLDER_MIME,
@@ -51,31 +53,49 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     );
   }
 
-  async listChildren(folderId: string): Promise<DriveFile[]> {
+  async listChildren(
+    accessToken: string,
+    folderId: string,
+  ): Promise<DriveFile[]> {
+    this.lastAccessToken = accessToken;
     return [...this.files.values()]
       .filter((f) => f.parentId === folderId && !f.trashed)
       .map((f) => ({ ...f }));
   }
 
-  async getFile(fileId: string): Promise<DriveFileResult> {
+  async getFile(accessToken: string, fileId: string): Promise<DriveFileResult> {
+    this.lastAccessToken = accessToken;
     return this.result(fileId);
   }
 
-  async rename(fileId: string, name: string): Promise<DriveFileResult> {
+  async rename(
+    accessToken: string,
+    fileId: string,
+    name: string,
+  ): Promise<DriveFileResult> {
+    this.lastAccessToken = accessToken;
     return this.mutate(fileId, (f) => void (f.name = name));
   }
 
-  async move(fileId: string, newParentId: string): Promise<DriveFileResult> {
+  async move(
+    accessToken: string,
+    fileId: string,
+    newParentId: string,
+  ): Promise<DriveFileResult> {
+    this.lastAccessToken = accessToken;
     return this.mutate(fileId, (f) => void (f.parentId = newParentId));
   }
 
-  async trash(fileId: string): Promise<DriveFileResult> {
+  async trash(accessToken: string, fileId: string): Promise<DriveFileResult> {
+    this.lastAccessToken = accessToken;
     return this.mutate(fileId, (f) => void (f.trashed = true));
   }
 
   async startResumableUpload(
+    accessToken: string,
     input: StartUploadInput,
   ): Promise<{ sessionUri: string }> {
+    this.lastAccessToken = accessToken;
     const sessionUri = `https://fake-upload.googleapis.test/session/${++this.sessionCounter}`;
     this.sessions.set(sessionUri, {
       input,
@@ -88,9 +108,11 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
   }
 
   async uploadChunk(
+    accessToken: string,
     sessionUri: string,
     chunk: UploadChunkInput,
   ): Promise<UploadChunkResult> {
+    this.lastAccessToken = accessToken;
     const s = this.sessions.get(sessionUri);
     if (!s) return { status: "session-not-found" };
     if (s.fileId) return { status: "complete", file: this.mustGet(s.fileId) };
@@ -119,18 +141,27 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     return { status: "complete", file };
   }
 
-  async getUploadStatus(sessionUri: string): Promise<UploadStatusResult> {
+  async getUploadStatus(
+    accessToken: string,
+    sessionUri: string,
+  ): Promise<UploadStatusResult> {
+    this.lastAccessToken = accessToken;
     const s = this.sessions.get(sessionUri);
     if (!s) return { status: "session-not-found" };
     if (s.fileId) return { status: "complete", file: this.mustGet(s.fileId) };
     return { status: "incomplete", receivedBytes: s.receivedBytes };
   }
 
-  async getStartPageToken(): Promise<string> {
+  async getStartPageToken(accessToken: string): Promise<string> {
+    this.lastAccessToken = accessToken;
     return String(this.changeLog.length);
   }
 
-  async getChanges(pageToken: string): Promise<DriveChangesResult> {
+  async getChanges(
+    accessToken: string,
+    pageToken: string,
+  ): Promise<DriveChangesResult> {
+    this.lastAccessToken = accessToken;
     const from = Number.parseInt(pageToken, 10);
     const start = Number.isNaN(from) ? 0 : from;
     const latest = new Map<string, DriveChange>();
@@ -141,7 +172,11 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     };
   }
 
-  async download(fileId: string): Promise<DriveDownloadResult> {
+  async download(
+    accessToken: string,
+    fileId: string,
+  ): Promise<DriveDownloadResult> {
+    this.lastAccessToken = accessToken;
     const f = this.files.get(fileId);
     const data = this.contents.get(fileId);
     if (!f || !data || f.mimeType === DRIVE_FOLDER_MIME)
@@ -154,7 +189,26 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     };
   }
 
+  async getThumbnail(
+    accessToken: string,
+    fileId: string,
+  ): Promise<DriveDownloadResult> {
+    this.lastAccessToken = accessToken;
+    const f = this.files.get(fileId);
+    if (!f || f.thumbnailLink === null) return { status: "not-found" };
+    const svg = Buffer.from(placeholderSvg(f.name));
+    return {
+      status: "ok",
+      stream: Readable.from([svg]),
+      size: svg.length,
+      name: f.name,
+    };
+  }
+
   // ---- test controls ----
+
+  /** Access token passed to the most recent adapter call. */
+  lastAccessToken: string | null = null;
 
   /** Seeds a folder (no change-log entry is skipped; seeding is logged like any create). */
   seedFolder(name: string, parentId: string = FAKE_DRIVE_ROOT_ID): DriveFile {
@@ -162,6 +216,16 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
   }
 
   seedFile(
+    name: string,
+    parentId: string,
+    content: Buffer | string = "",
+    mimeType = "application/octet-stream",
+  ): DriveFile {
+    return this.insert(name, mimeType, parentId, Buffer.from(content));
+  }
+
+  /** Simulates someone adding a file to a folder in the Drive UI. */
+  externalAddFile(
     name: string,
     parentId: string,
     content: Buffer | string = "",
@@ -217,6 +281,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     this.idCounter = 0;
     this.sessionCounter = 0;
     this.clock = 0;
+    this.lastAccessToken = null;
     this.files.set(FAKE_DRIVE_ROOT_ID, {
       id: FAKE_DRIVE_ROOT_ID,
       name: "My Drive",
@@ -225,6 +290,9 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
       trashed: false,
       size: 0,
       modifiedTime: this.now(),
+      createdTime: this.now(),
+      md5Checksum: null,
+      thumbnailLink: null,
     });
   }
 
@@ -240,6 +308,8 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     parentId: string,
     data: Buffer,
   ): DriveFile {
+    const isFolder = mimeType === DRIVE_FOLDER_MIME;
+    const createdTime = this.now();
     const file: DriveFile = {
       id: `fake-drive-${++this.idCounter}`,
       name,
@@ -247,7 +317,14 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
       parentId,
       trashed: false,
       size: data.length,
-      modifiedTime: this.now(),
+      modifiedTime: createdTime,
+      createdTime,
+      md5Checksum: isFolder
+        ? null
+        : createHash("md5").update(data).digest("hex"),
+      thumbnailLink: isFolder
+        ? null
+        : `https://fake-drive.googleusercontent.test/thumb/${this.idCounter}=s220`,
     };
     this.files.set(file.id, file);
     this.contents.set(file.id, data);
@@ -274,4 +351,13 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     if (!f) throw new Error(`Fake Drive: missing file ${fileId}`);
     return { ...f };
   }
+}
+
+function placeholderSvg(name: string): string {
+  const label = name
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="#d9d9d9"/><text x="200" y="155" font-family="sans-serif" font-size="20" text-anchor="middle" fill="#444">${label}</text></svg>`;
 }
