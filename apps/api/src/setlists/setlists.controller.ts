@@ -13,11 +13,15 @@ import {
   addSongToSetlistSchema,
   appendSetlistSongSchema,
   copySetlistSchema,
+  exportSetlistSchema,
   gigHistoryQuerySchema,
   replaceSetlistItemsSchema,
   type AddSongToSetlist,
   type AppendSetlistSong,
   type CopySetlist,
+  type ExportResult,
+  type ExportSetlist,
+  type User,
   type GigHistoryEntry,
   type GigHistoryQuery,
   type GigSetlist,
@@ -30,6 +34,7 @@ import {
   CurrentMembership,
   type BandMembership,
 } from "../bands/index.js";
+import { CurrentUser } from "../auth/decorators.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { SetlistsService } from "./setlists.service.js";
 
@@ -92,6 +97,22 @@ export class SetlistsController {
     @Body(new ZodPipe(copySetlistSchema)) body: CopySetlist,
   ): Promise<SetlistDetail> {
     return this.setlists.copyFrom(m.bandId, setlistId, body);
+  }
+
+  @Post(":setlistId/export")
+  @HttpCode(200)
+  exportToSpotify(
+    @CurrentUser() user: User,
+    @CurrentMembership() m: BandMembership,
+    @Param("setlistId") setlistId: string,
+    @Body(new ZodPipe(exportSetlistSchema)) body: ExportSetlist,
+  ): Promise<ExportResult> {
+    return this.setlists.exportToSpotify(
+      user.id,
+      m.bandId,
+      setlistId,
+      body.name,
+    );
   }
 
   @Post(":setlistId/songs")

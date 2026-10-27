@@ -89,4 +89,15 @@ export class TestingController {
     this.registry.spotify.revokeRefreshTokens();
     return { ok: true };
   }
+
+  /** Playlists the Spotify fake created through export, in creation order. */
+  @Get("spotify/created-playlists")
+  spotifyCreatedPlaylists(): {
+    id: string;
+    name: string;
+    isPublic: boolean;
+    trackIds: string[];
+  }[] {
+    return this.registry.spotify.createdPlaylists();
+  }
 }

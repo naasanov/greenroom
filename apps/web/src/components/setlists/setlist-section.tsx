@@ -1,9 +1,16 @@
 "use client";
 
-import { GripVertical, History, ListPlus, X } from "lucide-react";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { GripVertical, History, ListPlus, Upload, X } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  ExportDialog,
+  useExportReturn,
+} from "@/components/library/export-dialog";
 import { songArt } from "@/components/library/song-utils";
 import { Button } from "@/components/ui/button";
+import { useCurrentBand } from "@/lib/current-band";
+import { exportDateLabel, useGigForExport } from "@/lib/queries/spotify-export";
 import { PickTarget, TargetRow } from "./pick-dnd";
 import {
   SongLine,
@@ -14,6 +21,19 @@ import {
 import type { SetlistBuilder } from "./use-setlist-builder";
 
 export const SETLIST_TARGET = "setlist";
+
+/** The open event, read from the drawer's URL (`/gigs/:id`, `/practices/:id?date=`). */
+function useEventFromUrl(): {
+  gigId: string | null;
+  practiceDate: string | null;
+} {
+  const [, seg, id] = usePathname().split("/");
+  const date = useSearchParams().get("date");
+  return {
+    gigId: seg === "gigs" && id ? id : null,
+    practiceDate: seg === "practices" ? date : null,
+  };
+}
 
 /**
  * The editable setlist inside an event drawer: ordered rows with reorder
@@ -35,6 +55,30 @@ export function SetlistSection({
   const items = setlist?.items;
   const ids = useMemo(() => items?.map((i) => i.songId) ?? [], [items]);
   const setOrder = editor.setOrder;
+
+  const { currentBand } = useCurrentBand();
+  const bandName = currentBand?.name ?? "Band";
+  const { gigId, practiceDate } = useEventFromUrl();
+  const gig = useGigForExport(builder.bandId, gigId);
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const [exporting, setExporting] = useState(false);
+  const exportBack = useExportReturn("setlist");
+  const [exportSeen, setExportSeen] = useState(false);
+  if (exportBack.resume && !exportSeen) {
+    setExportSeen(true);
+    setExporting(true);
+  }
+  const dateLabel = exportDateLabel(gigId ? gig.data?.date : practiceDate);
+  const defaultName = gigId
+    ? `${gig.data?.title ?? "Gig"} setlist${dateLabel ? ` (${dateLabel})` : ""}`
+    : `${bandName} practice setlist${dateLabel ? ` (${dateLabel})` : ""}`;
+  const returnTo = useMemo(() => {
+    const next = new URLSearchParams(search);
+    for (const k of ["spotify", "export", "exportName"]) next.delete(k);
+    const qs = next.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  }, [pathname, search]);
 
   const onChange = useCallback(
     (next: string[], change: { added?: string }) => {
@@ -182,8 +226,33 @@ export function SetlistSection({
         >
           <History /> Copy from a past gig
         </Button>
+        {setlist && setlist.songCount > 0 && builder.setlistId ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setExporting(true)}
+          >
+            <Upload /> Export to Spotify
+          </Button>
+        ) : null}
         {extra}
       </div>
+      {builder.setlistId ? (
+        <ExportDialog
+          bandId={builder.bandId}
+          open={exporting}
+          onOpenChange={(o) => {
+            if (o) return;
+            setExporting(false);
+            exportBack.clear();
+          }}
+          target={{ kind: "setlist", setlistId: builder.setlistId }}
+          defaultName={exportBack.resume?.name || defaultName}
+          returnTo={returnTo}
+          autoStart={exportBack.resume?.state === "start"}
+          connectError={exportBack.resume?.state === "error"}
+        />
+      ) : null}
     </section>
   );
 }

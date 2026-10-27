@@ -67,4 +67,11 @@ export class TestApi {
   async revokeSpotifyRefreshTokens(): Promise<void> {
     await this.call("post", "spotify/revoke-refresh-tokens");
   }
+
+  /** Playlists created in the Spotify fake by export, in creation order. */
+  async spotifyCreatedPlaylists(): Promise<
+    { id: string; name: string; isPublic: boolean; trackIds: string[] }[]
+  > {
+    return this.call("get", "spotify/created-playlists");
+  }
 }

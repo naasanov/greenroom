@@ -1,6 +1,6 @@
 "use client";
 
-import { ListMusic, Music, Plus, Search, X } from "lucide-react";
+import { ListMusic, Music, Plus, Search, Upload, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongSort } from "@greenroom/shared";
@@ -18,9 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useCurrentBand } from "@/lib/current-band";
 import { usePrefetchSong, useSongs } from "@/lib/queries/songs";
 import { pathWithout } from "@/lib/queries/spotify";
 import { cn } from "@/lib/utils";
+import { ExportDialog, useExportReturn } from "./export-dialog";
 import { ImportDialog } from "./import-dialog";
 import { SongSheet, type SheetTarget } from "./song-sheet";
 import {
@@ -40,6 +42,8 @@ const SONG_PATH = /^\/songs\/([^/]+)\/?$/;
  * opening and closing never remount the list.
  */
 export function LibraryView({ bandId }: { bandId: string }) {
+  const { currentBand } = useCurrentBand();
+  const bandName = currentBand?.name ?? "Band";
   const pathname = usePathname();
   const pathId = SONG_PATH.exec(pathname)?.[1] ?? null;
   // Local override so the sheet reacts before Next reports the new pathname.
@@ -61,9 +65,13 @@ export function LibraryView({ bandId }: { bandId: string }) {
   const urlParams = useSearchParams();
   const spotifyParam = urlParams.get("spotify");
   const importParam = urlParams.get("import");
+  // Export returns carry their own params and are handled by useExportReturn.
+  const exportReturn = urlParams.get("export") !== null;
+  const [exporting, setExporting] = useState(false);
+  const exportBack = useExportReturn("library");
   // Returning from the Spotify login resumes the import, then clears the params.
   const returnKey =
-    spotifyParam === "connected" || spotifyParam === "error"
+    !exportReturn && (spotifyParam === "connected" || spotifyParam === "error")
       ? `${spotifyParam}|${importParam ?? ""}`
       : null;
   const [handledKey, setHandledKey] = useState<string | null>(null);
@@ -80,6 +88,11 @@ export function LibraryView({ bandId }: { bandId: string }) {
       router.replace(pathWithout(pathname, urlParams, ["spotify", "import"]));
     }
   }, [returnKey, pathname, router, urlParams]);
+  const [exportSeen, setExportSeen] = useState(false);
+  if (exportBack.resume && !exportSeen) {
+    setExportSeen(true);
+    setExporting(true);
+  }
   const [search, setSearch] = useState("");
   const q = useDebounced(search.trim(), 250);
   const [sort, setSort] = useState<SongSort>("recent");
@@ -151,29 +164,40 @@ export function LibraryView({ bandId }: { bandId: string }) {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4 pb-28">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">Music Library</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" aria-label="Sort songs">
-                {SORT_LABELS[sort]}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup
-                value={sort}
-                onValueChange={(v) => {
-                  const next = v as SongSort;
-                  setSort(next);
-                  saveSort(next);
-                }}
-              >
-                {SONG_SORTS.map((s) => (
-                  <DropdownMenuRadioItem key={s} value={s}>
-                    {SORT_LABELS[s]}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              aria-label="Export to Spotify"
+              disabled={!list || list.length === 0}
+              onClick={() => setExporting(true)}
+            >
+              <Upload />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" aria-label="Sort songs">
+                  {SORT_LABELS[sort]}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={(v) => {
+                    const next = v as SongSort;
+                    setSort(next);
+                    saveSort(next);
+                  }}
+                >
+                  {SONG_SORTS.map((s) => (
+                    <DropdownMenuRadioItem key={s} value={s}>
+                      {SORT_LABELS[s]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="relative">
@@ -296,6 +320,20 @@ export function LibraryView({ bandId }: { bandId: string }) {
         initialUrl={importing ?? ""}
         autoStart={resume === "start"}
         connectError={resume === "error"}
+      />
+      <ExportDialog
+        bandId={bandId}
+        open={exporting}
+        onOpenChange={(o) => {
+          if (o) return;
+          setExporting(false);
+          exportBack.clear();
+        }}
+        target={{ kind: "library", sort }}
+        defaultName={exportBack.resume?.name || `${bandName} library`}
+        returnTo="/library"
+        autoStart={exportBack.resume?.state === "start"}
+        connectError={exportBack.resume?.state === "error"}
       />
       <DiscardChangesDialog
         open={discard !== null}

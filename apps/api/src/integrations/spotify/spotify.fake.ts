@@ -132,8 +132,11 @@ interface StoredPlaylist {
 export class FakeSpotifyAdapter implements SpotifyAdapter {
   private tracks = new Map<string, SpotifyTrack>();
   private playlists = new Map<string, StoredPlaylist>();
+  private created: string[] = [];
   private counter = 0;
   private refreshTokens = new Set<string>();
+  // Scopes of the latest authorize URL; the next code exchange grants them.
+  private requestedScopes: string[] = [];
 
   constructor() {
     this.reset();
@@ -163,6 +166,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     state: string;
     scopes: string[];
   }): string {
+    this.requestedScopes = [...input.scopes];
     // With a staging passcode set, the API serves its own consent page.
     if (stagingLoginEnabled()) {
       return `${apiPublicUrl()}/fake-spotify/authorize?${new URLSearchParams({
@@ -194,7 +198,9 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
         accessToken: `fake-spotify-access-${n}`,
         refreshToken,
         expiresAt: this.expiry(),
-        scopes: ["playlist-read-private", "playlist-read-collaborative"],
+        scopes: this.requestedScopes.length
+          ? [...this.requestedScopes]
+          : ["playlist-read-private", "playlist-read-collaborative"],
       },
     };
   }
@@ -245,6 +251,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   ): Promise<SpotifyCreatePlaylistResult> {
     if (!this.validToken(userToken)) return { status: "unauthorized" };
     const id = `fakePlaylistCreated${++this.counter}`;
+    this.created.push(id);
     this.playlists.set(id, {
       id,
       name: input.name,
@@ -272,7 +279,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     if (!p || p.ownerToken !== userToken) return { status: "not-found" };
     for (const uri of trackUris) {
       const id = parseSpotifyId(uri);
-      if (id && this.tracks.has(id)) p.trackIds.push(id);
+      if (id) p.trackIds.push(id);
     }
     return { status: "ok" };
   }
@@ -299,6 +306,28 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     return p ? this.hydrate(p) : undefined;
   }
 
+  /** Playlists created through the adapter, in creation order. */
+  createdPlaylists(): {
+    id: string;
+    name: string;
+    isPublic: boolean;
+    trackIds: string[];
+  }[] {
+    return this.created.flatMap((id) => {
+      const p = this.playlists.get(id);
+      return p
+        ? [
+            {
+              id: p.id,
+              name: p.name,
+              isPublic: p.isPublic,
+              trackIds: [...p.trackIds],
+            },
+          ]
+        : [];
+    });
+  }
+
   /** Makes every issued refresh token fail with invalid-grant. */
   revokeRefreshTokens(): void {
     this.refreshTokens.clear();
@@ -306,6 +335,8 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
 
   reset(): void {
     this.counter = 0;
+    this.created = [];
+    this.requestedScopes = [];
     this.refreshTokens.clear();
     this.tracks = new Map(CATALOG.map((t) => [t.id, t]));
     this.playlists = new Map();

@@ -1,4 +1,3 @@
-import { notImplemented } from "../not-implemented.js";
 import {
   parseSpotifyId,
   type SpotifyAdapter,
@@ -19,7 +18,7 @@ const TOKEN_SKEW_MS = 60_000;
 const MAX_RETRY_WAIT_MS = 5000;
 const SEARCH_MAX = 50;
 
-const ni53 = <T>(): Promise<T> => notImplemented("Spotify", "5.3");
+const ADD_BATCH = 100;
 
 type Json = Record<string, unknown>;
 
@@ -234,11 +233,55 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
     };
   }
 
-  createPlaylist(): Promise<SpotifyCreatePlaylistResult> {
-    return ni53();
+  async createPlaylist(
+    userToken: string,
+    input: { name: string; description?: string; isPublic?: boolean },
+  ): Promise<SpotifyCreatePlaylistResult> {
+    const res = await this.userSend(userToken, "POST", "/me/playlists", {
+      name: input.name,
+      description: input.description ?? "",
+      public: input.isPublic ?? false,
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { status: "unauthorized" };
+    }
+    if (!res.ok) throw await failure("playlist create", res);
+    const body: unknown = await res.json();
+    const id = isObj(body) ? str(body.id) : null;
+    if (!isObj(body) || !id)
+      throw new Error("Spotify playlist create response had no id");
+    const ext = isObj(body.external_urls) ? body.external_urls : {};
+    return {
+      status: "ok",
+      playlist: {
+        id,
+        name: str(body.name) ?? input.name,
+        url: str(ext.spotify) ?? `https://open.spotify.com/playlist/${id}`,
+      },
+    };
   }
-  addTracksToPlaylist(): Promise<SpotifyWriteResult> {
-    return ni53();
+
+  /** Adds in batches of 100, the per-request maximum. */
+  async addTracksToPlaylist(
+    userToken: string,
+    playlistId: string,
+    trackUris: string[],
+  ): Promise<SpotifyWriteResult> {
+    const enc = encodeURIComponent(playlistId);
+    for (let i = 0; i < trackUris.length; i += ADD_BATCH) {
+      const res = await this.userSend(
+        userToken,
+        "POST",
+        `/playlists/${enc}/items`,
+        { uris: trackUris.slice(i, i + ADD_BATCH) },
+      );
+      if (res.status === 401 || res.status === 403) {
+        return { status: "unauthorized" };
+      }
+      if (res.status === 404) return { status: "not-found" };
+      if (!res.ok) throw await failure("playlist add", res);
+    }
+    return { status: "ok" };
   }
 
   private tokenRequest(form: Record<string, string>): Promise<Response> {
@@ -258,6 +301,32 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
       body: new URLSearchParams(form),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+  }
+
+  /** JSON write with a user token; retries once on 429. */
+  private async userSend(
+    userToken: string,
+    method: "POST",
+    path: string,
+    body: unknown,
+  ): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(API_URL + path, {
+        method,
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (res.status !== 429 || attempt > 0) return res;
+      const secs = Number(res.headers.get("retry-after"));
+      const wait = Number.isFinite(secs) ? secs * 1000 : 1000;
+      await new Promise((r) =>
+        setTimeout(r, Math.min(MAX_RETRY_WAIT_MS, Math.max(0, wait))),
+      );
+    }
   }
 
   /** GET with a user token; retries once on 429. */

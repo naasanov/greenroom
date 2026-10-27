@@ -30,9 +30,14 @@ export class SpotifyConnectController {
   async start(
     @CurrentUser() user: User,
     @Query("redirectTo") redirectTo: unknown,
+    @Query("scopes") scopes: unknown,
     @Res() res: Response,
   ): Promise<void> {
-    const url = await this.connections.start(user.id, safeRedirect(redirectTo));
+    const url = await this.connections.start(
+      user.id,
+      safeRedirect(redirectTo),
+      scopes === "export" ? "export" : "import",
+    );
     res.redirect(302, url);
   }
 

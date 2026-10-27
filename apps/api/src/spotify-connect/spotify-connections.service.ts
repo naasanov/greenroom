@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { oauthConnections, oauthStates, type Database } from "@greenroom/db";
+import { SONG_ERROR_CODES } from "@greenroom/shared";
 import { apiPublicUrl } from "../auth/auth.constants.js";
 import { decryptToken, encryptToken } from "../common/token-crypto.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
   SPOTIFY,
+  SPOTIFY_EXPORT_SCOPES,
   SPOTIFY_IMPORT_SCOPES,
   type SpotifyAdapter,
 } from "../integrations/index.js";
@@ -48,7 +50,11 @@ export class SpotifyConnectionsService {
   }
 
   /** Stores a single-use state bound to the user and returns the authorize URL. */
-  async start(userId: string, redirectTo: string): Promise<string> {
+  async start(
+    userId: string,
+    redirectTo: string,
+    scopes: "import" | "export" = "import",
+  ): Promise<string> {
     const state = randomBytes(32).toString("base64url");
     await this.db.insert(oauthStates).values({
       stateHash: sha256(state),
@@ -60,7 +66,34 @@ export class SpotifyConnectionsService {
     return this.spotify.buildAuthUrl({
       redirectUri: spotifyRedirectUri(),
       state,
-      scopes: SPOTIFY_IMPORT_SCOPES,
+      scopes:
+        scopes === "export" ? SPOTIFY_EXPORT_SCOPES : SPOTIFY_IMPORT_SCOPES,
+    });
+  }
+
+  /**
+   * A usable token whose grant includes playlist-modify scopes. A missing
+   * connection, a revoked grant, or a read-only grant is a 409 asking for export consent.
+   */
+  async getExportToken(userId: string): Promise<string> {
+    const row = await this.find(userId);
+    const token = row ? await this.getAccessToken(userId) : null;
+    const granted = row ? await this.find(userId) : undefined;
+    if (
+      !token ||
+      !granted ||
+      !SPOTIFY_EXPORT_SCOPES.every((s) => granted.scopes.includes(s))
+    ) {
+      throw this.exportLoginRequired();
+    }
+    return token;
+  }
+
+  exportLoginRequired(): ConflictException {
+    return new ConflictException({
+      code: SONG_ERROR_CODES.spotifyLoginRequired,
+      scopes: "export",
+      message: "Connect Spotify to export playlists",
     });
   }
 

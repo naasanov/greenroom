@@ -4,6 +4,7 @@ export const SONG_ERROR_CODES = {
   duplicateSong: "DUPLICATE_SONG",
   playlistNotFound: "PLAYLIST_NOT_FOUND_OR_PRIVATE",
   spotifyLoginRequired: "SPOTIFY_LOGIN_REQUIRED",
+  nothingToExport: "NOTHING_TO_EXPORT",
 } as const;
 
 /** Trims, and maps an empty string to null so cleared fields store null. */
@@ -184,4 +185,24 @@ export interface ImportProgress {
   failed: number;
   /** Set once the import ends: failed imports carry a message. */
   error: string | null;
+}
+
+export const exportSetlistSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+});
+export type ExportSetlist = z.infer<typeof exportSetlistSchema>;
+
+/** Library exports follow the given sort (default: recently added). */
+export const exportLibrarySchema = exportSetlistSchema.extend({
+  sort: songSortSchema.optional(),
+});
+export type ExportLibrary = z.infer<typeof exportLibrarySchema>;
+
+export interface ExportResult {
+  playlistId: string;
+  playlistUrl: string;
+  name: string;
+  exported: number;
+  /** Songs without a Spotify track, in export order. */
+  skipped: { songId: string; title: string }[];
 }

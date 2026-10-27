@@ -12,6 +12,7 @@ All routes are under `/bands/:bandId/songs` and use `@BandMember()` (non-members
 | `POST /resolve` | Smart add: `{ input }` returns `{ kind, candidates }`. |
 | `POST /suggest-tab` | `{ title, artist? }` returns `{ suggestedReference }` (for showing the Songsterr suggestion before saving). |
 | `POST /import` | Start a Spotify playlist import. Reads through the caller's Spotify login. 202 with progress. 409 `{ code: "SPOTIFY_LOGIN_REQUIRED" }` when the user has no usable Spotify connection (see `spotify-connect/README.md`). 404 `PLAYLIST_NOT_FOUND_OR_PRIVATE` if the playlist is missing or not accessible to that Spotify account; 400 if not a playlist link. |
+| `POST /export` | Export the library (optional `sort`) to a new private Spotify playlist named `name`. 200 `ExportResult`; 409 `SPOTIFY_LOGIN_REQUIRED` with `scopes: "export"` when the connection is missing or lacks modify scopes; 422 `NOTHING_TO_EXPORT`. See `spotify-connect/README.md`. |
 | `GET /imports/:importId` | Poll `{ status, total, done, added, skipped, failed, playlistName, error }`. |
 
 ## Smart add

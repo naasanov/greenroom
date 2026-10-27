@@ -32,6 +32,12 @@ export const SPOTIFY_IMPORT_SCOPES = [
   "playlist-read-collaborative",
 ];
 
+export const SPOTIFY_EXPORT_SCOPES = [
+  ...SPOTIFY_IMPORT_SCOPES,
+  "playlist-modify-private",
+  "playlist-modify-public",
+];
+
 export interface SpotifyUserTokens {
   accessToken: string;
   refreshToken: string;
