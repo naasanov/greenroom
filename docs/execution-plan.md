@@ -75,6 +75,8 @@ Parallel group 5A
 - **6.2 Media UI.** Drawer preview strip, full-screen view (static pop first), folder sections, collapsible headers, density toggle, Unsorted, upload tray with per-item border progress and batch bar, selection model + action bar, move/rename, single-item viewer with share/download, multi-download (share sheet on mobile, zip on desktop), delete to Drive trash, wake lock, keep-open note. Status: Not started
 - **6.3 Public upload links.** Scoped, expiring, revocable, rate limited, type and size limits, lands in Unsorted. Status: Not started
 
+- **6.5 Media linked to songs.** Song picker in the upload tray (per item and bulk) and a "Link to song" gallery action, setlist songs first; linking renames items that have not been manually renamed to the song title (app and Drive); song tile label and viewer; "Videos" section on the song detail sheet grouped by gig. Schema and read shape land with 5.2. Status: Not started
+
 🛑 **GATE 4: Media experience review** (try a real upload from an iPhone). Status: Not started
 
 - **6.4 Grow/morph animation** from drawer to full-screen media and back. Status: Not started
@@ -95,7 +97,7 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Open questions
-- Photos live in the band's Drive (decided 2026-10-22, see design.md). Open: a user in several bands has one photo per band's Drive. Upload once and copy to every band, or set it per band?
+- (Resolved 2026-10-27) Member photos: set per band, stored in each band's Profile photos folder.
 
 # Temporary
 - **/status page.** Build-status tree at https://staging.greenroom.fyi/status, rendered from this file on GitHub `main`. Status: Done (live)

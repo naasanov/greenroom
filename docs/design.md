@@ -209,6 +209,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Media lives INSIDE the gig, not in its own global tab — media is always media *of* a gig, not a separate activity. Reached by tapping the event (opens the populated drawer), where media is one section alongside setlist, lineup, contact. The gig is the hub for everything about that show.
   - Open thread (not now): the social-posting goal is cross-gig ("post our best shots from the last few months"), which a per-gig home serves weakly. Possible future lightweight "recent media across all gigs" view IF social posting becomes a real workflow. Not a tab, not yet.
 - Folders, not "tags": reconciled with the existing Drive structure — Gigs → gig date → subfolders (e.g. performance videos, posed/after photos, flyer). The user mental model is folders (concrete, matches what they see in Drive), so on upload you pick which FOLDER a file goes in rather than applying an abstract tag. Same data, honest word.
+  - **New gigs start with no subfolders (decided 2026-10-27):** files land in Unsorted (the gig folder itself) and members create folders such as "Flyer" or "Videos" as needed. To revisit at the media review gate.
 - Upload UI: a big full-width "add media" button/box with a large center plus — both an obvious drag-and-drop target and the mobile tap-to-pick entry (choose from files / photos&videos / camera).
   - Once files are dropped/picked, the plus box becomes the queue: each file is a big row (the box is both the drop zone and the list). Per-row: its own progress bar, a folder picker (set before/during upload since folder = where it lands in Drive), rename, and cancel mid-flight.
   - Auto-start the queue once files land (don't force a manual "Start" — extra step for the common case). Per-row cancel covers the slow-connection case. This is where the resumable/resilient upload backend becomes visible: each item progresses and retries independently without affecting the others.
@@ -241,6 +242,11 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Multi-select on desktop: the server bundles the selection into a zip download.
   - Whole gig/folder: link out to that gig's Google Drive folder rather than building a bulk download.
 - **Quick rename:** tapping the name label under a thumbnail renames it directly (inline), in both the tray and the gallery. The tap area spans the full thumbnail width and is about fingertip height (~44pt), even though the text is small. Tapping the picture selects it. Fallback if the target still feels cramped: long-press to rename. **Rejected:** double-tap to rename, because it forces a delay on every single tap, making selection laggy, and double-tap usually means zoom or like on phones.
+- **Link media to a song (decided 2026-10-27):** any photo or video can be linked to one song from the Music Library, so the band can find every clip of itself playing that song.
+  - Where: a song picker in the upload tray (per item and as a bulk choice in the tray header, next to the folder selector) and a "Link to song" action in the gallery action bar for any selection. The picker lists the gig's setlist first, then the rest of the library, with search.
+  - Naming: an item keeps its original file name until someone renames it (in the app or directly in Drive). Linking a song to an item that has not been manually renamed renames it to the song title (keeping the extension, with a " (2)" style suffix when the name is taken in that folder), in the app and in Drive. Manually renamed items keep their name. Unlinking never renames.
+  - A linked item shows the song title on its tile and in the single-item viewer; the link can be changed or cleared there.
+  - Song detail sheet: a "Videos" section lists the videos linked to that song across all gigs, grouped by gig (title and date, newest first), each opening the single-item viewer. Linked photos show in the same section after the videos. Deleting a song unlinks its media and never deletes media.
 
 # Public gig calendar (new feature)
 - A publicly shareable, view-only link showing the band's gigs (for example, for an Instagram bio). It has no access to anything else in the app.
@@ -275,6 +281,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Reference values render as tappable links with the site's favicon only when the value is an actual URL; plain values render as plain text (no favicon, no link styling).
 - Edit button top-right switches fields to editable in place without shifting the layout (no jitter when toggling edit/cancel).
 - Delete lives in edit mode, with a warning if the song is used in setlists ("this is in 3 setlists").
+- **Media of this song (decided 2026-10-27):** videos and photos linked to the song from gig media (see "Link media to a song" under Media gallery & upload flow).
 
 ## Playlists & Spotify auth
 - Import playlist: paste a playlist link. Songs already in the library are skipped (no duplicates).
@@ -346,6 +353,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Linking flow: Google sign-in, then the **Google Picker** to choose which folder the band's media lives in (never dumped in the Drive root). The app builds the Gigs structure inside that folder.
 - **Google OAuth app is published to Production without verification (decided 2026-10-22).** Testing mode expires Drive and Calendar refresh tokens after 7 days. Sign-in uses only basic scopes, so only the admin linking Drive or Calendar sees Google's one-time "unverified app" screen; the 100-user cap is fine for bands.
 - **Photos live in Drive too (decided 2026-10-22):** the band photo and member profile photos are stored in a top-level "Profile photos" folder inside the band's linked folder, next to Gigs. Until Drive is linked, avatars fall back to the Google profile photo or initials.
+  - **Member photos are per band (decided 2026-10-27):** a member sets their photo separately in each band, stored in that band's Profile photos folder. A band without Drive linked shows the Google profile photo or initials.
 - **Decided scope: full Drive access** (`drive` scope), not `drive.file`. Researched: with `drive.file`, picking a folder does NOT grant access to its contents, so files added directly in Drive would be invisible to the app and the changes poller. Full access lets the poller see outside-the-app uploads too. Trade-off accepted: since it's essentially just our band using it, users will see Google's "unverified app" warning rather than going through Google's restricted-scope review. Revisit if the app is ever opened to other bands. The picked folder is still where the app stores media and the scope it watches.
 - **Ownership is the band's choice:** a dedicated band Google account or a member's personal account. The app doesn't enforce either. (Risk to note: if the linked account's owner leaves, media access goes with them.)
 - Files added directly in the Drive folder outside the app DO show up in the app (via the changes poller), landing in the matching folder section, or Unsorted if they're not in a known folder.
@@ -354,6 +362,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Same lazy pattern as Drive: the Events tab works fully without Google Calendar. An unlinked band shows a small banner on the Events tab offering to connect (also available in Band settings).
 - On connect, the app creates a **new dedicated calendar named after the band** in the connecting account, rather than writing into anyone's personal calendar.
 - Every practice and gig on that calendar invites band members as attendees by email. Members RSVP from their own Google Calendar, which is what drives the two-way decline/RSVP sync.
+- **Gig invites go to all active members (decided 2026-10-27),** not only the lineup. Gig RSVPs stay out of the app; any answers on gig events in Google are ignored. A member who answers a whole recurring practice series in Google gets that answer on every occurrence they have not answered individually.
 - **Calendar email (decided 2026-10-22):** each user has an optional "calendar email" in personal settings, and invites go there instead of the sign-in email. This covers members on other calendars (e.g. Outlook): they get standard invites that update automatically and RSVP from their own calendar, with replies flowing back through Google. Subscribing to the band calendar is not the main path because it has no per-person RSVP.
 - Ownership follows the same rule as Drive: the band chooses whose account (dedicated band account or a member's).
 
