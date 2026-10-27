@@ -25,6 +25,7 @@ export function SelectionBar({
   actions,
   onClear,
   noun = "selected",
+  labels = true,
   placement = "fixed",
   className,
 }: {
@@ -32,6 +33,8 @@ export function SelectionBar({
   actions: SelectionAction[];
   onClear: () => void;
   noun?: string;
+  /** False keeps the buttons icon-only at every width (long action lists). */
+  labels?: boolean;
   placement?: Placement;
   className?: string;
 }) {
@@ -62,21 +65,25 @@ export function SelectionBar({
       >
         <X />
       </Button>
-      <p className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">
+      <p className="shrink-0 px-1 text-sm font-semibold">
         <span data-testid="selection-count">{count}</span> {noun}
       </p>
-      {shown.map((a) => (
-        <Button
-          key={a.key}
-          variant={a.destructive ? "destructive" : "secondary"}
-          onClick={a.onSelect}
-          aria-label={a.label}
-          className="px-3"
-        >
-          {a.icon}
-          <span className="hidden sm:inline">{a.label}</span>
-        </Button>
-      ))}
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto">
+        {shown.map((a) => (
+          <Button
+            key={a.key}
+            variant={a.destructive ? "destructive" : "secondary"}
+            onClick={a.onSelect}
+            aria-label={a.label}
+            className="shrink-0 px-3"
+          >
+            {a.icon}
+            {labels ? (
+              <span className="hidden sm:inline">{a.label}</span>
+            ) : null}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

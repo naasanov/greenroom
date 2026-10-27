@@ -2,9 +2,9 @@
 
 import { Check, Plus, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useMemo, useRef, useState } from "react";
-import type { GigHistoryEntry } from "@greenroom/shared";
-import { SideDrawer } from "@/components/app/bottom-drawer";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
+import { BottomDrawer, SideDrawer } from "@/components/app/bottom-drawer";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EmptyState } from "@/components/app/empty-state";
 import { SongSheet } from "@/components/library/song-sheet";
@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSetlistHistory } from "@/lib/queries/setlists";
+import { useSongs } from "@/lib/queries/songs";
+import { useSetlistHistory, type SetlistSong } from "@/lib/queries/setlists";
 import { cn } from "@/lib/utils";
 import { PickerRow } from "./pick-dnd";
 import { SETLIST_TARGET } from "./setlist-section";
@@ -283,17 +284,31 @@ function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
 /**
  * The song sheet for adding a song in place. It lives in a non-modal Radix
  * dialog layer so its inputs keep focus even though the sheet is portaled
- * outside the event drawer, and Escape closes only the sheet.
+ * outside the hosting drawer, and Escape closes only the sheet. `onPick`
+ * receives an existing song the user opened or a newly created one.
  */
-function AddSongSheet({ builder }: { builder: SetlistBuilder }) {
-  const { sheet, songs, editor, guarded } = builder;
+function AddSongSheet({
+  bandId,
+  sheet,
+  songs,
+  closeSheet,
+  onPick,
+  title = "New song for the setlist",
+}: {
+  bandId: string;
+  sheet: SetlistBuilder["sheet"];
+  songs: SongSummary[] | undefined;
+  closeSheet: () => void;
+  onPick: (song: SetlistSong) => void;
+  title?: string;
+}) {
   const dirty = useRef(false);
   const [discard, setDiscard] = useState(false);
   const open = !!sheet?.open;
 
   const requestClose = () => {
     if (dirty.current) setDiscard(true);
-    else builder.closeSheet();
+    else closeSheet();
   };
 
   if (!sheet) return null;
@@ -311,33 +326,27 @@ function AddSongSheet({ builder }: { builder: SetlistBuilder }) {
             className="pointer-events-none fixed inset-0 z-[60] outline-none [&>aside]:pointer-events-auto"
           >
             <DialogPrimitive.Title className="sr-only">
-              New song for the setlist
+              {title}
             </DialogPrimitive.Title>
             <SongSheet
-              bandId={builder.bandId}
+              bandId={bandId}
               target={{ kind: "add", nonce: sheet.nonce }}
               open={open}
               initialText={sheet.initialText}
               siblings={[]}
               onSelect={(id) => {
                 const existing = songs?.find((s) => s.id === id);
-                if (existing) {
-                  void guarded((target) =>
-                    editor.append(toSetlistSong(existing), target),
-                  );
-                }
+                if (existing) onPick(toSetlistSong(existing));
                 dirty.current = false;
-                builder.closeSheet();
+                closeSheet();
               }}
               onRequestClose={requestClose}
               onCreated={(song) => {
                 dirty.current = false;
-                void guarded((target) =>
-                  editor.append(toSetlistSong(song), target),
-                );
-                builder.closeSheet();
+                onPick(toSetlistSong(song));
+                closeSheet();
               }}
-              onDeleted={() => builder.closeSheet()}
+              onDeleted={() => closeSheet()}
               onDirtyChange={(d) => {
                 dirty.current = d;
               }}
@@ -351,7 +360,7 @@ function AddSongSheet({ builder }: { builder: SetlistBuilder }) {
         onDiscard={() => {
           dirty.current = false;
           setDiscard(false);
-          builder.closeSheet();
+          closeSheet();
         }}
       />
     </>
@@ -410,8 +419,224 @@ export function SetlistAside({ builder }: { builder: SetlistBuilder }) {
     <>
       <LibraryDrawer builder={builder} />
       <HistoryDrawer builder={builder} />
-      <AddSongSheet builder={builder} />
+      <AddSongSheet
+        bandId={builder.bandId}
+        sheet={builder.sheet}
+        songs={builder.songs}
+        closeSheet={builder.closeSheet}
+        onPick={(song) =>
+          void builder.guarded((target) => builder.editor.append(song, target))
+        }
+      />
       <CopyChoiceDialog builder={builder} />
     </>
+  );
+}
+
+const SHEET_EXIT_MS = 400;
+
+function PickRow({
+  song,
+  current,
+  group,
+  onPick,
+}: {
+  song: SongSummary;
+  current: boolean;
+  group: "setlist" | "library";
+  onPick: (song: SetlistSong) => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        data-testid="song-pick-row"
+        data-group={group}
+        aria-label={song.title}
+        aria-pressed={current}
+        onClick={() => onPick(toSetlistSong(song))}
+        className="flex h-14 w-full touch-manipulation items-center gap-2.5 rounded-2xl border bg-card px-2.5 shadow-soft transition-colors outline-none hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <SongLine song={toSetlistSong(song)} />
+        {current ? (
+          <Check className="size-4 shrink-0 text-primary" strokeWidth={3} />
+        ) : null}
+      </button>
+    </li>
+  );
+}
+
+function GroupHeading({ children }: { children: string }) {
+  return (
+    <h4 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      {children}
+    </h4>
+  );
+}
+
+/**
+ * Single-pick version of the library drawer: same search, song rows and
+ * add-a-song-in-place sheet, but a tap chooses one song instead of toggling
+ * setlist membership. Songs in `firstSongIds` (a gig's setlist) list first.
+ */
+export function SongPickerDrawer({
+  bandId,
+  open,
+  onOpenChange,
+  title = "Link to song",
+  firstSongIds = [],
+  currentSongId = null,
+  onPick,
+  onClear,
+}: {
+  bandId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title?: string;
+  firstSongIds?: string[];
+  currentSongId?: string | null;
+  onPick: (song: SetlistSong) => void;
+  /** Adds a "No song" row that calls this. */
+  onClear?: () => void;
+}) {
+  const songsQuery = useSongs(bandId, { q: "", sort: "title" }, open);
+  const songs = songsQuery.data;
+  const [search, setSearch] = useState("");
+  const [sheet, setSheet] = useState<SetlistBuilder["sheet"]>(null);
+  const nonce = useRef(0);
+  const q = search.trim().toLowerCase();
+
+  const openSheet = useCallback((initialText = "") => {
+    nonce.current += 1;
+    setSheet({ nonce: nonce.current, initialText, open: true });
+  }, []);
+  const closeSheet = useCallback(() => {
+    setSheet((s) => (s ? { ...s, open: false } : s));
+    setTimeout(() => setSheet((s) => (s && !s.open ? null : s)), SHEET_EXIT_MS);
+  }, []);
+
+  const { first, rest } = useMemo(() => {
+    const ids = new Set(firstSongIds);
+    const match = (songs ?? []).filter(
+      (s) =>
+        !q ||
+        s.title.toLowerCase().includes(q) ||
+        (s.artist ?? "").toLowerCase().includes(q),
+    );
+    return {
+      first: firstSongIds.flatMap((id) => match.find((s) => s.id === id) ?? []),
+      rest: match.filter((s) => !ids.has(s.id)),
+    };
+  }, [songs, q, firstSongIds]);
+
+  const pick = (song: SetlistSong) => {
+    onPick(song);
+    onOpenChange(false);
+  };
+
+  return (
+    <BottomDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      tall
+      headerAction={
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Add a new song"
+          onClick={() => openSheet(search.trim())}
+        >
+          <Plus />
+        </Button>
+      }
+      aside={
+        <AddSongSheet
+          bandId={bandId}
+          sheet={sheet}
+          songs={songs}
+          closeSheet={closeSheet}
+          title="New song to link"
+          onPick={pick}
+        />
+      }
+    >
+      <div data-testid="song-picker">
+        <SearchBox
+          value={search}
+          onChange={setSearch}
+          label="Search the library"
+          placeholder="Search songs"
+        />
+        {onClear && !q ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mb-3 w-full"
+            onClick={() => {
+              onClear();
+              onOpenChange(false);
+            }}
+          >
+            <X /> No song
+          </Button>
+        ) : null}
+        {!songs ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading...
+          </p>
+        ) : first.length + rest.length === 0 ? (
+          <div
+            data-testid="library-no-match"
+            className="flex flex-col items-center gap-3 py-6 text-center"
+          >
+            <p className="text-sm text-muted-foreground">
+              {q
+                ? `No songs match \u201c${search.trim()}\u201d.`
+                : "Your library is empty."}
+            </p>
+            <Button type="button" onClick={() => openSheet(search.trim())}>
+              <Plus /> {q ? "Add this song" : "Add song"}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {first.length > 0 ? (
+              <section aria-label="On this gig's setlist">
+                <GroupHeading>On this gig&apos;s setlist</GroupHeading>
+                <ul className="flex flex-col gap-2">
+                  {first.map((s) => (
+                    <PickRow
+                      key={s.id}
+                      song={s}
+                      group="setlist"
+                      current={s.id === currentSongId}
+                      onPick={pick}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {rest.length > 0 ? (
+              <section aria-label="Library">
+                {first.length > 0 ? <GroupHeading>Library</GroupHeading> : null}
+                <ul className="flex flex-col gap-2">
+                  {rest.map((s) => (
+                    <PickRow
+                      key={s.id}
+                      song={s}
+                      group="library"
+                      current={s.id === currentSongId}
+                      onPick={pick}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </BottomDrawer>
   );
 }

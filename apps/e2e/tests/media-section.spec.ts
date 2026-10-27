@@ -48,10 +48,7 @@ test("media section shows the empty state, thumbnails with counts, and missing i
   await expect(drawer.getByTestId("media-counts")).toHaveText(
     "2 photos, 1 video",
   );
-  await expect(drawer.getByTestId("media-strip")).toHaveAttribute(
-    "href",
-    new RegExp(gigFolder.id),
-  );
+  await expect(drawer.getByTestId("media-strip")).toBeVisible();
 
   const doomed = (await fake.files()).find((f) => f.name === "a.png")!;
   await fake.external({ action: "delete", fileId: doomed.id });

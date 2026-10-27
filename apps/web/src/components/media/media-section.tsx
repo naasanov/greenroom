@@ -5,6 +5,8 @@ import type { GigMedia, MediaItem } from "@greenroom/shared";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
 import { useGoogleIntegrations } from "@/lib/queries/google";
 import { useGigMedia } from "@/lib/queries/media";
+import { useRouter } from "next/navigation";
+import { openMediaView } from "./media-gallery-page";
 
 const PREVIEW_COUNT = 4;
 
@@ -69,6 +71,7 @@ export function MediaSection({
   bandId: string;
   gigId: string;
 }) {
+  const router = useRouter();
   const media = useGigMedia(bandId, gigId);
   const integrations = useGoogleIntegrations(bandId);
   const data = media.data;
@@ -107,20 +110,15 @@ export function MediaSection({
           </p>
         </>
       );
-      body = data.driveFolderUrl ? (
-        <a
+      body = (
+        <button
+          type="button"
           data-testid="media-strip"
-          href={data.driveFolderUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex flex-col gap-2"
+          onClick={() => openMediaView(router, gigId)}
+          className="flex flex-col gap-2 text-left"
         >
           {inner}
-        </a>
-      ) : (
-        <div data-testid="media-strip" className="flex flex-col gap-2">
-          {inner}
-        </div>
+        </button>
       );
     }
   }
