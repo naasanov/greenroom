@@ -35,7 +35,7 @@ export const setlistKeys = {
 /** The song fields an optimistic setlist row needs. */
 export type SetlistSong = Pick<
   SongSummary,
-  "id" | "title" | "artist" | "durationSeconds" | "imageUrl"
+  "id" | "title" | "artist" | "durationSeconds" | "imageUrl" | "youtubeUrl"
 >;
 
 const base = (bandId: string, setlistId: string) =>
@@ -106,6 +106,7 @@ const optimisticItem = (song: SetlistSong): SetlistItem => ({
   artist: song.artist,
   durationSeconds: song.durationSeconds,
   imageUrl: song.imageUrl,
+  youtubeUrl: song.youtubeUrl,
 });
 
 // One request chain per setlist keeps server writes in tap order.

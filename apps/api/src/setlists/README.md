@@ -5,7 +5,7 @@ All routes are under `/bands/:bandId/...` and use `@BandMember()` (non-members g
 | Route | Purpose |
 | --- | --- |
 | `GET /gigs/:gigId/setlist` | The gig's setlist (`gig_setlists` is one per gig), created empty on first access. Returns the setlist plus `gigId`. |
-| `GET /setlists/:setlistId` | `items` (title, artist, duration, image), `songCount`, `totalDurationSeconds` (known durations only) and `unknownDurationCount`. |
+| `GET /setlists/:setlistId` | `items` (title, artist, duration, image, youtube link), `songCount`, `totalDurationSeconds` (known durations only) and `unknownDurationCount`. |
 | `PUT /setlists/:setlistId/items` | `{ songIds }`: replaces the whole order (reorder, add, remove in one call). |
 | `POST /setlists/:setlistId/items` | `{ songId }`: append (tap-to-add). |
 | `DELETE /setlists/:setlistId/items/:songId` | Remove one song. |

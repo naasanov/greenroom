@@ -23,6 +23,7 @@ export async function liveItems(
       artist: songs.artist,
       durationSeconds: songs.durationSeconds,
       imageUrl: songs.imageUrl,
+      youtubeUrl: songs.youtubeUrl,
     })
     .from(setlistItems)
     .innerJoin(songs, eq(songs.id, setlistItems.songId))

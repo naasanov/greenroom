@@ -19,6 +19,7 @@ export const toSetlistSong = (s: SongSummary): SetlistSong => ({
   artist: s.artist,
   durationSeconds: s.durationSeconds,
   imageUrl: songArt(s),
+  youtubeUrl: s.youtubeUrl,
 });
 
 /** Art, title, artist and duration; fills the space between a row's controls. */

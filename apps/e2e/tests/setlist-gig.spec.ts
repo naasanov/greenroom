@@ -305,6 +305,18 @@ test.describe("copy from a past gig", () => {
   });
 });
 
+test("a YouTube-only song shows its thumbnail in the setlist row", async ({
+  page,
+  testApi,
+}) => {
+  await fillSetlist(testApi, seed.gigs.tentative.id, [SONGS.midnightTrain.id]);
+  await openGig(page, seed.gigs.tentative);
+  await expect(rows(page).first().locator("img")).toHaveAttribute(
+    "src",
+    /i\.ytimg\.com/,
+  );
+});
+
 test("adding a new song in place appends it to the setlist", async ({
   page,
 }) => {

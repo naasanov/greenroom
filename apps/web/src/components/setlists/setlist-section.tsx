@@ -2,6 +2,7 @@
 
 import { GripVertical, History, ListPlus, X } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
+import { songArt } from "@/components/library/song-utils";
 import { Button } from "@/components/ui/button";
 import { PickTarget, TargetRow } from "./pick-dnd";
 import {
@@ -106,7 +107,7 @@ export function SetlistSection({
               title: item.title,
               artist: item.artist,
               durationSeconds: item.durationSeconds,
-              imageUrl: item.imageUrl,
+              imageUrl: songArt(item),
             };
             return (
               <TargetRow

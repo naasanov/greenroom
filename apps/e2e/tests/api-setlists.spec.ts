@@ -112,6 +112,23 @@ test("setlist: lazy gig setlist, replace order, append, remove, totals", async (
     songId: b,
     artist: "X",
     durationSeconds: 200,
+    youtubeUrl: null,
+  });
+
+  const yt = await api.post(`/bands/${bandId}/songs`, {
+    data: {
+      title: "Y",
+      youtubeUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+      force: true,
+    },
+  });
+  const ytId = (await yt.json()).id;
+  sl = await (
+    await api.post(`${base}/items`, { data: { songId: ytId } })
+  ).json();
+  expect(sl.items.at(-1)).toMatchObject({
+    songId: ytId,
+    youtubeUrl: "https://www.youtube.com/watch?v=abcdefghijk",
   });
 
   // Reorder + remove through a full replace.
