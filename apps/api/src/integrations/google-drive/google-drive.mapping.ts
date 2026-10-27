@@ -1,4 +1,4 @@
-import type { drive_v3 } from "googleapis";
+import type { drive_v3 } from "@googleapis/drive";
 import type { DriveFile } from "./google-drive.adapter.js";
 
 export const DRIVE_FILE_FIELDS =

@@ -1,4 +1,4 @@
-import { google, type calendar_v3 } from "googleapis";
+import { auth, calendar, type calendar_v3 } from "@googleapis/calendar";
 import type {
   CalendarChangesResult,
   CalendarDeleteResult,
@@ -30,9 +30,9 @@ function httpStatus(err: unknown): number | undefined {
 }
 
 function calendarFor(accessToken: string): calendar_v3.Calendar {
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  return google.calendar({ version: "v3", auth });
+  const client = new auth.OAuth2();
+  client.setCredentials({ access_token: accessToken });
+  return calendar({ version: "v3", auth: client });
 }
 
 /** Talks to Calendar v3 with the caller's access token; every write notifies attendees. */

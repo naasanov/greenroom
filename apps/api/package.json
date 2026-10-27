@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
+    "@googleapis/calendar": "^20.1.0",
+    "@googleapis/drive": "^27.0.0",
     "@greenroom/db": "workspace:*",
     "@greenroom/shared": "workspace:*",
     "@nestjs/common": "^12.0.1",
@@ -21,7 +23,6 @@
     "cookie-parser": "^1.4.7",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.4",
-    "googleapis": "^188.0.0",
     "pg-boss": "^12.38.0",
     "reflect-metadata": "^0.2.2",
     "rrule": "^2.8.1",

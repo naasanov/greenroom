@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
-import { google, type drive_v3 } from "googleapis";
+import { auth as googleAuth, drive, type drive_v3 } from "@googleapis/drive";
 import {
   DRIVE_FOLDER_MIME,
   type DriveChange,
@@ -45,9 +45,9 @@ function isNotFound(err: unknown): boolean {
 }
 
 function driveFor(accessToken: string): drive_v3.Drive {
-  const auth = new google.auth.OAuth2();
+  const auth = new googleAuth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
-  return google.drive({ version: "v3", auth });
+  return drive({ version: "v3", auth });
 }
 
 /** Talks to Drive v3 with the caller's access token; resumable uploads use raw fetch. */
