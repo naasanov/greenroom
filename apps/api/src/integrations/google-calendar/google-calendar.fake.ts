@@ -20,15 +20,20 @@ interface CalendarState {
 
 export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   private calendars = new Map<string, CalendarState>();
+  private info = new Map<string, { summary: string; timeZone: string }>();
   private calCounter = 0;
   private eventCounter = 0;
   private writeCounter = 0;
 
   // ---- adapter ----
 
-  async createCalendar(accessToken: string): Promise<{ calendarId: string }> {
+  async createCalendar(
+    accessToken: string,
+    input?: { summary: string; timeZone: string },
+  ): Promise<{ calendarId: string }> {
     this.lastAccessToken = accessToken;
     const calendarId = `fake-cal-${++this.calCounter}@group.calendar.test`;
+    if (input) this.info.set(calendarId, { ...input });
     this.calendars.set(calendarId, {
       events: new Map(),
       log: [],
@@ -54,7 +59,9 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
       recurrence: input.recurrence ?? [],
       attendees: (input.attendeeEmails ?? []).map((email) => ({
         email,
-        responseStatus: "needsAction" as const,
+        responseStatus:
+          lowerKeys(input.attendeeResponses)[email.toLowerCase()] ??
+          ("needsAction" as const),
       })),
       cancelled: false,
       etag: "",
@@ -218,6 +225,13 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     cal.minValidOffset = cal.log.length + 1;
   }
 
+  /** Name and time zone a calendar was created with. */
+  calendarInfo(
+    calendarId: string,
+  ): { summary: string; timeZone: string } | undefined {
+    return this.info.get(calendarId);
+  }
+
   getEvent(calendarId: string, eventId: string): CalendarEvent | undefined {
     const e = this.cal(calendarId).events.get(eventId);
     return e ? clone(e) : undefined;
@@ -234,6 +248,7 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
 
   reset(): void {
     this.calendars.clear();
+    this.info.clear();
     this.calCounter = 0;
     this.eventCounter = 0;
     this.writeCounter = 0;
@@ -312,13 +327,14 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
       };
     }
     if (patch.attendeeEmails !== undefined) {
-      next.attendees = patch.attendeeEmails.map(
-        (email) =>
-          existing.attendees.find((a) => a.email === email) ?? {
-            email,
-            responseStatus: "needsAction" as const,
-          },
-      );
+      const responses = lowerKeys(patch.attendeeResponses);
+      next.attendees = patch.attendeeEmails.map((email) => ({
+        email,
+        responseStatus:
+          responses[email.toLowerCase()] ??
+          existing.attendees.find((a) => a.email === email)?.responseStatus ??
+          ("needsAction" as const),
+      }));
     }
     if (cancelled !== undefined) next.cancelled = cancelled;
     return this.write(cal, next);
@@ -332,6 +348,14 @@ function clone(e: CalendarEvent): CalendarEvent {
     attendees: e.attendees.map((a) => ({ ...a })),
     privateProperties: { ...e.privateProperties },
   };
+}
+
+function lowerKeys(
+  responses: Record<string, AttendeeResponse> | undefined,
+): Record<string, AttendeeResponse> {
+  return Object.fromEntries(
+    Object.entries(responses ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
+  );
 }
 
 function isDefined<T>(v: T | undefined): v is T {

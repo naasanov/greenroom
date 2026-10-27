@@ -7,3 +7,5 @@ export * from "./events.js";
 export * from "./setlists.js";
 export * from "./links.js";
 export * from "./google.js";
+export * from "./media.js";
+export * from "./calendar-sync.js";

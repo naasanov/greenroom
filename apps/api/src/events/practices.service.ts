@@ -30,6 +30,7 @@ import {
   type SetPracticeSetlist,
   type UpdatePractice,
 } from "@greenroom/shared";
+import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { copyItems } from "../setlists/items.js";
 import { resolveAssignment, startsHere } from "./assignment.js";
@@ -95,7 +96,10 @@ const notFound = (): NotFoundException =>
 
 @Injectable()
 export class PracticesService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly calendarSync: CalendarSyncQueue,
+  ) {}
 
   // ---- lookups ----
 
@@ -263,6 +267,7 @@ export class PracticesService {
         createdByUserId: userId,
       })
       .returning();
+    await this.calendarSync.series(bandId, row!.id);
     return toSeries(row!);
   }
 
@@ -283,6 +288,7 @@ export class PracticesService {
 
     if (patch.scope === "this") {
       await this.editThis(series, original, override, patch);
+      await this.calendarSync.occurrence(bandId, series.id, original);
       const fresh = await this.findOverride(series.id, original);
       return {
         series: toSeries(series),
@@ -296,6 +302,9 @@ export class PracticesService {
     const result = splits
       ? await this.splitAndEdit(series, original, patch)
       : await this.editAll(series, patch);
+
+    await this.calendarSync.series(bandId, series.id);
+    if (splits) await this.calendarSync.series(bandId, result.series.id);
 
     const target = splits ? result.first : original;
     const occurrence = isOccurrence(result.series, target)
@@ -585,6 +594,7 @@ export class PracticesService {
           target: [overridesTable.seriesId, overridesTable.originalStart],
           set: { cancelled: true },
         });
+      await this.calendarSync.occurrence(bandId, seriesId, original);
       return;
     }
 
@@ -593,6 +603,7 @@ export class PracticesService {
         .update(practiceSeries)
         .set({ deletedAt: new Date() })
         .where(eq(practiceSeries.id, seriesId));
+      await this.calendarSync.series(bandId, seriesId);
       return;
     }
 
@@ -627,6 +638,7 @@ export class PracticesService {
           ),
         );
     });
+    await this.calendarSync.series(bandId, seriesId);
   }
 
   // ---- RSVP ----
@@ -651,6 +663,7 @@ export class PracticesService {
         ],
         set: { status },
       });
+    await this.calendarSync.rsvp(bandId, seriesId, original);
     return this.detail(series, original, override, userId);
   }
 

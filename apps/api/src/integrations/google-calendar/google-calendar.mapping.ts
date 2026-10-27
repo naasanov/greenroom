@@ -1,4 +1,4 @@
-import type { calendar_v3 } from "googleapis";
+import type { calendar_v3 } from "@googleapis/calendar";
 import type {
   AttendeeResponse,
   CalendarAttendee,
@@ -58,11 +58,11 @@ export function buildEventBody(
   }
   if (input.recurrence !== undefined) body.recurrence = input.recurrence;
   if (input.attendeeEmails !== undefined) {
+    const responses = lowerKeys(input.attendeeResponses);
     body.attendees = input.attendeeEmails.map((email) => {
       const prior = existing.find((a) => a.email === email);
-      return prior
-        ? { email, responseStatus: prior.responseStatus }
-        : { email };
+      const status = responses[email.toLowerCase()] ?? prior?.responseStatus;
+      return status ? { email, responseStatus: status } : { email };
     });
   }
   if (input.privateProperties !== undefined) {
@@ -72,6 +72,14 @@ export function buildEventBody(
     body.status = input.cancelled ? "cancelled" : "confirmed";
   }
   return body;
+}
+
+function lowerKeys(
+  responses: Record<string, AttendeeResponse> | undefined,
+): Record<string, AttendeeResponse> {
+  return Object.fromEntries(
+    Object.entries(responses ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
+  );
 }
 
 const RESPONSES: readonly AttendeeResponse[] = [

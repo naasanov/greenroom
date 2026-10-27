@@ -27,6 +27,7 @@ import {
   type UpdateBand,
 } from "@greenroom/shared";
 import { webUrl } from "../auth/auth.constants.js";
+import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -55,7 +56,10 @@ const toSummary = (
 
 @Injectable()
 export class BandsService {
-  constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Database,
+    private readonly calendarSync: CalendarSyncQueue,
+  ) {}
 
   private async uniqueSlug(tx: Tx, name: string): Promise<string> {
     const base = slugify(name);
@@ -244,6 +248,7 @@ export class BandsService {
         .set({ leftAt: new Date() })
         .where(eq(memberships.id, m.id));
     });
+    await this.calendarSync.bandAttendees(bandId);
   }
 
   async leave(
@@ -251,6 +256,7 @@ export class BandsService {
     userId: string,
     deleteBand: boolean,
   ): Promise<void> {
+    let bandDeleted = false;
     await this.db.transaction(async (tx) => {
       await this.lockBand(tx, bandId);
       const m = await this.activeMembership(tx, bandId, userId);
@@ -266,6 +272,7 @@ export class BandsService {
           });
         }
         await tx.delete(bands).where(eq(bands.id, bandId));
+        bandDeleted = true;
         return;
       }
       if (m.role === "admin" && (await this.adminCount(tx, bandId)) <= 1) {
@@ -276,6 +283,7 @@ export class BandsService {
         .set({ leftAt: new Date() })
         .where(eq(memberships.id, m.id));
     });
+    if (!bandDeleted) await this.calendarSync.bandAttendees(bandId);
   }
 
   // Instruments
@@ -387,7 +395,8 @@ export class BandsService {
 
   async acceptInvite(token: string, userId: string): Promise<BandSummary> {
     const band = await this.bandForToken(token);
-    return this.db.transaction(async (tx) => {
+    let joined = false;
+    const summary = await this.db.transaction(async (tx) => {
       await this.lockBand(tx, band.id);
       const [existing] = await tx
         .select()
@@ -403,6 +412,7 @@ export class BandsService {
         await tx
           .insert(memberships)
           .values({ bandId: band.id, userId, role: "member" });
+        joined = true;
       }
       await tx
         .update(users)
@@ -411,6 +421,8 @@ export class BandsService {
       if (existing) return toSummary(band, existing.role);
       return toSummary(band, "member");
     });
+    if (joined) await this.calendarSync.bandAttendees(band.id);
+    return summary;
   }
 
   /** Sets the user's last used band; 404 unless they are an active member. */

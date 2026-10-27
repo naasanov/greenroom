@@ -4,7 +4,11 @@ import { and, eq } from "drizzle-orm";
 import {
   bandGoogleLinks,
   bands,
+  calendarSyncStates,
+  gigs,
   oauthStates,
+  practiceOccurrenceOverrides,
+  practiceSeries,
   users,
   type Database,
 } from "@greenroom/db";
@@ -173,6 +177,18 @@ export class GoogleLinksService {
     }
     if (!tokens.refreshToken) return fail("exchange_failed");
 
+    // A different Google account cannot see the old calendar, so sync starts over.
+    if (service === "calendar") {
+      const prior = await this.getLink(row.bandId, "calendar");
+      if (prior && prior.googleSub !== profile.sub) {
+        await this.clearCalendarSync(row.bandId);
+        await this.db
+          .update(bands)
+          .set({ calendarId: null })
+          .where(eq(bands.id, row.bandId));
+      }
+    }
+
     const values = {
       googleSub: profile.sub,
       googleEmail: profile.email,
@@ -306,5 +322,32 @@ export class GoogleLinksService {
           : { calendarId: null, calendarLinkedByUserId: null },
       )
       .where(eq(bands.id, bandId));
+    if (service === "calendar") await this.clearCalendarSync(bandId);
+  }
+
+  /** Forgets every Google event id, etag and the sync token; the Google calendar is left alone. */
+  private async clearCalendarSync(bandId: string): Promise<void> {
+    await this.db
+      .update(gigs)
+      .set({ gcalEventId: null, gcalEtag: null, updatedAt: gigs.updatedAt })
+      .where(eq(gigs.bandId, bandId));
+    await this.db
+      .update(practiceSeries)
+      .set({
+        gcalEventId: null,
+        gcalEtag: null,
+        updatedAt: practiceSeries.updatedAt,
+      })
+      .where(eq(practiceSeries.bandId, bandId));
+    await this.db
+      .update(practiceOccurrenceOverrides)
+      .set({
+        gcalInstanceEtag: null,
+        updatedAt: practiceOccurrenceOverrides.updatedAt,
+      })
+      .where(eq(practiceOccurrenceOverrides.bandId, bandId));
+    await this.db
+      .delete(calendarSyncStates)
+      .where(eq(calendarSyncStates.bandId, bandId));
   }
 }

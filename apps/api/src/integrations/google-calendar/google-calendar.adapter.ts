@@ -54,6 +54,11 @@ export interface CalendarEventInput {
   recurrence?: string[];
   /** Attendee emails; new attendees start as needsAction. */
   attendeeEmails?: string[];
+  /**
+   * Response status to record per attendee email (lowercase keys are matched
+   * case-insensitively). Emails not listed keep their current status.
+   */
+  attendeeResponses?: Record<string, AttendeeResponse>;
 }
 
 export type CalendarEventPatch = Partial<CalendarEventInput>;
