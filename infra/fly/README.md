@@ -4,10 +4,10 @@ Staging: web `https://staging.greenroom.fyi`, api `https://api.staging.greenroom
 Apps: `greenroom-staging-web`, `greenroom-staging-api`, `greenroom-staging-db` (self-run `postgres:17`, private network only).
 Prod is a copy: drop `staging-` from app names, use apex `greenroom.fyi` and `api.greenroom.fyi`, copy the tomls to `prod.*.toml`.
 
-All commands run from the repo root. `fly` is `~/.fly/bin/fly`. Never print secrets.
+All commands run from the repo root. On the Mac `fly` is `~/.fly/bin/fly`; on the remote factory (`FACTORY=1`) `fly` is on PATH but not logged in, so deploys there go through CI on push to `main`. Never print secrets.
 
 ```sh
-export PATH="$HOME/.fly/bin:$PATH"
+export PATH="$HOME/.fly/bin:$PATH"   # Mac only
 fly auth whoami   # must be logged in
 ORG=personal      # adjust if the Fly org differs
 ```
@@ -23,7 +23,7 @@ fly volumes create pgdata -a greenroom-staging-db -r iad -s 1 -n 1 --yes
 
 ## 2. Database password and secrets
 
-The password is hex (URL-safe), held in a shell variable, stored in the Keychain, and piped to Fly.
+The password is hex (URL-safe), held in a shell variable, stored in the Keychain (Mac), and piped to Fly.
 `--stage` queues secrets until the first deploy because no machines exist yet.
 
 ```sh

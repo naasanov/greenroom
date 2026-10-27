@@ -37,7 +37,9 @@ TypeScript end to end. pnpm workspace + Turborepo monorepo: Next.js frontend (`a
 
 Run from the repo root: `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format`.
 
-- Local setup: `cp .env.example .env` (secrets come from the Keychain, see `memory/secrets-in-keychain.md`), `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`.
+- Machines: `FACTORY=1` in the environment means the remote Linux factory; otherwise assume the user's Mac.
+- Local setup on the Mac: `cp .env.example .env` (secrets come from the Keychain, see `memory/secrets-in-keychain.md`), `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`.
+- On the factory: `.env` already exists (dev values only) and Postgres 17 runs natively on localhost:5432 with the same credentials and both DBs, so skip `pnpm db:up` (no Docker); run `pnpm db:migrate` and `pnpm db:seed`. `fly` is on PATH but not logged in: staging deploys only through CI on push to `main`.
 - Staging: https://staging.greenroom.fyi and https://api.staging.greenroom.fyi (Fly apps `greenroom-staging-{web,api,db}`, region `iad`). Pushes to `main` run CI and then auto-deploy staging; manual deploy with `pnpm deploy:staging`. Runbook, DNS, backups, and prod setup: `infra/fly/README.md`. Creating cloud resources or DNS changes needs explicit user approval.
 - Tests: targeted specs during work (`pnpm test:e2e -- <area>- smoke.spec`, args are Playwright path regex filters, not globs; always go through the root script, since `pnpm --filter @greenroom/e2e test:e2e` skips the web/api rebuild and tests a stale build); the full `pnpm test:e2e` only at ticket end or before a gate (Playwright, desktop + iPhone/WebKit, fake integrations, test DB). How to write specs and add fake-control endpoints: `apps/e2e/README.md`.
 

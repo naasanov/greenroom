@@ -4,7 +4,7 @@ Playwright tests against built servers: API on 4100, web on 3100, `greenroom_tes
 Projects: `desktop` (Chromium 1280x800) and `mobile` (iPhone 15, WebKit). Tests run serially (one worker, shared DB).
 
 ## Run
-- One-time: `pnpm db:up` and `pnpm --filter @greenroom/e2e exec playwright install chromium webkit`.
+- One-time: `pnpm db:up` (Mac; on the factory Postgres already runs natively, skip it) and `pnpm --filter @greenroom/e2e exec playwright install chromium webkit`.
 - `pnpm test:e2e` from the root builds everything first, then runs.
 - Fast loop after a build: `cd apps/e2e && pnpm exec playwright test --project=desktop -g "name"`.
 - Global setup migrates the test DB. Set `TEST_DATABASE_URL` to override it.

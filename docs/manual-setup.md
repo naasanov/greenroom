@@ -2,7 +2,7 @@
 
 Step-by-step instructions for the human tasks listed under "Manual setup" in [execution-plan.md](./execution-plan.md). Each `##` heading matches an item name there; the staging `/status` page shows these steps under that item.
 
-Every secret goes into the macOS Keychain under the exact env var name shown, never into chat. The orchestrator reads it from there and sets it in `.env` and on Fly.
+Every secret goes into the macOS Keychain on the dev Mac under the exact env var name shown, never into chat. The orchestrator on the Mac reads it from there and sets it in `.env` and on Fly. The remote factory (`FACTORY=1`) has no Keychain and does not receive these secrets.
 
 ## How to hand over secrets
 1. In a terminal on the dev Mac, run this once per value, replacing `NAME` with the env var name from the item's steps:

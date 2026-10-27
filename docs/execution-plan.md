@@ -18,7 +18,7 @@ Things the orchestrator cannot fully do itself. Rule: hand work to the orchestra
 - **Magic-link email provider:** decided: Resend. Create the account and API key; the orchestrator adds the DNS records. Steps in [manual-setup.md](./manual-setup.md#magic-link-email-provider). Status: Done (2026-10-26: domain greenroom.fyi added, DKIM/SPF/MX records live in DNS, RESEND_API_KEY in the Keychain; the real email adapter is still a stub)
 - **Sentry:** create the org and projects and copy the DSNs. Steps in [manual-setup.md](./manual-setup.md#sentry). Status: Not started
 - **Accounts + logins:** create accounts for Fly.io, Cloudflare, and GitHub with billing set up, then log in to the CLIs once on the dev machine (`fly auth login`, `gh auth login`) and create a scoped Cloudflare API token. GitHub + `gh` login done; Fly.io + `fly` login done (flyctl in `~/.fly/bin`, not Homebrew); Cloudflare API token in Keychain (`CLOUDFLARE_API_TOKEN`) with zone access verified. Status: Done
-- **Secrets:** store each value in the Keychain under its env var name; the orchestrator loads them into .env and Fly. Steps in [manual-setup.md](./manual-setup.md#secrets). Status: Not started
+- **Secrets:** store each value in the Keychain on the dev Mac under its env var name (the remote factory gets none of these); the orchestrator loads them into .env and Fly. Steps in [manual-setup.md](./manual-setup.md#secrets). Status: Not started
 - **Real test accounts for Phase 8:** a Google account and a Spotify account the walkthrough agent can use, with any 2FA prompts handled by the user. Steps in [manual-setup.md](./manual-setup.md#real-test-accounts-for-phase-8). Status: Not started
 
 **Orchestrator does via CLI once logged in:**

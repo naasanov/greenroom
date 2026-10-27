@@ -30,7 +30,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Parallel agent coordination](parallel-agent-coordination.md) — one lockfile owner per wave, orchestrator pre-installs deps, e2e mutex lock
 - [Commit cadence](commit-cadence.md) — orchestrator commits and pushes on its own after validated checkpoints; watch CI + staging deploy
 - [Status updates are immediate](status-updates-immediate.md) — push execution-plan status changes the moment they happen; /status reads GitHub main
-- [Secrets in Keychain](secrets-in-keychain.md) — secrets are Keychain generic passwords named after the env var; inject into .env with `security`, never print
+- [Secrets in Keychain](secrets-in-keychain.md) — Mac: Keychain generic passwords named after the env var, inject with `security`, never print; factory: env vars only, real-mode secrets absent
 - [Fly infra gotchas](fly-infra-gotchas.md) — merged FlyV1 deploy token format, deploy from repo root, DNS-only CNAMEs, db is private
 - [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first
 - [Non-modal drawer gotchas](drawer-nonmodal-gotchas.md) — Radix stays modal under Vaul; close event drawers by id; focus trap and aria-hidden caveats
