@@ -64,6 +64,20 @@
       "when": 1793102055415,
       "tag": "0008_band_google_links",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793122539179,
+      "tag": "0009_media_drive_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793122608040,
+      "tag": "0010_media_member_photos_song_links",
+      "breakpoints": true
     }
   ]
 }

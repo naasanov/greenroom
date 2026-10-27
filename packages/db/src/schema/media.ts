@@ -6,11 +6,13 @@ import {
   pgEnum,
   pgTable,
   text,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { bands } from "./bands.js";
 import { gigs } from "./gigs.js";
 import { createdAt, deletedAt, id, tstz, updatedAt } from "./helpers.js";
+import { songs } from "./music.js";
 import { users } from "./users.js";
 
 export const mediaFolders = pgTable(
@@ -31,6 +33,7 @@ export const mediaFolders = pgTable(
   (t) => [
     index("media_folders_band_id_idx").on(t.bandId),
     index("media_folders_gig_id_idx").on(t.gigId),
+    uniqueIndex("media_folders_drive_folder_id_idx").on(t.driveFolderId),
   ],
 );
 
@@ -88,6 +91,11 @@ export const mediaItems = pgTable(
       () => publicUploadLinks.id,
       { onDelete: "set null" },
     ),
+    // Linked library song; null when unlinked. name_customized stops song-title renames.
+    songId: uuid("song_id").references(() => songs.id, {
+      onDelete: "set null",
+    }),
+    nameCustomized: boolean("name_customized").notNull().default(false),
     missing: boolean("missing").notNull().default(false),
     trashedAt: tstz("trashed_at"),
     createdAt: createdAt(),
@@ -97,7 +105,8 @@ export const mediaItems = pgTable(
   (t) => [
     index("media_items_band_id_idx").on(t.bandId),
     index("media_items_gig_folder_idx").on(t.gigId, t.folderId),
-    index("media_items_drive_file_id_idx").on(t.driveFileId),
+    index("media_items_song_id_idx").on(t.songId),
+    uniqueIndex("media_items_band_drive_file_idx").on(t.bandId, t.driveFileId),
   ],
 );
 

@@ -30,6 +30,12 @@ export const bands = pgTable("bands", {
     .unique()
     .default(sql`replace(gen_random_uuid()::text, '-', '')`),
   driveRootFolderId: text("drive_root_folder_id"),
+  // The app-built `Gigs` and `Profile photos` folders inside the root folder.
+  driveGigsFolderId: text("drive_gigs_folder_id"),
+  drivePhotosFolderId: text("drive_photos_folder_id"),
+  // Band photo file in Drive; photo_url is the public API URL that serves it.
+  photoDriveFileId: text("photo_drive_file_id"),
+  photoMimeType: text("photo_mime_type"),
   driveLinkedByUserId: uuid("drive_linked_by_user_id").references(
     () => users.id,
     { onDelete: "set null" },
@@ -57,6 +63,8 @@ export const memberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: membershipRole("role").notNull().default("member"),
+    // Member photo in the band's Profile photos folder; per band, not per user.
+    photoDriveFileId: text("photo_drive_file_id"),
     joinedAt: tstz("joined_at").notNull().defaultNow(),
     leftAt: tstz("left_at"),
   },
