@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
 import {
@@ -15,6 +15,12 @@ import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
+import { LineupAside } from "@/components/lineups/lineup-aside";
+import { LineupSection } from "@/components/lineups/lineup-section";
+import {
+  useLineupBuilder,
+  type LineupBuilder,
+} from "@/components/lineups/use-lineup-builder";
 import { PickDndProvider } from "@/components/setlists/pick-dnd";
 import { SetlistAside } from "@/components/setlists/setlist-aside";
 import { SetlistSection } from "@/components/setlists/setlist-section";
@@ -33,7 +39,15 @@ function mapsUrl(gig: Gig): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}${place}`;
 }
 
-function GigDetails({ gig, setlist }: { gig: Gig; setlist: SetlistBuilder }) {
+function GigDetails({
+  gig,
+  setlist,
+  lineup,
+}: {
+  gig: Gig;
+  setlist: SetlistBuilder;
+  lineup: LineupBuilder;
+}) {
   const hasContact = gig.contactName || gig.contactPhone || gig.contactEmail;
   return (
     <div className="flex flex-col gap-5">
@@ -87,9 +101,10 @@ function GigDetails({ gig, setlist }: { gig: Gig; setlist: SetlistBuilder }) {
           </Fact>
         ) : null}
       </dl>
-      {/* Lineup and Media sections mount here in later tasks. */}
+      {/* The Media section mounts here in a later task. */}
       <div data-testid="gig-sections" className="flex flex-col gap-6">
         <SetlistSection builder={setlist} />
+        <LineupSection builder={lineup} />
       </div>
     </div>
   );
@@ -131,6 +146,23 @@ export function GigDrawer({
     excludeGigId: gigId,
   });
 
+  const { setLibraryOpen, setHistoryOpen } = setlist;
+  const closeSetlistAsides = useCallback(() => {
+    setLibraryOpen(false);
+    setHistoryOpen(false);
+  }, [setLibraryOpen, setHistoryOpen]);
+  const lineup = useLineupBuilder({
+    bandId,
+    gigId,
+    mode: setlist.mode,
+    onOpenRoster: closeSetlistAsides,
+  });
+  const { setRosterOpen } = lineup;
+  const setlistAsideOpen = setlist.libraryOpen || setlist.historyOpen;
+  useEffect(() => {
+    if (setlistAsideOpen) setRosterOpen(false);
+  }, [setlistAsideOpen, setRosterOpen]);
+
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
   const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
 
@@ -147,7 +179,12 @@ export function GigDrawer({
         <BottomDrawer
           open={open}
           className={eventDrawerClass(setlist.besideEffective)}
-          aside={<SetlistAside builder={setlist} />}
+          aside={
+            <>
+              <SetlistAside builder={setlist} />
+              <LineupAside builder={lineup} />
+            </>
+          }
           onOpenChange={(open) => !open && onClose()}
           dismissible={!dirty}
           onDismissAttempt={requestClose}
@@ -190,7 +227,7 @@ export function GigDrawer({
               onDirtyChange={onDirty}
             />
           ) : (
-            <GigDetails gig={gig} setlist={setlist} />
+            <GigDetails gig={gig} setlist={setlist} lineup={lineup} />
           )}
         </BottomDrawer>
       </PickDndProvider>

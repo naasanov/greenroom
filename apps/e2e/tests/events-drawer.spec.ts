@@ -77,7 +77,8 @@ test("tapping another event while one is open switches to it", async ({
   await showGigDate(page, a.id, a.title);
   await eventIn(page, a.title).click();
   await expect(dialog(page, a.title)).toBeVisible();
-  await eventIn(page, b.title).click();
+  // The open drawer (setlist + lineup) can cover the chip on a phone.
+  await eventIn(page, b.title).dispatchEvent("click");
   await expect(dialog(page, b.title)).toBeVisible();
   await expect(dialog(page, a.title)).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));

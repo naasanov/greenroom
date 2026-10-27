@@ -135,6 +135,7 @@ export class BandsService {
   async members(bandId: string): Promise<BandMember[]> {
     const rows = await this.db
       .select({
+        membershipId: memberships.id,
         userId: users.id,
         displayName: users.displayName,
         email: users.email,

@@ -29,6 +29,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragMoveEvent,
+  type DragOverEvent,
   type DragStartEvent,
   type DragEndEvent,
   type UniqueIdentifier,
@@ -176,7 +177,8 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const onDragMove = (e: DragMoveEvent) => {
+  // Also runs on over changes so a late droppable measurement still updates the gap.
+  const onDragMove = (e: DragMoveEvent | DragOverEvent) => {
     const data = e.active.data.current as DragData | undefined;
     if (data?.type !== "pick") return;
     const next =
@@ -224,6 +226,7 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
         collisionDetection={collision}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
+        onDragOver={onDragMove}
         onDragEnd={onDragEnd}
         onDragCancel={finish}
       >
