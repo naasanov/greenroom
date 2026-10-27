@@ -66,9 +66,9 @@ Parallel group 3A
 
 # Phase 5: Integrations
 Parallel group 5A
-- **5.1 Google Calendar sync.** Lazy link banner, dedicated band calendar, members as attendees, two-way sync with etags and last-write-wins, delete wins, recurrence round-trip, RSVPs mapped to attendee status (accepted / tentative / declined / needs action), single RSVP list in the practice drawer. Invite each member at their calendar email (fallback: sign-in email) with attendee notifications on, so non-Google calendars like Outlook get invites and updates. Status: Not started
-- **5.2 Google Drive link.** Unlinked state, Google sign-in + Picker, full drive scope, Gigs folder structure, file-ID references, changes-API poller, missing-file placeholders, band and member photo upload into the "Profile photos" folder. Status: Not started
-- **5.3 Spotify user auth.** Export library/setlist to playlist (skipped-songs message), requesting the extra playlist-modify scopes on first export. The Spotify user-OAuth adapter, connection storage, and login-gated playlist import were pulled into 3.3 on 2026-10-22. Status: Not started
+- **5.1 Google Calendar sync.** Lazy link banner, dedicated band calendar, members as attendees, two-way sync with etags and last-write-wins, delete wins, recurrence round-trip, RSVPs mapped to attendee status (accepted / tentative / declined / needs action), single RSVP list in the practice drawer. Invite each member at their calendar email (fallback: sign-in email) with attendee notifications on, so non-Google calendars like Outlook get invites and updates. Status: In progress (2026-10-27, started while Gate 3 is in review: wave 1 running: real Google OAuth, Drive, and Calendar adapters plus a per-band Google link flow)
+- **5.2 Google Drive link.** Unlinked state, Google sign-in + Picker, full drive scope, Gigs folder structure, file-ID references, changes-API poller, missing-file placeholders, band and member photo upload into the "Profile photos" folder. Status: In progress (2026-10-27: wave 1 running, shares the Google adapters and link flow with 5.1)
+- **5.3 Spotify user auth.** Export library/setlist to playlist (skipped-songs message), requesting the extra playlist-modify scopes on first export. The Spotify user-OAuth adapter, connection storage, and login-gated playlist import were pulled into 3.3 on 2026-10-22. Status: In progress (2026-10-27: wave 1 running)
 
 # Phase 6: Media
 - **6.1 Upload backend.** Server-brokered chunked uploads to Drive resumable sessions, progress tracking, resume/skip on re-add. Status: Not started
