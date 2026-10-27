@@ -124,10 +124,7 @@ test("removing a row updates the list and the total", async ({ page }) => {
   await expect(rows(page)).toHaveCount(4);
 });
 
-test("a row can be reordered with the keyboard", async ({
-  page,
-  isMobile,
-}) => {
+test("a row can be reordered with the keyboard", async ({ page, isMobile }) => {
   test.skip(isMobile, "Keyboard reorder is a desktop path");
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);
