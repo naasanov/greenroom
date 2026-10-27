@@ -8,12 +8,14 @@ export function MemberAvatar({
   member,
   className,
 }: {
-  member: Pick<BandMember, "userId" | "displayName" | "avatarUrl">;
+  member: Pick<BandMember, "userId" | "displayName" | "avatarUrl"> &
+    Partial<Pick<BandMember, "photoUrl">>;
   className?: string;
 }) {
+  const src = member.photoUrl ?? member.avatarUrl;
   return (
     <Avatar className={cn("size-16", className)}>
-      {member.avatarUrl ? <AvatarImage src={member.avatarUrl} alt="" /> : null}
+      {src ? <AvatarImage src={src} alt="" /> : null}
       <AvatarFallback
         className={cn("text-xl font-semibold", toneFor(member.userId))}
       >

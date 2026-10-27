@@ -27,7 +27,7 @@ function MemberCard({
       <ListCard
         title={member.displayName}
         subtitle={instruments.map(instrumentLabel).join(", ") || undefined}
-        thumbnail={member.avatarUrl}
+        thumbnail={member.photoUrl ?? member.avatarUrl}
         thumbnailIcon={
           <span className="text-xl font-semibold">
             {member.displayName.slice(0, 1).toUpperCase()}

@@ -61,6 +61,8 @@ export const bandMemberSchema = z.object({
   displayName: z.string(),
   email: z.string(),
   avatarUrl: z.string().nullable(),
+  /** The member's photo for this band, or null. */
+  photoUrl: z.string().nullable(),
   instruments: myInstrumentsSchema,
   role: bandRoleSchema,
   joinedAt: z.string(),

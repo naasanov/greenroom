@@ -11,10 +11,18 @@ import { InstrumentsAutosave } from "@/components/settings/instruments-autosave"
 import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PhotoUpload } from "@/components/app/photo-upload";
+import { MemberAvatar } from "@/components/roster/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { keys, useMyInstruments, useSignOut } from "@/lib/queries";
+import { useCurrentBand } from "@/lib/current-band";
+import { keys, useMembers, useMyInstruments, useSignOut } from "@/lib/queries";
+import {
+  NOT_LINKED_NOTE,
+  useDriveStatus,
+  useMyBandPhoto,
+} from "@/lib/queries/photos";
 
 /** Saves name and calendar email only; instruments autosave separately. */
 function useSaveProfileFields() {
@@ -128,10 +136,43 @@ function PersonalForm({ user }: { user: User }) {
   );
 }
 
+/** The member's photo for the current band, disabled until the band's Drive is set up. */
+function MemberPhotoRow({
+  user,
+  band,
+}: {
+  user: User;
+  band: { id: string; name: string };
+}) {
+  const members = useMembers(band.id);
+  const status = useDriveStatus(band.id);
+  const photo = useMyBandPhoto(band.id);
+  const mine = members.data?.find((m) => m.userId === user.id);
+  const member = {
+    userId: user.id,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    photoUrl: mine?.photoUrl ?? null,
+  };
+  return (
+    <PhotoUpload
+      testId="member-photo-row"
+      title={`Your photo in ${band.name}`}
+      hasPhoto={!!member.photoUrl}
+      loading={status.isPending || members.isPending}
+      disabledNote={status.data?.folderSet === false ? NOT_LINKED_NOTE : null}
+      preview={<MemberAvatar member={member} className="size-16" />}
+      onUpload={(file) => photo.upload.mutateAsync(file)}
+      onRemove={() => photo.remove.mutateAsync()}
+    />
+  );
+}
+
 /** Name, photo, instruments, and sign out. */
 export function PersonalSection({ user }: { user: User }) {
   const mine = useMyInstruments();
   const signOut = useSignOut();
+  const { currentBand } = useCurrentBand();
 
   return (
     <SectionCard
@@ -161,6 +202,10 @@ export function PersonalSection({ user }: { user: User }) {
           </span>
         </div>
       </div>
+
+      {currentBand ? (
+        <MemberPhotoRow key={currentBand.id} user={user} band={currentBand} />
+      ) : null}
 
       {mine.data ? (
         <>

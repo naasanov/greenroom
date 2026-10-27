@@ -27,6 +27,7 @@ import {
   type UpdateBand,
 } from "@greenroom/shared";
 import { webUrl } from "../auth/auth.constants.js";
+import { memberPhotoUrl } from "../media/media-util.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 
@@ -146,6 +147,7 @@ export class BandsService {
         avatarUrl: users.avatarUrl,
         role: memberships.role,
         joinedAt: memberships.joinedAt,
+        photoDriveFileId: memberships.photoDriveFileId,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
@@ -163,8 +165,9 @@ export class BandsService {
           )
           .orderBy(asc(userInstruments.position))
       : [];
-    return rows.map((r) => ({
+    return rows.map(({ photoDriveFileId, ...r }) => ({
       ...r,
+      photoUrl: memberPhotoUrl(bandId, r.userId, photoDriveFileId),
       joinedAt: r.joinedAt.toISOString(),
       instruments: groupInstruments(
         instruments.filter((i) => i.userId === r.userId),
