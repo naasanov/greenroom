@@ -25,6 +25,14 @@ import { SegmentedToggle } from "@/components/app/segmented-toggle";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
+import { PickDndProvider } from "@/components/setlists/pick-dnd";
+import { SetlistAside } from "@/components/setlists/setlist-aside";
+import { SetlistSection } from "@/components/setlists/setlist-section";
+import { usePracticeSetlist } from "@/components/setlists/use-practice-setlist";
+import {
+  useSetlistBuilder,
+  type SetlistBuilder,
+} from "@/components/setlists/use-setlist-builder";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import {
   PracticeForm,
@@ -66,9 +74,15 @@ const RSVP_OPTIONS = [
 function PracticeDetails({
   bandId,
   occ,
+  setlist,
+  onRemoveSetlist,
+  setlistError,
 }: {
   bandId: string;
   occ: PracticeOccurrence;
+  setlist: SetlistBuilder;
+  onRemoveSetlist: () => void;
+  setlistError: string | null;
 }) {
   const me = useMe().data;
   const rsvp = useSetRsvp(bandId, occ.seriesId, occ.occurrenceKey, me?.id);
@@ -108,6 +122,30 @@ function PracticeDetails({
         <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
         <AttendeeList attendees={attendees} />
       </section>
+
+      <SetlistSection
+        builder={setlist}
+        caption={
+          occ.recurring ? "Changes apply to this and later practices." : null
+        }
+        extra={
+          occ.setlistId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="ml-auto text-muted-foreground"
+              onClick={onRemoveSetlist}
+            >
+              Remove setlist
+            </Button>
+          ) : null
+        }
+      />
+      {setlistError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {setlistError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -150,6 +188,19 @@ export function PracticeDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const onDirty = useCallback((d: boolean) => setDirty(d), []);
   const series = usePracticeSeries(bandId, seriesId, editing);
+  const practiceSetlist = usePracticeSetlist({
+    bandId,
+    seriesId,
+    occurrenceKey,
+    occ,
+  });
+  const setlist = useSetlistBuilder({
+    bandId,
+    setlistId: occ?.setlistId ?? undefined,
+    beside,
+    beforeChange: practiceSetlist.beforeChange,
+    allowEmpty: true,
+  });
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
   const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
@@ -195,75 +246,85 @@ export function PracticeDrawer({
 
   return (
     <>
-      <BottomDrawer
-        open={open}
-        className={eventDrawerClass(beside)}
-        onOpenChange={(open) => !open && onClose()}
-        dismissible={!dirty}
-        onDismissAttempt={requestClose}
-        title={title}
-        description={EVENT_TYPES.practice.label}
-        headerAction={<ShareButton path={path} title={title} />}
-        footer={
-          occ && !editing ? (
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                variant="outline"
-                onClick={() => {
-                  setSaveError(null);
-                  setEditing(true);
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() =>
-                  occ.recurring
-                    ? setDeleteScopeOpen(true)
-                    : setConfirmDelete(true)
-                }
-              >
-                Delete
-              </Button>
-            </div>
-          ) : undefined
-        }
-      >
-        {!occ ? (
-          <div className="flex justify-center py-10">
-            <Loader2
-              aria-label="Loading"
-              className="size-5 animate-spin text-muted-foreground"
-            />
-          </div>
-        ) : editing ? (
-          editInitial ? (
-            <PracticeForm
-              idPrefix="practice-edit"
-              initial={editInitial}
-              editing
-              seriesStartDate={series.data?.startDate}
-              externalError={saveError}
-              timeZone={series.data?.timeZone ?? occ.timeZone}
-              submitLabel="Save changes"
-              onSubmit={save}
-              onCancel={cancelEdit}
-              onDirtyChange={onDirty}
-            />
-          ) : (
+      <PickDndProvider>
+        <BottomDrawer
+          open={open}
+          className={eventDrawerClass(setlist.besideEffective)}
+          aside={<SetlistAside builder={setlist} />}
+          onOpenChange={(open) => !open && onClose()}
+          dismissible={!dirty}
+          onDismissAttempt={requestClose}
+          title={title}
+          description={EVENT_TYPES.practice.label}
+          headerAction={<ShareButton path={path} title={title} />}
+          footer={
+            occ && !editing ? (
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  variant="outline"
+                  onClick={() => {
+                    setSaveError(null);
+                    setEditing(true);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() =>
+                    occ.recurring
+                      ? setDeleteScopeOpen(true)
+                      : setConfirmDelete(true)
+                  }
+                >
+                  Delete
+                </Button>
+              </div>
+            ) : undefined
+          }
+        >
+          {!occ ? (
             <div className="flex justify-center py-10">
               <Loader2
                 aria-label="Loading"
                 className="size-5 animate-spin text-muted-foreground"
               />
             </div>
-          )
-        ) : (
-          <PracticeDetails bandId={bandId} occ={occ} />
-        )}
-      </BottomDrawer>
+          ) : editing ? (
+            editInitial ? (
+              <PracticeForm
+                idPrefix="practice-edit"
+                initial={editInitial}
+                editing
+                seriesStartDate={series.data?.startDate}
+                externalError={saveError}
+                timeZone={series.data?.timeZone ?? occ.timeZone}
+                submitLabel="Save changes"
+                onSubmit={save}
+                onCancel={cancelEdit}
+                onDirtyChange={onDirty}
+              />
+            ) : (
+              <div className="flex justify-center py-10">
+                <Loader2
+                  aria-label="Loading"
+                  className="size-5 animate-spin text-muted-foreground"
+                />
+              </div>
+            )
+          ) : (
+            <PracticeDetails
+              bandId={bandId}
+              occ={occ}
+              setlist={setlist}
+              onRemoveSetlist={() => void practiceSetlist.remove()}
+              setlistError={practiceSetlist.error}
+            />
+          )}
+        </BottomDrawer>
+      </PickDndProvider>
+      {practiceSetlist.dialog}
 
       <EditScopeDialog
         open={deleteScopeOpen}

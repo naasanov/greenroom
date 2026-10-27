@@ -33,6 +33,8 @@ export type LibraryMode = "side" | "overlay" | "stack";
 export interface SetlistBuilder {
   bandId: string;
   setlistId: string | undefined;
+  /** False only while a setlist is expected but has no id yet (gigs load theirs first). */
+  ready: boolean;
   setlist: SetlistDetail | undefined;
   loadError: boolean;
   editor: SetlistEditor;
@@ -70,12 +72,15 @@ export function useSetlistBuilder({
   beside = false,
   excludeGigId,
   beforeChange,
+  allowEmpty = false,
 }: {
   bandId: string;
   setlistId: string | undefined;
   beside?: boolean;
   excludeGigId?: string;
   beforeChange?: BeforeChange;
+  /** Treat a missing setlist id as "no setlist yet"; `beforeChange` supplies one on the first edit. */
+  allowEmpty?: boolean;
 }): SetlistBuilder {
   const detail = useSetlist(bandId, setlistId);
   const editor = useSetlistEditor(bandId, setlistId);
@@ -152,6 +157,7 @@ export function useSetlistBuilder({
   return {
     bandId,
     setlistId,
+    ready: !!setlistId || allowEmpty,
     setlist: detail.data,
     loadError: detail.isError,
     editor,

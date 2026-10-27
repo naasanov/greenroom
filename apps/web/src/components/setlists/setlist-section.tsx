@@ -1,7 +1,7 @@
 "use client";
 
 import { GripVertical, History, ListPlus, X } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PickTarget, TargetRow } from "./pick-dnd";
 import {
@@ -19,7 +19,17 @@ export const SETLIST_TARGET = "setlist";
  * handles and remove buttons, plus the Add songs / Copy buttons. Every change
  * saves immediately through the builder's editor.
  */
-export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
+export function SetlistSection({
+  builder,
+  caption,
+  extra,
+}: {
+  builder: SetlistBuilder;
+  /** Quiet line under the heading. */
+  caption?: ReactNode;
+  /** Trailing action in the button row (e.g. remove the setlist). */
+  extra?: ReactNode;
+}) {
   const { setlist, editor, guarded, songs } = builder;
   const items = setlist?.items;
   const ids = useMemo(() => items?.map((i) => i.songId) ?? [], [items]);
@@ -60,8 +70,11 @@ export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
           </p>
         ) : null}
       </div>
+      {caption ? (
+        <p className="-mt-2 text-sm text-muted-foreground">{caption}</p>
+      ) : null}
 
-      {!setlist ? (
+      {!setlist && builder.setlistId ? (
         builder.loadError ? (
           <p role="alert" className="text-sm text-destructive">
             Could not load the setlist.
@@ -82,11 +95,13 @@ export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
               data-testid="setlist-empty"
               className="flex h-14 items-center rounded-2xl border border-dashed px-4 text-sm text-muted-foreground"
             >
-              No songs yet. Add some from your library or copy a past gig.
+              {builder.setlistId
+                ? "No songs yet. Add some from your library or copy a past gig."
+                : "No setlist"}
             </p>
           }
         >
-          {setlist.items.map((item) => {
+          {(setlist?.items ?? []).map((item) => {
             const song = {
               title: item.title,
               artist: item.artist,
@@ -145,7 +160,7 @@ export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
         <Button
           type="button"
           variant="outline"
-          disabled={!builder.setlistId}
+          disabled={!builder.ready}
           aria-expanded={builder.libraryOpen}
           onClick={() => {
             editor.clearError();
@@ -157,7 +172,7 @@ export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
         <Button
           type="button"
           variant="outline"
-          disabled={!builder.setlistId}
+          disabled={!builder.ready}
           aria-expanded={builder.historyOpen}
           onClick={() => {
             editor.clearError();
@@ -166,6 +181,7 @@ export function SetlistSection({ builder }: { builder: SetlistBuilder }) {
         >
           <History /> Copy from a past gig
         </Button>
+        {extra}
       </div>
     </section>
   );

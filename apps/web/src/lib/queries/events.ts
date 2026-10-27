@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { z } from "zod";
 import {
   gigLinkSchema,
@@ -19,6 +20,7 @@ import {
   type PracticeEditResult,
   type PracticeOccurrence,
   type PracticeSeries,
+  type PracticeSetlistResult,
   type RsvpStatus,
   type UpdateGig,
   type UpdatePractice,
@@ -229,6 +231,49 @@ export function useDeletePractice(
       return qc.invalidateQueries({ queryKey: eventKeys.all(bandId) });
     },
   });
+}
+
+export type SetlistConflictChoice = "replace" | "keep";
+
+/**
+ * Raw setlist assignment calls for one practice occurrence. Every call uses
+ * scope `this_and_following`; `refresh` refetches occurrences and events so
+ * other open views agree.
+ */
+export function usePracticeSetlistApi(
+  bandId: string,
+  seriesId: string,
+  occurrenceKey: string,
+) {
+  const qc = useQueryClient();
+  return useMemo(() => {
+    const url = `/bands/${bandId}/practices/${seriesId}/occurrences/${occurrenceKey}/setlist`;
+    const scope = "this_and_following";
+    return {
+      /** Creates a new setlist (a copy of the current one) starting at this occurrence. */
+      fork: (onConflict: SetlistConflictChoice) =>
+        api(url, {
+          method: "POST",
+          body: { scope, onConflict, copyCurrent: true },
+          schema: typed<PracticeSetlistResult & { newSetlistId: string }>(),
+        }),
+      /** Re-assigns the occurrence's own setlist, dropping later custom ones. */
+      replaceLater: (setlistId: string) =>
+        api(url, {
+          method: "PUT",
+          body: { setlistId, scope, onConflict: "replace" },
+        }),
+      clear: (onConflict: SetlistConflictChoice) =>
+        api(`${url}?scope=${scope}&onConflict=${onConflict}`, {
+          method: "DELETE",
+        }),
+      refresh: () =>
+        Promise.all([
+          qc.invalidateQueries({ queryKey: ["bands", bandId, "practices"] }),
+          qc.invalidateQueries({ queryKey: eventKeys.all(bandId) }),
+        ]),
+    };
+  }, [qc, bandId, seriesId, occurrenceKey]);
 }
 
 /** Sets the signed-in user's RSVP; the occurrence cache updates before the server answers. */

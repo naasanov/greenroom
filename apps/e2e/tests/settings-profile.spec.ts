@@ -29,7 +29,9 @@ test("member edits their name and instruments", async ({
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await save.click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(
+    page.locator("form").getByText("Saved", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByTestId("settings-name")).toHaveText("Dev Deluxe");
 
   const row = (
@@ -189,7 +191,9 @@ test("member sets, rejects, and clears a calendar email", async ({
 
   await field.fill("  Dev@Outlook.Test ");
   await save.click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(
+    page.locator("form").getByText("Saved", { exact: true }),
+  ).toBeVisible();
   expect(await stored()).toBe("dev@outlook.test");
   await page.reload();
   await expect(page.getByLabel("Calendar email")).toHaveValue(
@@ -198,6 +202,8 @@ test("member sets, rejects, and clears a calendar email", async ({
 
   await page.getByLabel("Calendar email").fill("");
   await save.click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(
+    page.locator("form").getByText("Saved", { exact: true }),
+  ).toBeVisible();
   expect(await stored()).toBeNull();
 });

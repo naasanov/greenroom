@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { CreateGig } from "@greenroom/shared";
+import type { CreateGig, Gig, PracticeSeries } from "@greenroom/shared";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EVENT_TYPES } from "@/components/app/event-types";
 import { SplitDrawer } from "@/components/app/split-drawer";
@@ -13,6 +13,10 @@ import {
 } from "@/components/events/practice-form";
 import { localTimeZone } from "@/components/events/time";
 import { useCreateGig, useCreatePractice } from "@/lib/queries/events";
+
+/** What the create drawer just made; the caller opens it. */
+export type CreatedEvent =
+  { kind: "gig"; gig: Gig } | { kind: "practice"; series: PracticeSeries };
 
 /** The Practice | Gig split drawer for adding an event. */
 export function CreateEventDrawer({
@@ -28,8 +32,8 @@ export function CreateEventDrawer({
   /** `YYYY-MM-DD` when opened from a day; empty from the FAB. */
   defaultDate: string;
   onOpenChange: (open: boolean) => void;
-  /** Called with the local date of the first created event. */
-  onCreated: (date: string) => void;
+  /** Called after the drawer starts closing, so the caller can open the new event. */
+  onCreated: (created: CreatedEvent) => void;
   /** Sits left of the agenda sheet on wide screens. */
   beside?: boolean;
 }) {
@@ -59,14 +63,14 @@ export function CreateEventDrawer({
   async function saveGig(payload: CreateGig) {
     const gig = await createGig.mutateAsync(payload);
     close();
-    onCreated(gig.date);
+    onCreated({ kind: "gig", gig });
   }
 
   async function savePractice(submit: PracticeSubmit) {
     if (submit.kind !== "create") return;
     const series = await createPractice.mutateAsync(submit.body);
     close();
-    onCreated(series.startDate);
+    onCreated({ kind: "practice", series });
   }
 
   return (

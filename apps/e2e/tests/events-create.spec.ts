@@ -17,6 +17,8 @@ test("FAB creates a gig with just a title and date", async ({ page }) => {
   await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
   await pane.getByRole("button", { name: "Create gig" }).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Quick gig" })).toBeVisible();
+  await expect(page).toHaveURL(/\/gigs\/[0-9a-f-]+$/);
   await expect(eventIn(page, "Quick gig")).toBeVisible();
 });
 
@@ -94,6 +96,9 @@ test("a recurring practice shows a summary and creates its occurrences", async (
   );
   await pane.getByRole("button", { name: "Create practice" }).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
+  await expect(
+    page.getByRole("dialog", { name: "Horn section" }),
+  ).toBeVisible();
   await expect(eventIn(page, "Horn section")).toHaveCount(4);
 });
 

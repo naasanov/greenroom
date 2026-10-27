@@ -11,7 +11,10 @@ import type {
 } from "@greenroom/shared";
 import { Fab } from "@/components/app/fab";
 import { AgendaButton, AgendaSheet } from "@/components/events/agenda-sheet";
-import { CreateEventDrawer } from "@/components/events/create-drawer";
+import {
+  CreateEventDrawer,
+  type CreatedEvent,
+} from "@/components/events/create-drawer";
 import {
   EventCalendar,
   type CalendarMode,
@@ -261,6 +264,28 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
     openEvent(ev);
   }
 
+  /** Hands the create drawer off to the new event's drawer and shows its date. */
+  function openCreated(created: CreatedEvent) {
+    if (!bandId) return;
+    if (created.kind === "gig") {
+      const { gig: made } = created;
+      qc.setQueryData(keys.gig(bandId, made.id), made);
+      qc.setQueryData(keys.link("gigs", made.id), {
+        bandId,
+        gigId: made.id,
+      });
+      setJumpDate(made.date);
+      go({ kind: "gig", gigId: made.id }, "push");
+    } else {
+      const { series } = created;
+      setJumpDate(series.startDate);
+      go(
+        { kind: "practice", seriesId: series.id, date: series.startDate },
+        "push",
+      );
+    }
+  }
+
   function followEdit(result: PracticeEditResult) {
     const next = result.occurrence;
     if (!bandId || !next) return go(null, "replace");
@@ -351,7 +376,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
             defaultDate={create.date}
             beside={agendaOpen}
             onOpenChange={(open) => setCreate((c) => ({ ...c, open }))}
-            onCreated={setJumpDate}
+            onCreated={openCreated}
           />
         ) : null}
 

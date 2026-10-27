@@ -405,7 +405,7 @@ function CopyChoiceDialog({ builder }: { builder: SetlistBuilder }) {
  * sheet, and the replace-or-append question.
  */
 export function SetlistAside({ builder }: { builder: SetlistBuilder }) {
-  if (!builder.setlistId) return null;
+  if (!builder.ready) return null;
   return (
     <>
       <LibraryDrawer builder={builder} />

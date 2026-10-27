@@ -133,16 +133,19 @@ test("a row can be reordered with the keyboard", async ({ page }) => {
   await expect(handle).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("ArrowDown");
   await page.waitForTimeout(250);
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/items"),
+  );
   await page.keyboard.press("Space");
   await expect
     .poll(async () => (await rowTitles(page)).slice(0, 2))
     .toEqual(["Midnight Train", "Skyline Drive"]);
+  await saved;
   await page.reload();
   await expect(rows(page)).toHaveCount(5);
-  expect((await rowTitles(page)).slice(0, 2)).toEqual([
-    "Midnight Train",
-    "Skyline Drive",
-  ]);
+  await expect
+    .poll(async () => (await rowTitles(page)).slice(0, 2))
+    .toEqual(["Midnight Train", "Skyline Drive"]);
 });
 
 test("a row can be reordered by dragging its handle", async ({
@@ -175,6 +178,7 @@ test("a library song can be dragged into the setlist at a position", async ({
   await expect(rows(page)).toHaveCount(5);
   await openLibrary(page);
 
+  await rows(page).nth(1).scrollIntoViewIfNeeded();
   const source = (await libraryRow(page, "Harbor Lights").boundingBox())!;
   const second = (await rows(page).nth(1).boundingBox())!;
   await page.mouse.move(
