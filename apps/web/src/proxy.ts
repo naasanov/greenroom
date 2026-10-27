@@ -6,6 +6,7 @@ const PUBLIC_PREFIXES = [
   "/invite/",
   "/showcase",
   "/status",
+  "/privacy",
 ];
 // gr_session locally, gr_<env>_session elsewhere (e.g. gr_staging_session).
 const SESSION_COOKIE = /^gr_([a-z]+_)?session$/;
