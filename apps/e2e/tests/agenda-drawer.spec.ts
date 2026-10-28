@@ -87,12 +87,13 @@ test("tapping another card while a drawer is open hands off to it", async ({
     button: 0,
   });
   await second.dispatchEvent("click");
-  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
+  // The exit window opens at the press, so check it before the slower URL update.
   await expect(
     page.locator("[data-vaul-drawer][data-exiting]", { hasText: a.title }),
   ).toHaveCount(1);
   await expect(live(page, b.title)).toBeVisible();
   await expect(page.locator("[data-vaul-drawer]")).toHaveCount(1);
+  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
   await expect(agendaSheet(page)).toBeVisible();
 });
 

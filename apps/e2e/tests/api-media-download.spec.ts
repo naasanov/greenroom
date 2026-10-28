@@ -1,8 +1,5 @@
 import { USERS } from "@greenroom/db";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { inflateRawSync } from "node:zlib";
 import { GIG_IDS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { BAND, FakeDrive, clientFor, setupDrive } from "./api-media-helpers.js";
@@ -71,17 +68,32 @@ test("content honors Range requests with 206", async ({ testApi }) => {
   expect(past.headers()["content-range"]).toBe("bytes */20");
 });
 
+// Minimal zip reader: walks the central directory and reads stored or deflated entries.
 function listZip(buf: Buffer): Record<string, string> {
-  const dir = mkdtempSync(join(tmpdir(), "zip-"));
-  const file = join(dir, "x.zip");
-  writeFileSync(file, buf);
-  const names = execFileSync("unzip", ["-Z1", file])
-    .toString()
-    .trim()
-    .split("\n");
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  if (eocd < 0) throw new Error("zip: end of central directory not found");
+  const count = buf.readUInt16LE(eocd + 10);
+  let pos = buf.readUInt32LE(eocd + 16);
   const out: Record<string, string> = {};
-  for (const n of names)
-    out[n] = execFileSync("unzip", ["-p", file, n]).toString();
+  for (let i = 0; i < count; i++) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) throw new Error("zip: bad entry");
+    const method = buf.readUInt16LE(pos + 10);
+    const compSize = buf.readUInt32LE(pos + 20);
+    const nameLen = buf.readUInt16LE(pos + 28);
+    const extraLen = buf.readUInt16LE(pos + 30);
+    const commentLen = buf.readUInt16LE(pos + 32);
+    const localOffset = buf.readUInt32LE(pos + 42);
+    const name = buf.toString("utf8", pos + 46, pos + 46 + nameLen);
+    const dataStart =
+      localOffset +
+      30 +
+      buf.readUInt16LE(localOffset + 26) +
+      buf.readUInt16LE(localOffset + 28);
+    const raw = buf.subarray(dataStart, dataStart + compSize);
+    out[name] = (method === 8 ? inflateRawSync(raw) : raw).toString();
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
   return out;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import {
   Drawer,
@@ -73,6 +73,13 @@ export function BottomDrawer({
     setInnerOpen(next);
     onOpenChange?.(next);
   };
+  // A drawer reopened mid-exit still holds its outside-press listener, so the
+  // press that opened it lands as "outside". Presses that began before the
+  // drawer opened are ignored.
+  const openedAt = useRef(0);
+  useEffect(() => {
+    if (isOpen) openedAt.current = performance.now();
+  }, [isOpen]);
   // Every dismissal route funnels here so guarded drawers stay open.
   const requestClose = () =>
     dismissible ? setOpen(false) : onDismissAttempt?.();
@@ -81,7 +88,14 @@ export function BottomDrawer({
       {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
       <DrawerContent
         data-exiting={open === false ? "" : undefined}
-        onPointerDownOutside={dismissible ? requestClose : undefined}
+        onPointerDownOutside={
+          dismissible
+            ? (e) => {
+                if (e.detail.originalEvent.timeStamp >= openedAt.current)
+                  requestClose();
+              }
+            : undefined
+        }
         onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
         onEscapeKeyDown={(e) => {
           if (!dismissible) {
