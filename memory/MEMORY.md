@@ -32,7 +32,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Status updates are immediate](status-updates-immediate.md) — push execution-plan status changes the moment they happen; /status reads GitHub main
 - [Secrets in Keychain](secrets-in-keychain.md) — Mac: Keychain generic passwords named after the env var, inject with `security`, never print; factory: env vars only, real-mode secrets absent
 - [Fly infra gotchas](fly-infra-gotchas.md) — merged FlyV1 deploy token format, deploy from repo root, DNS-only CNAMEs, db is private
-- [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first
+- [Scaffold gotchas](scaffold-gotchas.md) — Nest 12 ESM + ESLint (not oxlint), shadcn `cn` package, shared package must build first; use @googleapis/<api>, not googleapis
 - [Non-modal drawer gotchas](drawer-nonmodal-gotchas.md) — Radix stays modal under Vaul; close event drawers by id; focus trap and aria-hidden caveats
 - [E2E test scope](e2e-test-scope.md) — locally only targeted specs + smoke, never the full suite; CI runs the full suite on push
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting; factory runs desktop only (WebKit crashes)

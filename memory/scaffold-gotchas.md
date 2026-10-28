@@ -20,3 +20,4 @@ Choices made in task 0.1 (2026-10-19) that a fresh agent might "fix" by mistake:
 **Why:** these diverge from older Nest/shadcn conventions that agents may remember from training data.
 
 **How to apply:** mention the relevant bullet in briefs for agents touching the API, lint/test config, or shadcn components.
+- Import Google APIs from the per-API packages (`@googleapis/drive`, `@googleapis/calendar`), never the monolithic `googleapis`: its types pushed `nest build` past the default 2 GB heap and broke the staging deploy on 2026-10-27.
