@@ -1,6 +1,14 @@
 "use client";
 
-import { Check, Plus, Search, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  History,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
@@ -22,7 +30,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSongs } from "@/lib/queries/songs";
-import { useSetlistHistory, type SetlistSong } from "@/lib/queries/setlists";
+import {
+  useSetlist,
+  useSetlistHistory,
+  type SetlistSong,
+} from "@/lib/queries/setlists";
 import { cn } from "@/lib/utils";
 import { PickerRow } from "./pick-dnd";
 import { SETLIST_TARGET } from "./setlist-section";
@@ -104,6 +116,7 @@ function LibraryDrawer({ builder }: { builder: SetlistBuilder }) {
       open={builder.libraryOpen}
       onOpenChange={builder.setLibraryOpen}
       title="Music Library"
+      rise
       className={asideClass(builder.mode)}
       headerAction={
         <Button
@@ -118,6 +131,14 @@ function LibraryDrawer({ builder }: { builder: SetlistBuilder }) {
       }
     >
       <div data-testid="library-picker">
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-1 mb-3 w-full"
+          onClick={() => builder.setHistoryOpen(true)}
+        >
+          <History /> Copy from a past gig
+        </Button>
         <SearchBox
           value={search}
           onChange={setSearch}
@@ -211,6 +232,82 @@ const dayLabel = (date: string) =>
     timeZone: "UTC",
   }).format(new Date(`${date.slice(0, 10)}T12:00:00Z`));
 
+function HistoryRow({
+  entry: e,
+  builder,
+}: {
+  entry: GigHistoryEntry;
+  builder: SetlistBuilder;
+}) {
+  const [open, setOpen] = useState(false);
+  const detail = useSetlist(builder.bandId, open ? e.setlistId : undefined);
+  return (
+    <li className="rounded-2xl border bg-card shadow-soft">
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          data-testid="history-entry"
+          onClick={() => builder.requestCopy(e)}
+          className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-2xl px-3 py-2.5 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <span className="truncate text-sm font-semibold">{e.title}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            {[
+              e.venueName,
+              dayLabel(e.date),
+              `${e.songCount} ${e.songCount === 1 ? "song" : "songs"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </button>
+        <button
+          type="button"
+          data-testid="history-preview-toggle"
+          aria-expanded={open}
+          aria-label={`Preview songs in ${e.title}`}
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground outline-none hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <ChevronDown
+            className={cn("size-4 transition-transform", open && "rotate-180")}
+          />
+        </button>
+      </div>
+      {open ? (
+        <div data-testid="history-preview" className="border-t px-3 py-2">
+          {detail.data ? (
+            detail.data.items.length > 0 ? (
+              <ol className="flex flex-col gap-1">
+                {detail.data.items.map((it) => (
+                  <li key={it.itemId} className="flex flex-col text-sm">
+                    <span className="truncate">{it.title}</span>
+                    {it.artist ? (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {it.artist}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-xs text-muted-foreground">No songs.</p>
+            )
+          ) : detail.isError ? (
+            <p role="alert" className="text-xs text-destructive">
+              Could not load songs.
+            </p>
+          ) : (
+            <p role="status" className="text-xs text-muted-foreground">
+              Loading...
+            </p>
+          )}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
   const [search, setSearch] = useState("");
   const q = useDebounced(search.trim(), 250);
@@ -225,7 +322,19 @@ function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
       open={builder.historyOpen}
       onOpenChange={builder.setHistoryOpen}
       title="Copy from a past gig"
+      rise
       className={asideClass(builder.mode)}
+      headerAction={
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Back to the music library"
+          onClick={() => builder.setLibraryOpen(true)}
+        >
+          <ArrowLeft />
+        </Button>
+      }
     >
       <div data-testid="history-picker">
         <SearchBox
@@ -247,27 +356,7 @@ function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
         ) : entries.length > 0 ? (
           <ul className="flex flex-col gap-2" aria-label="Past gigs">
             {entries.map((e: GigHistoryEntry) => (
-              <li key={e.setlistId}>
-                <button
-                  type="button"
-                  data-testid="history-entry"
-                  onClick={() => builder.requestCopy(e)}
-                  className="flex w-full flex-col gap-0.5 rounded-2xl border bg-card px-3 py-2.5 text-left shadow-soft transition-colors outline-none hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <span className="truncate text-sm font-semibold">
-                    {e.title}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {[
-                      e.venueName,
-                      dayLabel(e.date),
-                      `${e.songCount} ${e.songCount === 1 ? "song" : "songs"}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </button>
-              </li>
+              <HistoryRow key={e.setlistId} entry={e} builder={builder} />
             ))}
           </ul>
         ) : (

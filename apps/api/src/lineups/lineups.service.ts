@@ -4,7 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import {
   gigLineup,
   gigs,
@@ -16,6 +27,8 @@ import {
   SETLIST_ERROR_CODES,
   type Lineup,
   type LineupCopyResult,
+  type LineupHistoryEntry,
+  type LineupHistoryQuery,
   type LineupMember,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
@@ -171,10 +184,72 @@ export class LineupsService {
         message: "No earlier gig has a lineup",
       });
     }
-    const active = (await this.members(this.db, source.id))
+    return {
+      ...(await this.copyMembers(bandId, gigId, source.id)),
+      sourceGigId: source.id,
+    };
+  }
+
+  /** Replaces the lineup with the source gig's; people who left are skipped. */
+  async copy(
+    bandId: string,
+    gigId: string,
+    sourceGigId: string,
+  ): Promise<Lineup> {
+    await this.findGig(bandId, gigId);
+    await this.findGig(bandId, sourceGigId);
+    return this.copyMembers(bandId, gigId, sourceGigId);
+  }
+
+  private async copyMembers(
+    bandId: string,
+    gigId: string,
+    sourceGigId: string,
+  ): Promise<Lineup> {
+    const active = (await this.members(this.db, sourceGigId))
       .filter((m) => !m.left)
       .map((m) => m.membershipId);
-    const lineup = await this.replace(bandId, gigId, active);
-    return { ...lineup, sourceGigId: source.id };
+    return this.replace(bandId, gigId, active);
+  }
+
+  /** Past gigs (today or earlier) with at least one current lineup member, newest first. */
+  async history(
+    bandId: string,
+    query: LineupHistoryQuery,
+  ): Promise<LineupHistoryEntry[]> {
+    const today = new Date().toISOString().slice(0, 10);
+    const text = query.q
+      ? `%${query.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+      : null;
+    return this.db
+      .select({
+        gigId: gigs.id,
+        title: gigs.title,
+        venueName: gigs.venueName,
+        date: gigs.date,
+        memberCount: sql<number>`count(${gigLineup.id})`.mapWith(Number),
+      })
+      .from(gigs)
+      .innerJoin(gigLineup, eq(gigLineup.gigId, gigs.id))
+      .innerJoin(
+        memberships,
+        and(
+          eq(memberships.id, gigLineup.membershipId),
+          isNull(memberships.leftAt),
+        ),
+      )
+      .where(
+        and(
+          eq(gigs.bandId, bandId),
+          isNull(gigs.deletedAt),
+          lte(gigs.date, today),
+          text
+            ? or(ilike(gigs.title, text), ilike(gigs.venueName, text))
+            : undefined,
+        ),
+      )
+      .groupBy(gigs.id)
+      .orderBy(desc(gigs.date), desc(gigs.startsAt), desc(gigs.id))
+      .limit(query.limit);
   }
 }

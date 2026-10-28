@@ -175,6 +175,7 @@ export function SideDrawer({
   onOpenChange,
   title,
   headerAction,
+  rise,
   children,
   className,
 }: {
@@ -182,6 +183,11 @@ export function SideDrawer({
   onOpenChange: (open: boolean) => void;
   title: string;
   headerAction?: ReactNode;
+  /**
+   * On wide screens, enter and exit by sliding up from the bottom edge with
+   * BottomDrawer's motion, instead of fading in from the side.
+   */
+  rise?: boolean;
   children?: ReactNode;
   className?: string;
 }) {
@@ -224,10 +230,16 @@ export function SideDrawer({
       data-state={open ? "open" : "closed"}
       data-vaul-no-drag
       className={cn(
-        "absolute inset-y-0 right-[calc(100%+0.75rem)] left-auto z-20 flex w-80 flex-col overflow-hidden rounded-3xl border bg-popover shadow-lift transition-[transform,opacity,visibility] duration-300 ease-out motion-reduce:transition-none",
+        "absolute inset-y-0 right-[calc(100%+0.75rem)] left-auto z-20 flex w-80 flex-col overflow-hidden bg-popover shadow-lift motion-reduce:transition-none",
+        rise
+          ? "rounded-t-3xl border border-b-0 transition-[transform,visibility] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          : "rounded-3xl border transition-[transform,opacity,visibility] duration-300 ease-out",
         open
-          ? "visible translate-x-0 opacity-100"
-          : "invisible translate-x-6 opacity-0",
+          ? cn("visible", rise ? "translate-y-0" : "translate-x-0 opacity-100")
+          : cn(
+              "invisible",
+              rise ? "translate-y-full" : "translate-x-6 opacity-0",
+            ),
         className,
       )}
     >

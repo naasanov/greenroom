@@ -6,7 +6,12 @@ Routes under `/bands/:bandId/gigs/:gigId/lineup`, `@BandMember()`, any member ma
 | --- | --- |
 | `GET /` | The lineup, sorted by name. |
 | `PUT /` | `{ membershipIds }`: replaces the lineup. Ids must be memberships of this band (400 `INVALID_MEMBERSHIP`). A former member is accepted only if already in this lineup. |
+| `POST /copy` | `{ sourceGigId }`: replaces the lineup with that gig's members (any gig of this band, past or future); people who have since left are not copied. 404 when either gig is not in the band. Returns the updated lineup. |
 | `POST /copy-from-last` | Replaces the lineup with that of the latest earlier gig (by date, strictly before) that has one. People who have since left are not copied. 404 `NO_PREVIOUS_LINEUP` when none exists. Returns the lineup plus `sourceGigId`. |
+
+## History
+
+`GET /bands/:bandId/lineups/history?q=&limit=` (member-only; `limit` 1-100, default 30). Past gigs (date today or earlier) whose lineup has at least one current member, newest first. `q` matches title or venue, case-insensitive. Returns `[{ gigId, title, venueName, date, memberCount }]`; `memberCount` counts current members only (those a copy would add). The client filters out the gig being edited.
 
 ## Rules
 - Gig creation (in `events/gigs.service.ts`) inserts every active member, so new gigs default to the full band.

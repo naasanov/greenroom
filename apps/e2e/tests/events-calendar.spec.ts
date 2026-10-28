@@ -162,3 +162,20 @@ test("a horizontal swipe pages the calendar and a vertical one does not", async 
   await expect(title).toHaveText(start);
   expect(next).not.toBe(start);
 });
+
+test("a month chip fills the width and most of the height of its day", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await showGigDate(page, gig.id, gig.title);
+  const cell = calendar(page).locator(`td[data-date="${gig.date}"]`);
+  const chips = cell.locator(".fc-event");
+  const n = await chips.count();
+  const c = (await cell.boundingBox())!;
+  const boxes = await Promise.all(
+    Array.from({ length: n }, (_, i) => chips.nth(i).boundingBox()),
+  );
+  const filled = boxes.reduce((sum, b) => sum + b!.height, 0);
+  expect(filled).toBeGreaterThan(c.height * 0.5);
+  expect(boxes[0]!.width).toBeGreaterThan(c.width - 12);
+});

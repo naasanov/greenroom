@@ -27,6 +27,7 @@ import { NoAccess } from "@/components/onboarding/deep-link-views";
 import { cn } from "@/lib/utils";
 import { useCurrentBand } from "@/lib/current-band";
 import { useDrawerStack } from "@/lib/use-drawer-stack";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { keys, useGig, usePracticeOccurrence } from "@/lib/queries";
 import {
@@ -229,11 +230,21 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
 
   // Create drawer.
   const [create, setCreate] = useState({ open: false, date: "", nonce: 0 });
+  const lastClosed = useRef<number | null>(null);
   const openCreate = (date: string) => {
+    // The outside pointerdown already closed (or guarded) the drawer for the
+    // day it shows, so the click that follows must not reopen it.
+    const closed = lastClosed.current;
+    if (date && create.date === date) {
+      if (create.open || (closed && performance.now() - closed < 600)) return;
+    }
     if (selRef.current) go(null, "replace");
     setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
   };
-  const [agendaOpen, setAgendaOpen] = useState(false);
+  // The agenda defaults open on wide screens until the user picks a state.
+  const wide = useMediaQuery("(min-width: 768px)");
+  const [agendaChoice, setAgendaOpen] = useState<boolean | null>(null);
+  const agendaOpen = agendaChoice ?? wide;
   const [jumpDate, setJumpDate] = useState<string | undefined>();
   // Agenda taps blank the focus for one commit, then jump, so a repeat tap re-navigates.
   const pendingJump = useRef<string | null>(null);
@@ -400,10 +411,17 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         />
 
         {agendaOpen ? null : (
-          <>
-            <AgendaButton onClick={() => setAgendaOpen(true)} />
-            <Fab label="Add event" onClick={() => openCreate("")} />
-          </>
+          <AgendaButton onClick={() => setAgendaOpen(true)} />
+        )}
+        {agendaOpen && !wide ? null : (
+          <Fab
+            label="Add event"
+            onClick={() => openCreate("")}
+            className={cn(
+              "transition-[right] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              agendaOpen && "md:right-[27rem]",
+            )}
+          />
         )}
 
         <AgendaSheet
@@ -420,7 +438,10 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
             open={create.open}
             defaultDate={create.date}
             beside={agendaOpen}
-            onOpenChange={(open) => setCreate((c) => ({ ...c, open }))}
+            onOpenChange={(open) => {
+              if (!open) lastClosed.current = performance.now();
+              setCreate((c) => ({ ...c, open }));
+            }}
             onCreated={openCreated}
           />
         ) : null}

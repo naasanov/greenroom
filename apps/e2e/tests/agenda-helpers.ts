@@ -25,9 +25,18 @@ export function cardDate(date: string): string {
   return date.startsWith(year) ? label.replace(`, ${year}`, "") : label;
 }
 
-/** Opens the agenda and waits until it has scrolled to the today line. */
+/**
+ * Opens the agenda (it is already open by default on desktop) and waits until
+ * it has scrolled to the today line.
+ */
 export async function openAgenda(page: Page) {
-  await page.getByRole("button", { name: "Agenda" }).click();
+  const button = page.getByRole("button", { name: "Agenda" });
+  if ((page.viewportSize()?.width ?? 0) < 768) {
+    await button.click();
+  } else if ((await agendaSheet(page).getAttribute("data-state")) !== "open") {
+    // Closed by the user, or still hydrating (the button then vanishes as it auto-opens).
+    await button.click({ timeout: 2000 }).catch(() => {});
+  }
   await expect(agendaSheet(page)).toBeVisible();
   await expect(agendaSheet(page).getByTestId("agenda-today")).toBeVisible();
   // Positioning happens once the data lands; wait for the scroll to settle.

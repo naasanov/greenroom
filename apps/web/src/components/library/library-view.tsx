@@ -1,6 +1,14 @@
 "use client";
 
-import { ListMusic, Music, Plus, Search, Upload, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  ListMusic,
+  Music,
+  Plus,
+  Search,
+  Upload,
+  X,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongSort } from "@greenroom/shared";
@@ -177,7 +185,8 @@ export function LibraryView({ bandId }: { bandId: string }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" aria-label="Sort songs">
-                  {SORT_LABELS[sort]}
+                  <ArrowUpDown />
+                  <span>Sort: {SORT_LABELS[sort]}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

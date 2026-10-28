@@ -25,13 +25,16 @@ test("agenda button sits above the add button and opens a right sheet", async ({
   page,
 }) => {
   await page.goto("/events");
-  const agenda = page.getByRole("button", { name: "Agenda" });
-  const add = page.getByRole("button", { name: "Add event" });
-  const a = (await agenda.boundingBox())!;
-  const b = (await add.boundingBox())!;
-  expect(a.y + a.height).toBeLessThanOrEqual(b.y);
-  expect(a.width).toBeLessThan(b.width);
-  await agenda.click();
+  // On desktop the sheet is already open and the button is not rendered.
+  if (page.viewportSize()!.width < 768) {
+    const agenda = page.getByRole("button", { name: "Agenda" });
+    const add = page.getByRole("button", { name: "Add event" });
+    const a = (await agenda.boundingBox())!;
+    const b = (await add.boundingBox())!;
+    expect(a.y + a.height).toBeLessThanOrEqual(b.y);
+    expect(a.width).toBeLessThan(b.width);
+  }
+  await openAgenda(page);
   const sheet = agendaSheet(page);
   await expect(sheet).toBeVisible();
   const viewport = page.viewportSize()!;
@@ -201,7 +204,9 @@ test("shows an empty state when the band has no events", async ({
   await db.delete(gigs);
   await db.delete(practiceSeries);
   await page.goto("/events");
-  await page.getByRole("button", { name: "Agenda" }).click();
+  if (page.viewportSize()!.width < 768) {
+    await page.getByRole("button", { name: "Agenda" }).click();
+  }
   await expect(agendaSheet(page).getByText("No events yet")).toBeVisible();
   await expect(agendaSheet(page).getByTestId("agenda-card")).toHaveCount(0);
 });

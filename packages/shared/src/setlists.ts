@@ -118,6 +118,24 @@ export interface LineupCopyResult extends Lineup {
   sourceGigId: string;
 }
 
+export const lineupHistoryQuerySchema = gigHistoryQuerySchema;
+export type LineupHistoryQuery = z.infer<typeof lineupHistoryQuerySchema>;
+
+/** A past gig whose lineup has at least one current member. */
+export interface LineupHistoryEntry {
+  gigId: string;
+  title: string;
+  venueName: string | null;
+  date: string;
+  /** Current (not former) members, the people a copy would add. */
+  memberCount: number;
+}
+
+export const copyLineupSchema = z.object({
+  sourceGigId: z.string().uuid(),
+});
+export type CopyLineup = z.infer<typeof copyLineupSchema>;
+
 export const replaceLineupSchema = z.object({
   membershipIds: z.array(z.string().uuid()).max(200),
 });

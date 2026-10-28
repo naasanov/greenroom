@@ -91,7 +91,7 @@ export function SongForm({
       <div className="flex items-start gap-3">
         <Thumbnail
           src={art}
-          seed={rawTitle || "song"}
+          seed={defaults.title || "song"}
           className="size-16"
           icon={<Music2 className="size-7 opacity-70" />}
         />

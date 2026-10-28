@@ -35,10 +35,12 @@ test("desktop event drawer sits left of the floating buttons", async ({
   const d = (await drawer.boundingBox())!;
   const f = (await fab.boundingBox())!;
   expect(f.x - (d.x + d.width)).toBeLessThan(40);
-  expect(d.x).toBeGreaterThan(page.viewportSize()!.width / 2 - 100);
+  expect(d.x + d.width).toBeGreaterThan(page.viewportSize()!.width / 2);
 });
 
-test("desktop event drawer follows the agenda sheet edge", async ({ page }) => {
+test("desktop event drawer follows the FAB column beside the agenda sheet", async ({
+  page,
+}) => {
   test.skip(!isWide(page), "desktop layout");
   const gig = seed.gigs.upcomingClub;
   await page.goto("/events");
@@ -52,9 +54,42 @@ test("desktop event drawer follows the agenda sheet edge", async ({ page }) => {
     .poll(async () => {
       const sheet = (await agendaSheet(page).boundingBox())!;
       const d = (await drawer.boundingBox())!;
-      return Math.round(sheet.x - (d.x + d.width));
+      const fab = (await page
+        .getByRole("button", { name: "Add event" })
+        .boundingBox())!;
+      return (
+        Math.round(sheet.x - fab.x - fab.width) > 0 &&
+        Math.round(fab.x - (d.x + d.width))
+      );
     })
-    .toBe(12);
+    .toBe(16);
+});
+
+test("desktop agenda is open by default and leaves the FAB clickable", async ({
+  page,
+}) => {
+  test.skip(!isWide(page), "desktop layout");
+  await page.goto("/events");
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "open");
+  const fab = page.getByRole("button", { name: "Add event" });
+  await expect
+    .poll(async () => {
+      const sheet = (await agendaSheet(page).boundingBox())!;
+      const f = (await fab.boundingBox())!;
+      return f.x + f.width <= sheet.x;
+    })
+    .toBe(true);
+  await fab.click();
+  await expect(page.getByTestId("split-viewport")).toBeVisible();
+});
+
+test("closing the agenda on desktop keeps it closed", async ({ page }) => {
+  test.skip(!isWide(page), "desktop layout");
+  await page.goto("/events");
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "open");
+  await agendaSheet(page).getByRole("button", { name: "Close" }).click();
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "closed");
+  await expect(page.getByRole("button", { name: "Agenda" })).toBeVisible();
 });
 
 test("desktop agenda pushes the calendar instead of covering it", async ({
@@ -63,8 +98,12 @@ test("desktop agenda pushes the calendar instead of covering it", async ({
   test.skip(!isWide(page), "desktop layout");
   await page.goto("/events");
   await expect(calendar(page)).toBeVisible();
+  await agendaSheet(page).getByRole("button", { name: "Close" }).click();
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "closed");
+  await page.waitForTimeout(400);
   const full = (await calendar(page).boundingBox())!;
-  await openAgenda(page);
+  await page.getByRole("button", { name: "Agenda" }).click();
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "open");
   await expect
     .poll(async () => {
       const cal = (await calendar(page).boundingBox())!;

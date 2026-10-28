@@ -43,6 +43,35 @@ test("clicking a day pre-fills the date", async ({ page }) => {
   await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date);
 });
 
+test("clicking the same empty day again closes the create drawer", async ({
+  page,
+}) => {
+  test.skip(page.viewportSize()!.width < 768, "desktop layout");
+  await page.goto("/events");
+  await expect(calendar(page).locator(".fc-event").first()).toBeVisible();
+  const empty = calendar(page).locator(
+    "td.fc-daygrid-day:not(:has(.fc-event))",
+  );
+  const first = empty.first();
+  const second = empty.nth(1);
+  const pos = { position: { x: 10, y: 60 } };
+  const split = page.getByTestId("split-viewport");
+  await first.click(pos);
+  await expect(split).toBeVisible();
+  await first.click(pos);
+  await expect(split).toBeHidden();
+  // Past the guard window that swallows the click following an outside-dismiss.
+  await page.waitForTimeout(700);
+  await first.click(pos);
+  await expect(split).toBeVisible();
+  await second.click(pos);
+  await expect(page.locator("[data-vaul-drawer][data-exiting]")).toHaveCount(0);
+  await expect(split).toBeVisible();
+  const date = await second.getAttribute("data-date");
+  const pane = await pickSide(page, "gig");
+  await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date!);
+});
+
 test("back arrow returns to the Practice | Gig split", async ({ page }) => {
   await page.goto("/events");
   await page.getByRole("button", { name: "Add event" }).click();
@@ -102,24 +131,27 @@ test("a recurring practice shows a summary and creates its occurrences", async (
   await expect(eventIn(page, "Horn section")).toHaveCount(4);
 });
 
+const drawerClose = (page: import("@playwright/test").Page) =>
+  page.locator("[data-vaul-drawer]").getByRole("button", { name: "Close" });
+
 test("untouched drawer closes silently; dirty drawer asks to discard", async ({
   page,
 }) => {
   await page.goto("/events");
   await page.getByRole("button", { name: "Add event" }).click();
-  await page.getByRole("button", { name: "Close" }).click();
+  await drawerClose(page).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Add event" }).click();
   const pane = await pickSide(page, "gig");
   await pane.getByLabel("Title").fill("Half done");
-  await page.getByRole("button", { name: "Close" }).click();
+  await drawerClose(page).click();
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toContainText("Discard changes?");
   await confirm.getByRole("button", { name: "Keep editing" }).click();
   await expect(pane.getByLabel("Title")).toHaveValue("Half done");
-  await page.getByRole("button", { name: "Close" }).click();
+  await drawerClose(page).click();
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
   expect(seed.gigs.upcomingClub.id).toBeTruthy();

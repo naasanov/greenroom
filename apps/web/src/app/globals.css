@@ -223,6 +223,10 @@
   a[href]:is(:disabled, [aria-disabled="true"], [data-disabled]) {
     cursor: not-allowed;
   }
+  /* Vaul disables selection on desktop drawers; content text stays selectable. */
+  [data-vaul-drawer][data-vaul-drawer] {
+    user-select: text;
+  }
   html {
     @apply font-sans;
     text-size-adjust: 100%;

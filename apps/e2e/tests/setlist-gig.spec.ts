@@ -1,6 +1,6 @@
 import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
 import { apiAs } from "./library-helpers.js";
 
@@ -26,9 +26,25 @@ async function openGig(page: Page, gig: { id: string; title: string }) {
   await expect(page.getByTestId("setlist-section")).toBeVisible();
 }
 
+const librarySide = (page: Page) =>
+  page.locator('aside[aria-label="Music Library"]');
+
+/** Waits for a drawer that rises from the bottom to finish its slide. */
+async function expectRisen(page: Page, side: Locator) {
+  const viewport = page.viewportSize()!;
+  await expect(async () => {
+    const box = (await side.boundingBox())!;
+    expect(Math.abs(box.y + box.height - viewport.height)).toBeLessThan(2);
+  }).toPass();
+}
+
 async function openLibrary(page: Page) {
   await page.getByRole("button", { name: "Add songs" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
+  // Drag tests measure rows right after opening, so wait out the slide on desktop.
+  if (await librarySide(page).count()) {
+    await expectRisen(page, librarySide(page));
+  }
 }
 
 async function closeLibrary(page: Page) {
@@ -63,6 +79,36 @@ test("empty setlist offers both ways to start", async ({ page }) => {
     page.getByRole("button", { name: "Copy from a past gig" }),
   ).toBeVisible();
   await expect(total(page)).toHaveCount(0);
+});
+
+test("the library drawer rises from the bottom and offers copying from a past gig", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "The bottom-anchored aside is the desktop layout");
+  await openGig(page, seed.gigs.tentative);
+  await openLibrary(page);
+
+  const side = librarySide(page);
+  await expect(side).toHaveAttribute("data-state", "open");
+  await expectRisen(page, side);
+
+  const copy = page
+    .getByTestId("library-picker")
+    .getByRole("button", { name: "Copy from a past gig" });
+  await expect(copy).toBeVisible();
+  await copy.click();
+  await expect(page.getByTestId("history-picker")).toBeVisible();
+  await expect(page.getByTestId("library-picker")).toBeHidden();
+  await expect(side).toHaveAttribute("data-state", "closed");
+
+  const history = page.locator('aside[aria-label="Copy from a past gig"]');
+  await expectRisen(page, history);
+  await history
+    .getByRole("button", { name: "Back to the music library" })
+    .click();
+  await expect(page.getByTestId("library-picker")).toBeVisible();
+  await expect(page.getByTestId("history-picker")).toBeHidden();
 });
 
 test("tapping library rows adds and removes songs with check marks", async ({
@@ -164,21 +210,34 @@ test("a row can be reordered by dragging its handle", async ({
   await page.mouse.move(from.x + 10, target.y + target.height - 8, {
     steps: 12,
   });
+  // The source row's handle stays fully visible while its overlay is dragged.
+  await expect(handle).toBeVisible();
+  await expect(
+    page.locator('[data-testid="target-row"]', { has: handle }),
+  ).toHaveCSS("opacity", "1");
   await page.mouse.up();
+  // No drop animation: the overlay is gone as soon as the pointer is released.
+  await expect(page.locator('body > div[style*="z-index: 200"]')).toHaveCount(
+    0,
+  );
   await expect
     .poll(async () => (await rowTitles(page)).slice(0, 3))
     .toEqual(["Midnight Train", "Paper Planes", "Skyline Drive"]);
 });
 
-test("a library song can be dragged into the setlist at a position", async ({
+test("a library song dragged over the setlist highlights it and appends on drop", async ({
   page,
   isMobile,
 }) => {
   test.skip(isMobile, "Drag from the library is desktop only");
+  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);
+  const before = await rowTitles(page);
   await openLibrary(page);
 
+  const target = page.getByTestId("target-setlist");
   await rows(page).nth(1).scrollIntoViewIfNeeded();
   const source = (await libraryRow(page, "Harbor Lights").boundingBox())!;
   const second = (await rows(page).nth(1).boundingBox())!;
@@ -188,29 +247,61 @@ test("a library song can be dragged into the setlist at a position", async ({
   );
   await page.mouse.down();
   await page.mouse.move(source.x + 20, source.y + 20, { steps: 4 });
+  await expect(target).not.toHaveAttribute("data-drop-active", "true");
   await page.mouse.move(second.x + second.width / 2, second.y + 8, {
     steps: 14,
   });
-  await expect(page.getByTestId("drop-gap")).toBeVisible();
+  await expect(target).toHaveAttribute("data-drop-active", "true");
+  // No gap, placeholder row or row shifting while hovering.
+  await expect(rows(page)).toHaveCount(5);
+  await expect(page.getByTestId("drop-gap")).toHaveCount(0);
   await page.mouse.up();
+  await expect(target).not.toHaveAttribute("data-drop-active", "true");
+  // The overlay does not fly back to the library row after the drop.
+  await expect(page.locator('body > div[style*="z-index: 200"]')).toHaveCount(
+    0,
+  );
 
   await expect(rows(page)).toHaveCount(6);
-  expect((await rowTitles(page)).slice(0, 3)).toEqual([
-    "Skyline Drive",
-    "Harbor Lights",
-    "Midnight Train",
-  ]);
+  expect(await rowTitles(page)).toEqual([...before, "Harbor Lights"]);
   await expect(libraryRow(page, "Harbor Lights")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   await page.reload();
   await expect(rows(page)).toHaveCount(6);
-  expect((await rowTitles(page)).slice(0, 3)).toEqual([
-    "Skyline Drive",
-    "Harbor Lights",
-    "Midnight Train",
-  ]);
+  expect(await rowTitles(page)).toEqual([...before, "Harbor Lights"]);
+});
+
+test("dropping a library song outside the setlist adds nothing", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Drag from the library is desktop only");
+  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  await page.setViewportSize({ width: 1400, height: 800 });
+  await openGig(page, seed.gigs.upcomingClub);
+  await expect(rows(page)).toHaveCount(5);
+  await openLibrary(page);
+
+  const target = page.getByTestId("target-setlist");
+  const source = (await libraryRow(page, "Harbor Lights").boundingBox())!;
+  await page.mouse.move(
+    source.x + source.width / 2,
+    source.y + source.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(source.x + 20, source.y + 20, { steps: 4 });
+  await page.mouse.move(source.x + 40, source.y + 40, { steps: 4 });
+  await expect(target).not.toHaveAttribute("data-drop-active", "true");
+  await page.mouse.up();
+
+  await page.waitForTimeout(300);
+  await expect(rows(page)).toHaveCount(5);
+  await expect(libraryRow(page, "Harbor Lights")).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
 });
 
 test("a library song can be dropped at the end of an empty setlist", async ({
@@ -218,9 +309,12 @@ test("a library song can be dropped at the end of an empty setlist", async ({
   isMobile,
 }) => {
   test.skip(isMobile, "Drag from the library is desktop only");
+  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.tentative);
   await openLibrary(page);
-  const source = (await libraryRow(page, "Red Line").boundingBox())!;
+  await libraryRow(page, "Skyline Drive").scrollIntoViewIfNeeded();
+  const source = (await libraryRow(page, "Skyline Drive").boundingBox())!;
   const zone = (await page.getByTestId("setlist-empty").boundingBox())!;
   await page.mouse.move(
     source.x + source.width / 2,
@@ -231,9 +325,13 @@ test("a library song can be dropped at the end of an empty setlist", async ({
   await page.mouse.move(zone.x + zone.width / 2, zone.y + zone.height / 2, {
     steps: 14,
   });
+  await expect(page.getByTestId("target-setlist")).toHaveAttribute(
+    "data-drop-active",
+    "true",
+  );
   await page.mouse.up();
   await expect(rows(page)).toHaveCount(1);
-  expect(await rowTitles(page)).toEqual(["Red Line"]);
+  expect(await rowTitles(page)).toEqual(["Skyline Drive"]);
 });
 
 test.describe("copy from a past gig", () => {
@@ -263,6 +361,18 @@ test.describe("copy from a past gig", () => {
     await page.getByLabel("Search past gigs").fill("Riverside");
     await expect(entries).toHaveCount(1);
     await expect(entries.first()).toContainText("Summer Fest");
+  });
+
+  test("a row expands to preview its songs without copying", async ({
+    page,
+  }) => {
+    await openGig(page, seed.gigs.tentative);
+    await openHistory(page);
+    await page.getByTestId("history-preview-toggle").first().click();
+    const preview = page.getByTestId("history-preview");
+    await expect(preview).toContainText("Red Line");
+    await expect(preview).toContainText("Harbor Lights");
+    await expect(page.getByTestId("history-picker")).toBeVisible();
   });
 
   test("into an empty setlist copies without asking", async ({ page }) => {

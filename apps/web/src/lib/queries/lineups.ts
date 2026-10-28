@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -8,7 +9,12 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { z } from "zod";
-import type { Lineup, LineupCopyResult, LineupMember } from "@greenroom/shared";
+import type {
+  Lineup,
+  LineupCopyResult,
+  LineupHistoryEntry,
+  LineupMember,
+} from "@greenroom/shared";
 import { api } from "@/lib/api";
 import { eventKeys } from "@/lib/queries/events";
 
@@ -17,6 +23,9 @@ const typed = <T>() => z.custom<T>();
 export const lineupKeys = {
   gig: (bandId: string, gigId: string) =>
     ["bands", bandId, "gigs", gigId, "lineup"] as const,
+  history: (bandId: string, q: string) =>
+    ["bands", bandId, "lineup-history", q] as const,
+  historyRoot: (bandId: string) => ["bands", bandId, "lineup-history"] as const,
 };
 
 const path = (bandId: string, gigId: string) =>
@@ -30,6 +39,23 @@ export function useLineup(bandId: string, gigId: string) {
     queryKey: lineupKeys.gig(bandId, gigId),
     queryFn: () => api(path(bandId, gigId), { schema: typed<Lineup>() }),
     staleTime: 30_000,
+  });
+}
+
+/** Past gigs with a lineup, newest first; the caller filters out the current gig. */
+export function useLineupHistory(bandId: string, q: string, enabled = true) {
+  return useQuery({
+    queryKey: lineupKeys.history(bandId, q),
+    queryFn: () =>
+      api(
+        `/bands/${bandId}/lineups/history?${new URLSearchParams({
+          ...(q ? { q } : {}),
+          limit: "50",
+        })}`,
+        { schema: typed<LineupHistoryEntry[]>() },
+      ),
+    enabled,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -58,6 +84,7 @@ function enqueue(
     chains.delete(gigId);
     void qc.invalidateQueries({ queryKey: lineupKeys.gig(bandId, gigId) });
     void qc.invalidateQueries({ queryKey: eventKeys.all(bandId) });
+    void qc.invalidateQueries({ queryKey: lineupKeys.historyRoot(bandId) });
   });
 }
 
@@ -121,6 +148,30 @@ export function useCopyLastLineup(bandId: string, gigId: string) {
         });
       }
       void qc.invalidateQueries({ queryKey: eventKeys.all(bandId) });
+      void qc.invalidateQueries({ queryKey: lineupKeys.historyRoot(bandId) });
+    },
+  });
+}
+
+/** Replaces the lineup with a chosen gig's; the response fills the cache. */
+export function useCopyLineup(bandId: string, gigId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceGigId }: { sourceGigId: string }) =>
+      api(`${path(bandId, gigId)}/copy`, {
+        method: "POST",
+        body: { sourceGigId },
+        schema: typed<Lineup>(),
+      }),
+    onSuccess: (res) => {
+      if (!chains.has(gigId)) {
+        qc.setQueryData<Lineup>(lineupKeys.gig(bandId, gigId), {
+          gigId: res.gigId,
+          members: res.members,
+        });
+      }
+      void qc.invalidateQueries({ queryKey: eventKeys.all(bandId) });
+      void qc.invalidateQueries({ queryKey: lineupKeys.historyRoot(bandId) });
     },
   });
 }

@@ -68,7 +68,7 @@ test("sort options reorder the list and persist per device", async ({
   await loginAs(USERS.ava.email);
   await openLibrary(page);
   const sortButton = page.getByRole("button", { name: "Sort songs" });
-  await expect(sortButton).toHaveText("Recently added");
+  await expect(sortButton).toHaveText("Sort: Recently added");
 
   await chooseSort(page, "Title A-Z");
   await expect(cards(page).first()).toContainText("Harbor Lights");
@@ -79,14 +79,14 @@ test("sort options reorder the list and persist per device", async ({
 
   for (const label of ["Last played", "Most played", "Recently added"]) {
     await chooseSort(page, label);
-    await expect(sortButton).toHaveText(label);
+    await expect(sortButton).toHaveText(`Sort: ${label}`);
     await expect(cards(page)).toHaveCount(8);
   }
 
   await chooseSort(page, "Title A-Z");
   await page.reload();
   await expect(page.getByRole("button", { name: "Sort songs" })).toHaveText(
-    "Title A-Z",
+    "Sort: Title A-Z",
   );
   await expect(cards(page).first()).toContainText("Harbor Lights");
 });

@@ -84,6 +84,8 @@ test("tapping roster rows adds and removes people with check marks", async ({
 
 test("a member can be dragged into the lineup", async ({ page, isMobile }) => {
   test.skip(isMobile, "Drag from the roster is desktop only");
+  // Roster drag needs the side layout, which requires a viewport of 1300px or more.
+  await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await openRoster(page);
   const source = (await rosterRow(page, /^Cleo/).boundingBox())!;
@@ -95,8 +97,15 @@ test("a member can be dragged into the lineup", async ({ page, isMobile }) => {
   await page.mouse.down();
   await page.mouse.move(source.x + 20, source.y + 20, { steps: 4 });
   await page.mouse.move(first.x + first.width / 2, first.y + 8, { steps: 14 });
-  await expect(page.getByTestId("drop-gap")).toBeVisible();
+  await expect(page.getByTestId("target-lineup")).toHaveAttribute(
+    "data-drop-active",
+    "true",
+  );
   await page.mouse.up();
+  await expect(page.getByTestId("target-lineup")).not.toHaveAttribute(
+    "data-drop-active",
+    "true",
+  );
   await expect(rows(page)).toHaveCount(4);
   await expect(rosterRow(page, /^Cleo/)).toHaveAttribute(
     "aria-pressed",

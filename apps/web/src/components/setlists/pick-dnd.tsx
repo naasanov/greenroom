@@ -2,8 +2,10 @@
 
 /**
  * Generic pick-and-drag mechanic: a picker list (library, roster) whose rows
- * toggle on tap and, on desktop, can be dragged into an ordered target list at
- * a position; target rows can be reordered by their handle.
+ * toggle on tap and, on desktop, can be dragged onto an ordered target list.
+ * While a picked row is over the list the whole list is highlighted, and
+ * releasing appends the item to the end (no positional insertion). Target
+ * rows are reordered separately, by their handle.
  *
  * To reuse it for another item type:
  *  1. Wrap everything (the drawer and its aside) in one <PickDndProvider>.
@@ -13,6 +15,7 @@
  *  3. Render picker rows with <PickerRow>, passing the same targetId.
  * Item ids are plain strings; `onChange` receives the new full order. Rows
  * supply their own `overlay` node, so the provider knows nothing about songs.
+ * The list exposes `data-drop-active="true"` while a picker drag is over it.
  */
 
 import {
@@ -32,7 +35,6 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   type DragEndEvent,
-  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -72,8 +74,6 @@ interface DragData {
   type: "pick" | "item" | "container";
   targetId: string;
   itemId?: string;
-  /** Position of a target row in its list. */
-  index?: number;
   overlay?: ReactNode;
 }
 
@@ -86,8 +86,6 @@ interface ActiveDrag {
 
 interface PickDndState {
   active: ActiveDrag | null;
-  /** Index in the target where a picked item would land; null when not over it. */
-  insertAt: number | null;
   register: (targetId: string, reg: TargetRegistration) => void;
 }
 
@@ -116,29 +114,12 @@ const collision: CollisionDetection = (args) => {
   if (activeData.type === "item") {
     return closestCenter({ ...args, droppableContainers: items });
   }
+  // Picker drags only ever resolve to the container, never to a row position.
   const container = mine.find(
     (c) => (c.data.current as DragData | undefined)?.type === "container",
   );
-  const y = args.pointerCoordinates?.y;
-  if (!container || y === undefined) return [];
-  if (
-    pointerWithin({ ...args, droppableContainers: [container] }).length === 0
-  ) {
-    return [];
-  }
-  let best: { id: UniqueIdentifier; dist: number; index: number } | null = null;
-  for (const c of items) {
-    const rect = args.droppableRects.get(c.id);
-    if (!rect) continue;
-    const mid = rect.top + rect.height / 2;
-    const dist = Math.abs(y - mid);
-    if (!best || dist < best.dist) {
-      const index = (c.data.current as DragData).index ?? 0;
-      best = { id: c.id, dist, index: index + (y > mid ? 1 : 0) };
-    }
-  }
-  if (!best) return [{ id: container.id, data: { insertAt: 0 } }];
-  return [{ id: best.id, data: { insertAt: best.index } }];
+  if (!container) return [];
+  return pointerWithin({ ...args, droppableContainers: [container] });
 };
 
 const EDGE_BAND = 0.05;
@@ -163,7 +144,6 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
   };
   const [scrollEdge, setScrollEdge] = useState(true);
   const [active, setActive] = useState<ActiveDrag | null>(null);
-  const [insertAt, setInsertAt] = useState<number | null>(null);
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -198,16 +178,6 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Also runs on over changes so a late droppable measurement still updates the gap.
-  const onDragMove = (e: DragMoveEvent | DragOverEvent) => {
-    trackPointer(e);
-    const data = e.active.data.current as DragData | undefined;
-    if (data?.type !== "pick") return;
-    const next =
-      (e.collisions?.[0]?.data?.insertAt as number | undefined) ?? null;
-    setInsertAt((prev) => (prev === next ? prev : next));
-  };
-
   // Auto-scroll starts after the pointer dwells in the top or bottom edge band
   // of the list's scroll container, so passing over a clipped row or the footer
   // does not scroll the list out from under the pointer.
@@ -237,18 +207,18 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     clearDwell();
     setScrollEdge(true);
     setActive(null);
-    setInsertAt(null);
   };
 
   const onDragEnd = (e: DragEndEvent) => {
     const data = e.active.data.current as DragData | undefined;
     const reg = data ? registry.current.get(data.targetId) : undefined;
     if (data && reg && data.itemId) {
-      if (data.type === "pick" && insertAt !== null) {
-        if (!reg.ids.includes(data.itemId)) {
-          const next = [...reg.ids];
-          next.splice(insertAt, 0, data.itemId);
-          reg.onChange(next, { added: data.itemId });
+      if (data.type === "pick") {
+        const over = e.over?.data.current as DragData | undefined;
+        const onList =
+          over?.type === "container" && over.targetId === data.targetId;
+        if (onList && !reg.ids.includes(data.itemId)) {
+          reg.onChange([...reg.ids, data.itemId], { added: data.itemId });
         }
       } else if (data.type === "item" && e.over) {
         const over = e.over.data.current as DragData | undefined;
@@ -262,16 +232,12 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     finish();
   };
 
-  const value = useMemo(
-    () => ({ active, insertAt, register }),
-    [active, insertAt, register],
-  );
+  const value = useMemo(() => ({ active, register }), [active, register]);
   // Picks use a thin edge zone so a row near the list's edge is not scrolled away.
   const autoScroll =
     active?.type === "pick"
       ? { threshold: { x: 0.2, y: 0.05 }, enabled: scrollEdge }
       : { enabled: scrollEdge };
-  const droppingIn = active?.type === "pick" && insertAt !== null;
 
   return (
     <PickDndContext.Provider value={value}>
@@ -280,18 +246,15 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
         collisionDetection={collision}
         autoScroll={autoScroll}
         onDragStart={onDragStart}
-        onDragMove={onDragMove}
-        onDragOver={onDragMove}
+        onDragMove={trackPointer}
+        onDragOver={trackPointer}
         onDragEnd={onDragEnd}
         onDragCancel={finish}
       >
         {children}
         {mounted
           ? createPortal(
-              <DragOverlay
-                zIndex={200}
-                dropAnimation={droppingIn ? null : undefined}
-              >
+              <DragOverlay zIndex={200} dropAnimation={null}>
                 {active?.overlay ?? null}
               </DragOverlay>,
               document.body,
@@ -306,14 +269,13 @@ const ROW_GAP = 8;
 
 interface TargetCtx {
   targetId: string;
-  ids: string[];
   rowHeight: number;
 }
 const TargetContext = createContext<TargetCtx | null>(null);
 
 /**
- * The ordered target list. Rows (<TargetRow>) are its children; while a picked
- * item hovers, rows at or after the insertion index slide down to open a gap.
+ * The ordered target list. Rows (<TargetRow>) are its children. While a picked
+ * item is over the container the whole list is highlighted; dropping appends.
  */
 export function PickTarget({
   targetId,
@@ -328,76 +290,57 @@ export function PickTarget({
   /** Current order. */
   ids: string[];
   onChange: (ids: string[], change: TargetChange) => void;
-  /** Fixed row height in px; the opened gap matches it. */
+  /** Fixed row height in px. */
   rowHeight?: number;
   /** Shown instead of the list when `ids` is empty. */
   empty?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
-  const { register, active, insertAt } = usePickDnd();
+  const { register, active } = usePickDnd();
   useEffect(() => {
     register(targetId, { ids, onChange });
   }, [register, targetId, ids, onChange]);
 
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `container:${targetId}`,
     data: { type: "container", targetId } satisfies DragData,
   });
-  const showGap = active?.type === "pick" && active.targetId === targetId;
-  const gapAt = showGap ? insertAt : null;
-  const ctx = useMemo(
-    () => ({ targetId, ids, rowHeight }),
-    [targetId, ids, rowHeight],
-  );
+  const dropActive =
+    isOver && active?.type === "pick" && active.targetId === targetId;
+  const ctx = useMemo(() => ({ targetId, rowHeight }), [targetId, rowHeight]);
 
   return (
     <TargetContext.Provider value={ctx}>
       <div
         ref={setNodeRef}
         data-testid={`target-${targetId}`}
+        data-drop-active={dropActive ? "true" : undefined}
         data-vaul-no-drag
         className={cn("relative", className)}
-        style={{
-          paddingBottom:
-            gapAt !== null && gapAt >= ids.length && ids.length > 0
-              ? rowHeight + ROW_GAP
-              : undefined,
-          transition: "padding-bottom 180ms ease",
-        }}
       >
         {ids.length === 0 ? (
-          <div className="relative">
-            {empty}
-            {gapAt !== null ? <GapMarker height={rowHeight} /> : null}
-          </div>
+          empty
         ) : (
           <SortableContext
             items={ids.map((id) => sortId(targetId, id))}
             strategy={verticalListSortingStrategy}
           >
-            <ul
-              data-gap-at={gapAt ?? undefined}
-              className="flex flex-col"
-              style={{ gap: ROW_GAP }}
-            >
+            <ul className="flex flex-col" style={{ gap: ROW_GAP }}>
               {children}
             </ul>
           </SortableContext>
         )}
+        <div
+          aria-hidden
+          data-testid="drop-highlight"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-10 rounded-2xl bg-primary/5 opacity-0 ring-2 ring-inset ring-primary/40 transition-opacity duration-150",
+            dropActive && "opacity-100",
+          )}
+        />
       </div>
     </TargetContext.Provider>
-  );
-}
-
-function GapMarker({ height }: { height: number }) {
-  return (
-    <div
-      aria-hidden
-      data-testid="drop-gap"
-      style={{ height }}
-      className="pointer-events-none absolute inset-x-0 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/10"
-    />
   );
 }
 
@@ -414,12 +357,15 @@ export function TargetRow({
   itemId,
   overlay,
   reorder = true,
+  dimWhenDragging = true,
   children,
 }: {
   itemId: string;
   /** Node shown under the cursor while this row is dragged. */
   overlay: ReactNode;
   reorder?: boolean;
+  /** False when the row dims its own content so the handle stays visible. */
+  dimWhenDragging?: boolean;
   children: (handle: {
     handleProps: HandleProps | null;
     dragging: boolean;
@@ -427,8 +373,6 @@ export function TargetRow({
 }) {
   const target = useContext(TargetContext);
   if (!target) throw new Error("TargetRow must be inside a <PickTarget>");
-  const { active, insertAt } = usePickDnd();
-  const index = target.ids.indexOf(itemId);
   const {
     attributes,
     listeners,
@@ -444,21 +388,9 @@ export function TargetRow({
       type: "item",
       targetId: target.targetId,
       itemId,
-      index,
       overlay,
     } satisfies DragData,
   });
-
-  const picking =
-    active?.type === "pick" && active.targetId === target.targetId;
-  const shift =
-    picking && insertAt !== null && index >= insertAt
-      ? target.rowHeight + ROW_GAP
-      : 0;
-  const isLast = index === target.ids.length - 1;
-  const showGapHere = picking && insertAt !== null && insertAt === index;
-  const showGapAfter =
-    picking && insertAt !== null && isLast && insertAt >= target.ids.length;
 
   const handleProps: HandleProps | null = reorder
     ? {
@@ -473,34 +405,13 @@ export function TargetRow({
       ref={setNodeRef}
       data-testid="target-row"
       data-item-id={itemId}
-      className={cn("relative", isDragging && "opacity-30")}
+      className={cn("relative", isDragging && dimWhenDragging && "opacity-30")}
       style={{
         height: target.rowHeight,
-        transform: picking
-          ? `translateY(${shift}px)`
-          : CSS.Translate.toString(transform),
-        transition: picking ? "transform 180ms ease" : transition,
+        transform: CSS.Translate.toString(transform),
+        transition,
       }}
     >
-      {showGapHere ? (
-        <div
-          aria-hidden
-          data-testid="drop-gap"
-          style={{
-            top: -(target.rowHeight + ROW_GAP),
-            height: target.rowHeight,
-          }}
-          className="pointer-events-none absolute inset-x-0 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/10"
-        />
-      ) : null}
-      {showGapAfter ? (
-        <div
-          aria-hidden
-          data-testid="drop-gap"
-          style={{ top: target.rowHeight + ROW_GAP, height: target.rowHeight }}
-          className="pointer-events-none absolute inset-x-0 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/10"
-        />
-      ) : null}
       {children({ handleProps, dragging: isDragging })}
     </li>
   );
@@ -543,7 +454,7 @@ export function PickerRow({
       data-vaul-no-drag
       data-testid="picker-row"
       data-item-id={itemId}
-      className={cn(isDragging && "opacity-40", className)}
+      className={cn("select-none", isDragging && "opacity-40", className)}
     >
       {children}
     </li>

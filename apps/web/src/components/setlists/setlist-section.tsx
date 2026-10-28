@@ -10,14 +10,10 @@ import {
 import { songArt } from "@/components/library/song-utils";
 import { Button } from "@/components/ui/button";
 import { useCurrentBand } from "@/lib/current-band";
+import { cn } from "@/lib/utils";
 import { exportDateLabel, useGigForExport } from "@/lib/queries/spotify-export";
 import { PickTarget, TargetRow } from "./pick-dnd";
-import {
-  SongLine,
-  SongOverlay,
-  setlistSummary,
-  toSetlistSong,
-} from "./song-row";
+import { SongLine, setlistSummary, toSetlistSong } from "./song-row";
 import type { SetlistBuilder } from "./use-setlist-builder";
 
 export const SETLIST_TARGET = "setlist";
@@ -157,9 +153,17 @@ export function SetlistSection({
               <TargetRow
                 key={item.songId}
                 itemId={item.songId}
-                overlay={<SongOverlay song={song} />}
+                dimWhenDragging={false}
+                overlay={
+                  <div className="flex h-14 cursor-grabbing items-center gap-2 rounded-2xl border border-primary/40 bg-card pr-3 pl-0.5 shadow-lift">
+                    <span className="flex h-full w-8 shrink-0 items-center justify-center text-muted-foreground/70">
+                      <GripVertical className="size-5" />
+                    </span>
+                    <SongLine song={song} />
+                  </div>
+                }
               >
-                {({ handleProps }) => (
+                {({ handleProps, dragging }) => (
                   <div
                     data-testid="setlist-row"
                     className="flex h-full items-center gap-2 rounded-2xl border bg-card pr-1 pl-0.5 shadow-soft"
@@ -172,13 +176,23 @@ export function SetlistSection({
                     >
                       <GripVertical className="size-5" />
                     </button>
-                    <SongLine song={song} />
+                    <div
+                      className={cn(
+                        "flex min-w-0 flex-1 items-center gap-2.5",
+                        dragging && "opacity-30",
+                      )}
+                    >
+                      <SongLine song={song} />
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Remove ${item.title}`}
-                      className="shrink-0 text-muted-foreground"
+                      className={cn(
+                        "shrink-0 text-muted-foreground",
+                        dragging && "opacity-30",
+                      )}
                       onClick={() =>
                         void guarded((target) =>
                           editor.remove(item.songId, target),
