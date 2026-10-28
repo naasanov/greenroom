@@ -47,12 +47,46 @@ type Selection =
   | { kind: "gig"; gigId: string }
   | { kind: "practice"; seriesId: string; date: string | null };
 
+/**
+ * Publishes the bottom edge of the calendar controls as --events-drawer-top so
+ * event drawers (portaled to body) cap their height below the controls.
+ */
+function useDrawerTopVar(tab: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => {
+      const header = tab.current?.querySelector(
+        "[data-testid=calendar-title]",
+      )?.parentElement;
+      if (!header) return root.style.removeProperty("--events-drawer-top");
+      const bottom = Math.max(header.getBoundingClientRect().bottom, 0);
+      root.style.setProperty(
+        "--events-drawer-top",
+        `${Math.ceil(bottom) + 8}px`,
+      );
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (tab.current) ro.observe(tab.current);
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      root.style.removeProperty("--events-drawer-top");
+    };
+  }, [tab]);
+}
+
 function parseSelection(
   pathname: string,
   date: string | null,
 ): Selection | null {
-  const [, seg, id] = pathname.split("/");
-  if (seg === "gigs" && id) return { kind: "gig", gigId: id };
+  const [, seg, id, sub] = pathname.split("/");
+  // The full-screen media view (/gigs/:id/media) closes the drawer beneath it.
+  if (seg === "gigs" && id && sub !== "media")
+    return { kind: "gig", gigId: id };
   if (seg === "practices" && id) {
     return { kind: "practice", seriesId: id, date };
   }
@@ -89,6 +123,8 @@ interface EventDrawerData {
  * update local state first so the drawer never waits on a navigation.
  */
 export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
+  const tabRef = useRef<HTMLDivElement>(null);
+  useDrawerTopVar(tabRef);
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
@@ -326,6 +362,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
       )}
     >
       <div
+        ref={tabRef}
         data-testid="events-tab"
         data-focus-date={focusDate}
         className="mx-auto w-full max-w-5xl px-3 py-4 pb-28 md:pb-24"

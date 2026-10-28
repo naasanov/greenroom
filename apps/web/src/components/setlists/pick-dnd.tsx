@@ -141,9 +141,27 @@ const collision: CollisionDetection = (args) => {
   return [{ id: best.id, data: { insertAt: best.index } }];
 };
 
+const EDGE_BAND = 0.05;
+const EDGE_DWELL_MS = 200;
+
+function scrollParent(node: EventTarget | null): Element | null {
+  let el = node instanceof Element ? node.parentElement : null;
+  while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) {
+    el = el.parentElement;
+  }
+  return el;
+}
+
 /** One DndContext for a drawer and its aside; shared by every picker and target inside. */
 export function PickDndProvider({ children }: { children: ReactNode }) {
   const registry = useRef(new Map<string, TargetRegistration>());
+  const scroller = useRef<Element | null>(null);
+  const dwell = useRef<number | null>(null);
+  const clearDwell = () => {
+    if (dwell.current !== null) window.clearTimeout(dwell.current);
+    dwell.current = null;
+  };
+  const [scrollEdge, setScrollEdge] = useState(true);
   const [active, setActive] = useState<ActiveDrag | null>(null);
   const [insertAt, setInsertAt] = useState<number | null>(null);
   const mounted = useSyncExternalStore(
@@ -167,6 +185,9 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const onDragStart = (e: DragStartEvent) => {
+    scroller.current = scrollParent(e.activatorEvent.target);
+    // Pointer drags wait for the edge band; keyboard drags always scroll.
+    setScrollEdge(!("clientX" in e.activatorEvent));
     const data = e.active.data.current as DragData | undefined;
     if (!data || data.type === "container" || !data.itemId) return;
     setActive({
@@ -179,6 +200,7 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
 
   // Also runs on over changes so a late droppable measurement still updates the gap.
   const onDragMove = (e: DragMoveEvent | DragOverEvent) => {
+    trackPointer(e);
     const data = e.active.data.current as DragData | undefined;
     if (data?.type !== "pick") return;
     const next =
@@ -186,7 +208,34 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     setInsertAt((prev) => (prev === next ? prev : next));
   };
 
+  // Auto-scroll starts after the pointer dwells in the top or bottom edge band
+  // of the list's scroll container, so passing over a clipped row or the footer
+  // does not scroll the list out from under the pointer.
+  const trackPointer = (e: DragMoveEvent | DragOverEvent) => {
+    const a = e.activatorEvent as Partial<MouseEvent & TouchEvent>;
+    const src = a.touches?.[0] ?? a;
+    const box = scroller.current?.getBoundingClientRect();
+    if (!box || src.clientX === undefined || src.clientY === undefined) return;
+    const y = src.clientY + e.delta.y;
+    const band = box.height * EDGE_BAND;
+    const inBand =
+      (y >= box.top && y <= box.top + band) ||
+      (y >= box.bottom - band && y <= box.bottom);
+    if (inBand && dwell.current === null && !scrollEdge) {
+      dwell.current = window.setTimeout(
+        () => setScrollEdge(true),
+        EDGE_DWELL_MS,
+      );
+    } else if (!inBand) {
+      clearDwell();
+      setScrollEdge(false);
+    }
+  };
+
   const finish = () => {
+    scroller.current = null;
+    clearDwell();
+    setScrollEdge(true);
     setActive(null);
     setInsertAt(null);
   };
@@ -219,7 +268,9 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
   );
   // Picks use a thin edge zone so a row near the list's edge is not scrolled away.
   const autoScroll =
-    active?.type === "pick" ? { threshold: { x: 0.2, y: 0.05 } } : true;
+    active?.type === "pick"
+      ? { threshold: { x: 0.2, y: 0.05 }, enabled: scrollEdge }
+      : { enabled: scrollEdge };
   const droppingIn = active?.type === "pick" && insertAt !== null;
 
   return (
