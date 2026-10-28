@@ -223,3 +223,73 @@ export function memberUploadTypeAllowed(mime: string): boolean {
   const m = mime.toLowerCase();
   return MEMBER_UPLOAD_MIME_PREFIXES.some((p) => m.startsWith(p));
 }
+
+// ---- Public upload links ----
+
+export const UPLOAD_LINK_ERROR_CODES = {
+  invalid: "UPLOAD_LINK_INVALID",
+  full: "UPLOAD_LINK_FULL",
+} as const;
+
+export const UPLOAD_LINK_EXPIRY_DAYS = [1, 7, 30] as const;
+export const DEFAULT_LINK_MAX_FILE_BYTES = 4 * 1024 * 1024 * 1024;
+export const DEFAULT_LINK_MAX_TOTAL_BYTES = 50 * 1024 * 1024 * 1024;
+export const DEFAULT_LINK_MIME_PREFIXES = ["image/", "video/"] as const;
+
+export const createUploadLinkSchema = z.object({
+  expiresInDaysAfterGig: z
+    .union([z.literal(1), z.literal(7), z.literal(30)])
+    .optional(),
+});
+export type CreateUploadLink = z.infer<typeof createUploadLinkSchema>;
+
+export const uploadLinkSchema = z.object({
+  id: z.string().uuid(),
+  url: z.string(),
+  expiresAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+  createdAt: z.string(),
+  createdBy: z
+    .object({ id: z.string().uuid(), displayName: z.string() })
+    .nullable(),
+  uploadsCount: z.number().int(),
+  bytesUsed: z.number(),
+});
+export type UploadLink = z.infer<typeof uploadLinkSchema>;
+
+export const uploadLinkInvalidReasonSchema = z.enum([
+  "expired",
+  "revoked",
+  "unknown",
+]);
+export type UploadLinkInvalidReason = z.infer<
+  typeof uploadLinkInvalidReasonSchema
+>;
+
+/** What the public upload page may know about a link. */
+export const publicUploadLinkInfoSchema = z.object({
+  bandName: z.string(),
+  bandPhotoUrl: z.string().nullable(),
+  gigTitle: z.string(),
+  gigDate: z.string(),
+  expiresAt: z.string().nullable(),
+  maxFileBytes: z.number(),
+  allowedMimePrefixes: z.array(z.string()),
+});
+export type PublicUploadLinkInfo = z.infer<typeof publicUploadLinkInfoSchema>;
+
+export const createPublicUploadSchema = createUploadSchema
+  .omit({ folderId: true, songId: true })
+  .extend({ uploaderName: z.string().trim().max(80).optional() });
+export type CreatePublicUpload = z.infer<typeof createPublicUploadSchema>;
+
+/** The slim session shape a public uploader sees. */
+export const publicUploadSessionSchema = z.object({
+  id: z.string().uuid(),
+  status: uploadStatusSchema,
+  bytesReceived: z.number().int(),
+  totalBytes: z.number().int(),
+  chunkSize: z.number().int(),
+  fileName: z.string(),
+});
+export type PublicUploadSession = z.infer<typeof publicUploadSessionSchema>;

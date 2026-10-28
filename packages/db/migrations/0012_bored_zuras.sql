@@ -1,0 +1,1 @@
+ALTER TABLE "upload_sessions" ADD COLUMN "uploader_name" text;

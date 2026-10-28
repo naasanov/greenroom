@@ -68,3 +68,27 @@ Browser sends chunks to the API, the API relays them to a Drive resumable sessio
 - Edits while uploading are stored on the session and applied at completion: the file is moved in Drive if the folder changed since the Drive session started, renamed to the session's `fileName`, the media item is created with `name_customized`, then the song link runs `MediaService.linkSong` (song-title rename unless customized).
 - Stale cleanup: pg-boss queue `upload-sessions-cleanup`, daily, marks `pending` / `uploading` sessions untouched for 7 days as `failed`.
 - Fake-only: `/__test__/media/uploads/:sessionId/{interrupt,expire,age}` and `/__test__/media/uploads/cleanup`.
+
+## Public upload links
+
+A band member can create one link per gig (`POST /bands/:b/gigs/:g/upload-links`, `?new=1` forces another; `GET` lists recent ones; `DELETE /bands/:b/upload-links/:id` revokes, any member). The URL is `${WEB_URL}/u/<token>`; the token is 32 random bytes as base64url, stored in `public_upload_links.token` (plain, so the admin UI can show the link again). Creating needs Drive set up (409 `GOOGLE_NOT_LINKED` otherwise).
+
+Public routes (`@Public()`, no session, no cookies needed), all keyed by the token:
+
+| Route | Notes |
+| --- | --- |
+| `GET /public/upload-links/:token` | `{ bandName, bandPhotoUrl, gigTitle, gigDate, expiresAt, maxFileBytes, allowedMimePrefixes }` and nothing else. |
+| `POST .../uploads` | `{ fileName, mimeType, totalBytes, fingerprint, uploaderName? }`. Same create/resume/skip protocol as members. Returns only `{ id, status, bytesReceived, totalBytes, chunkSize, fileName }`. |
+| `PUT .../uploads/:sessionId` | `Content-Range` chunk, same 409 `UPLOAD_OFFSET_MISMATCH` / 502 `UPLOAD_DRIVE_ERROR` behaviour. |
+| `DELETE .../uploads/:sessionId` | Cancels. |
+
+Unknown, revoked, and expired tokens all return 404 `{ code: "UPLOAD_LINK_INVALID", reason: "unknown" | "revoked" | "expired" }`. A session created through a link is only visible through that same link (owner is `uploaded_via_link_id`); member routes never see it.
+
+Hardening:
+- Files always land in the gig's Unsorted (`unsortedOnly`), tagged with `uploaded_via_link_id`; the optional uploader name is stored on `upload_sessions.uploader_name`.
+- Expiry: 1, 7 (default), or 30 days after the gig date, ending at 00:00 UTC of the following day. A link made after the gig counts from today instead.
+- Type allowlist: `image/` and `video/` prefixes (422 `UPLOAD_TYPE_NOT_ALLOWED`). Per-file cap 4 GB (422 `UPLOAD_TOO_LARGE`). Per-link total 50 GB across non-failed, non-cancelled sessions (422 `UPLOAD_LINK_FULL`); re-sending a counted fingerprint resumes instead of adding bytes.
+- Rate limits (429), on session creation only: 200 files per hour per link (`UPLOAD_LINK_FILES_PER_HOUR`), 60 per hour per IP (`UPLOAD_LINK_FILES_PER_IP_HOUR`). Every public request is also capped at 1500 per minute per IP (`UPLOAD_LINK_REQUESTS_PER_MINUTE`). Counters are in memory per API process. With fakes enabled, an `x-test-ip` header overrides the IP so specs get their own bucket.
+- Revoking sets `revoked_at`; further requests fail immediately, including chunks of in-flight uploads.
+
+Follow-ups, not built: CAPTCHA on session creation, virus/malware scanning of uploaded files, hashing the token at rest (needs the admin UI to stop re-showing the URL), and showing members who uploaded what (the data is on `upload_sessions.uploader_name`).

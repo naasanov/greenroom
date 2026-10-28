@@ -138,6 +138,8 @@ export const uploadSessions = pgTable(
       () => publicUploadLinks.id,
       { onDelete: "set null" },
     ),
+    // Optional label a public-link uploader typed in.
+    uploaderName: text("uploader_name"),
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type"),
     // Client-computed (name, size, lastModified) fingerprint used to resume or skip re-uploads.

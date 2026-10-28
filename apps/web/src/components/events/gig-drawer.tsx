@@ -16,6 +16,7 @@ import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
 import { time12, whenLabel } from "@/components/events/time";
 import { MediaSection } from "@/components/media/media-section";
+import { UploadLinkButton } from "@/components/media/upload-link-dialog";
 import { LineupAside } from "@/components/lineups/lineup-aside";
 import { LineupSection } from "@/components/lineups/lineup-section";
 import {
@@ -108,6 +109,7 @@ function GigDetails({
         <SetlistSection builder={setlist} />
         <LineupSection builder={lineup} />
         <MediaSection bandId={bandId} gigId={gig.id} />
+        <UploadLinkButton bandId={bandId} gigId={gig.id} />
       </div>
     </div>
   );
