@@ -122,7 +122,7 @@ A dedicated IPv4 would add $2 per app; not needed.
 
 ## Staging sign-in
 
-Staging runs fake integrations, so Google sign-in and magic-link email do not work. Instead, setting a passcode secret makes "Sign in with Google" open a built-in page at `/fake-google/authorize` (email, passcode, and an option to create a "Demo Band" with sample members, gigs, songs and a weekly practice when the user has no band).
+Staging ran fake integrations until 2026-10-28, when it switched to real Google and Spotify (`INTEGRATIONS_MODE = "real"` in `staging.api.toml`). The passcode page below exists only while the mode is fake; to use it again, set the mode back to `"fake"`. Instead, setting a passcode secret makes "Sign in with Google" open a built-in page at `/fake-google/authorize` (email, passcode, and an option to create a "Demo Band" with sample members, gigs, songs and a weekly practice when the user has no band).
 
 ```sh
 fly secrets set STAGING_LOGIN_PASSCODE=<passcode> -a greenroom-staging-api

@@ -7,7 +7,7 @@ dockerfile = "../../apps/api/Dockerfile"
 
 [env]
 NODE_ENV = "production"
-INTEGRATIONS_MODE = "fake"
+INTEGRATIONS_MODE = "real"
 API_PORT = "4000"
 WEB_URL = "https://staging.greenroom.fyi"
 WEB_ORIGIN = "https://staging.greenroom.fyi"
