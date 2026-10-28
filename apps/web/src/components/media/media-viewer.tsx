@@ -78,8 +78,9 @@ export function MediaViewer({
   songTitle: (item: MediaItem) => string | null;
   onIndexChange: (index: number) => void;
   onClose: () => void;
-  onLinkSong: (item: MediaItem) => void;
-  onClearSong: (item: MediaItem) => void;
+  /** Omit both to show the linked song read-only (no change or clear buttons). */
+  onLinkSong?: (item: MediaItem) => void;
+  onClearSong?: (item: MediaItem) => void;
 }) {
   const item = items[index];
   const touch = useRef<{ x: number; y: number } | null>(null);
@@ -231,22 +232,26 @@ export function MediaViewer({
               <Music2 className="size-4 shrink-0" />
               <span className="truncate">{song}</span>
             </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onLinkSong(item)}
-            >
-              Change song
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onClearSong(item)}
-            >
-              Clear song
-            </Button>
+            {onLinkSong ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onLinkSong(item)}
+              >
+                Change song
+              </Button>
+            ) : null}
+            {onClearSong ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onClearSong(item)}
+              >
+                Clear song
+              </Button>
+            ) : null}
           </>
-        ) : (
+        ) : onLinkSong ? (
           <Button
             size="sm"
             variant="secondary"
@@ -254,7 +259,7 @@ export function MediaViewer({
           >
             <Music2 /> Link to song
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   );

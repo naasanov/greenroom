@@ -2,8 +2,10 @@
 
 import { Loader2, Music2, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
+  MediaItem,
   SongCandidate,
   SongCreated,
   SongDetail,
@@ -18,7 +20,10 @@ import { LinkList } from "@/components/app/link-list";
 import { Thumbnail } from "@/components/app/list-card";
 import { RightSheet } from "@/components/app/right-sheet";
 import { ShareButton } from "@/components/app/share-button";
+import { MediaThumb, isVideo } from "@/components/media/media-tile";
+import { MediaViewer } from "@/components/media/media-viewer";
 import { Button } from "@/components/ui/button";
+import { useSongMedia } from "@/lib/queries/uploads";
 import { useMediaQuery } from "@/lib/use-media-query";
 import {
   DuplicateSongError,
@@ -112,6 +117,105 @@ const dayLabel = (date: string) =>
     timeZone: "UTC",
   }).format(new Date(`${date}T12:00:00Z`));
 
+/** Videos linked to the song across gigs grouped by gig, then linked photos; hidden when empty. */
+function SongVideos({
+  bandId,
+  songId,
+  songTitle,
+}: {
+  bandId: string;
+  songId: string;
+  songTitle: string;
+}) {
+  const media = useSongMedia(bandId, songId);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const groups = media.data;
+  const { sections, flat } = useMemo(() => {
+    const build = (pick: (i: MediaItem) => boolean) =>
+      (groups ?? []).flatMap((g) => {
+        const items = g.items.filter(pick);
+        return items.length > 0 ? [{ gig: g.gig, items }] : [];
+      });
+    const videos = build((i) => isVideo(i));
+    const photos = build(
+      (i) => !isVideo(i) && !!i.mimeType?.startsWith("image/"),
+    );
+    return {
+      sections: [
+        { key: "videos", label: null, groups: videos },
+        { key: "photos", label: "Photos", groups: photos },
+      ].filter((s) => s.groups.length > 0),
+      flat: [...videos, ...photos].flatMap((g) => g.items),
+    };
+  }, [groups]);
+  if (flat.length === 0) return null;
+  const viewerIndex = viewerId ? flat.findIndex((i) => i.id === viewerId) : -1;
+  return (
+    <Section label="Videos">
+      <div data-testid="song-videos" className="flex flex-col gap-3">
+        {sections.map((sec) => (
+          <div key={sec.key} className="flex flex-col gap-3">
+            {sec.label ? (
+              <p className="text-xs font-medium text-muted-foreground">
+                {sec.label}
+              </p>
+            ) : null}
+            {sec.groups.map((g) => (
+              <div
+                key={g.gig.id}
+                data-testid="song-video-group"
+                data-gig={g.gig.title}
+                className="flex flex-col gap-1.5"
+              >
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <Link
+                    href={`/gigs/${g.gig.id}`}
+                    className="min-w-0 truncate font-medium hover:underline"
+                  >
+                    {g.gig.title}
+                  </Link>
+                  <span className="shrink-0 text-muted-foreground">
+                    {dayLabel(g.gig.date)}
+                  </span>
+                </div>
+                <ul className="grid grid-cols-3 gap-2">
+                  {g.items.map((item) => (
+                    <li key={item.id} className="min-w-0">
+                      <button
+                        type="button"
+                        data-testid="song-video"
+                        data-name={item.name}
+                        aria-label={`Open ${item.name}`}
+                        onClick={() => setViewerId(item.id)}
+                        className="block aspect-square w-full overflow-hidden rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <MediaThumb item={item} compact />
+                      </button>
+                      <p className="truncate pt-0.5 text-xs">{item.name}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {viewerIndex >= 0
+        ? createPortal(
+            <MediaViewer
+              items={flat}
+              index={viewerIndex}
+              songTitle={() => songTitle}
+              onIndexChange={(i) => setViewerId(flat[i]?.id ?? null)}
+              onClose={() => setViewerId(null)}
+            />,
+            document.body,
+          )
+        : null}
+    </Section>
+  );
+}
+
 function DetailSkeleton({ error }: { error: boolean }) {
   if (error) {
     return (
@@ -137,10 +241,12 @@ function DetailSkeleton({ error }: { error: boolean }) {
 
 /** Renders the summary fields at once; detail-only sections fill in later. */
 function SongView({
+  bandId,
   song,
   detail,
   detailError,
 }: {
+  bandId: string;
   song: SongSummary;
   detail: SongDetail | undefined;
   detailError: boolean;
@@ -229,6 +335,7 @@ function SongView({
               </p>
             ) : null}
           </Section>
+          <SongVideos bandId={bandId} songId={song.id} songTitle={song.title} />
         </>
       ) : (
         <DetailSkeleton error={detailError} />
@@ -523,7 +630,12 @@ export function SongSheet({
             </Button>
           </div>
         ) : null}
-        <SongView song={shown} detail={song} detailError={detail.isError} />
+        <SongView
+          bandId={bandId}
+          song={shown}
+          detail={song}
+          detailError={detail.isError}
+        />
       </div>
     );
   }

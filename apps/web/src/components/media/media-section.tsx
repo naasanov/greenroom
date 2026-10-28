@@ -1,12 +1,14 @@
 "use client";
 
-import { FileQuestion, FileVideo, ImageIcon } from "lucide-react";
+import { FileQuestion, FileVideo, ImageIcon, Upload } from "lucide-react";
+import { useRef, useState } from "react";
 import type { GigMedia, MediaItem } from "@greenroom/shared";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
 import { useGoogleIntegrations } from "@/lib/queries/google";
 import { useGigMedia } from "@/lib/queries/media";
 import { useRouter } from "next/navigation";
 import { openMediaView } from "./media-gallery-page";
+import { useUploadStore } from "./upload/upload-provider";
 
 const PREVIEW_COUNT = 4;
 
@@ -72,11 +74,21 @@ export function MediaSection({
   gigId: string;
 }) {
   const router = useRouter();
+  const store = useUploadStore();
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
   const media = useGigMedia(bandId, gigId);
   const integrations = useGoogleIntegrations(bandId);
   const data = media.data;
   const drive = integrations.data?.drive;
   const ready = !!data?.driveLinked && !!drive?.folderId;
+
+  // Picked or dropped files start uploading, then the full view shows the tray.
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    store.add(bandId, gigId, files);
+    openMediaView(router, gigId);
+  };
 
   let body;
   if (!data || !drive) {
@@ -133,6 +145,42 @@ export function MediaSection({
         Media
       </h3>
       {body}
+      {ready ? (
+        <>
+          <button
+            type="button"
+            data-testid="media-add"
+            onClick={() => input.current?.click()}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes("Files")) return;
+              e.preventDefault();
+              setOver(true);
+            }}
+            onDragLeave={() => setOver(false)}
+            onDrop={(e) => {
+              if (!e.dataTransfer.types.includes("Files")) return;
+              e.preventDefault();
+              setOver(false);
+              addFiles(Array.from(e.dataTransfer.files));
+            }}
+            className={`flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm font-medium outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`}
+          >
+            <Upload className="size-4" /> Add media
+          </button>
+          <input
+            ref={input}
+            type="file"
+            multiple
+            accept="image/*,video/*,audio/*,application/pdf"
+            hidden
+            data-testid="media-add-input"
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        </>
+      ) : null}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
+  Ban,
   CheckCheck,
   ChevronDown,
   Download,
@@ -18,9 +19,10 @@ import {
   Pencil,
   Share2,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaFolderWithItems, MediaItem } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
@@ -66,6 +68,7 @@ import {
 } from "@/lib/queries/media";
 import { useGigSetlist, useSetlist } from "@/lib/queries/setlists";
 import { useSongs } from "@/lib/queries/songs";
+import { useMyUploads } from "@/lib/queries/uploads";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
 import {
@@ -77,6 +80,11 @@ import {
 } from "./media-download";
 import { MediaTile, type Density } from "./media-tile";
 import { MediaViewer } from "./media-viewer";
+import { useGigUploads } from "./upload/upload-provider";
+import { UploadTray } from "./upload/upload-tray";
+
+const isTrayKey = (id: string) => id.startsWith("up-");
+const ACCEPT = "image/*,video/*,audio/*,application/pdf";
 
 const useDensity = createLocalChoice<Density>(
   "greenroom:media-density",
@@ -304,9 +312,8 @@ function SectionHeader({
 }
 
 /**
- * Full-screen gallery of one gig's media. Upload hook point: `onAddMedia`
- * receives the files picked with the floating plus button (the upload tray
- * attaches here); without it the picker does nothing with the files.
+ * Full-screen gallery of one gig's media. Picked or dropped files go to the
+ * upload queue (shown in the tray); `onAddMedia` is also notified.
  */
 export function MediaGallery({
   bandId,
@@ -349,6 +356,24 @@ export function MediaGallery({
   const [error, setError] = useState<string | null>(null);
   const shareSheet = useShareSheet("touch");
   const fileInput = useRef<HTMLInputElement>(null);
+  const { store, entries, defaults } = useGigUploads(gigId);
+  const mine = useMyUploads(bandId, gigId);
+  const [trayHeight, setTrayHeight] = useState(0);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [bulkPicker, setBulkPicker] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState<string[] | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    if (mine.data) store.restore(bandId, gigId, mine.data);
+  }, [mine.data, store, bandId, gigId]);
+
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    store.add(bandId, gigId, files);
+    onAddMedia?.(files);
+  };
+  const onTrayHeight = useCallback((px: number) => setTrayHeight(px), []);
 
   const data = media.data;
   const drive = integrations.data?.drive;
@@ -378,8 +403,17 @@ export function MediaGallery({
   const byId = useMemo(() => new Map(all.map((i) => [i.id, i])), [all]);
   const selectedIds = all.filter((i) => selected.has(i.id)).map((i) => i.id);
   const selectedItems = selectedIds.flatMap((id) => byId.get(id) ?? []);
-  const allSelected = all.length > 0 && selectedIds.length === all.length;
-  const placing = selecting && selectedIds.length > 0;
+  const trayKeys = entries.filter((e) => selected.has(e.key)).map((e) => e.key);
+  const selectedCount = selectedIds.length + trayKeys.length;
+  const trayScope =
+    trayKeys.length > 0 || (selectedIds.length === 0 && entries.length > 0);
+  const scopeIds = trayScope ? entries.map((e) => e.key) : all.map((i) => i.id);
+  const scopeSelected = trayScope ? trayKeys.length : selectedIds.length;
+  const allSelected = scopeIds.length > 0 && scopeSelected === scopeIds.length;
+  const placing = selecting && selectedCount > 0;
+  const trayOnly = trayKeys.length > 0 && selectedIds.length === 0;
+  const galleryOnly = selectedIds.length > 0 && trayKeys.length === 0;
+  const trayEntry = (key: string) => entries.find((e) => e.key === key);
 
   const songTitles = useMemo(
     () => new Map((songs.data ?? []).map((s) => [s.id, s.title])),
@@ -402,6 +436,10 @@ export function MediaGallery({
       if (!next.delete(id)) next.add(id);
       return next;
     });
+  const toggleTray = (key: string) => {
+    setSelecting(true);
+    toggle(key);
+  };
   const startWith = (id: string) => {
     setSelecting(true);
     setSelected((prev) => new Set(prev).add(id));
@@ -410,11 +448,14 @@ export function MediaGallery({
   const fail = (what: string) => ({ onError: () => setError(what) });
 
   function moveSelectionTo(folderId: string | null) {
-    if (selectedIds.length === 0) return;
-    move.mutate(
-      { itemIds: selectedIds, folderId },
-      fail("Could not move those items."),
-    );
+    if (selectedCount === 0) return;
+    if (trayKeys.length > 0) store.patch(trayKeys, { folderId });
+    if (selectedIds.length > 0) {
+      move.mutate(
+        { itemIds: selectedIds, folderId },
+        fail("Could not move those items."),
+      );
+    }
     setMoveMenu(false);
     clearSelection();
   }
@@ -477,9 +518,19 @@ export function MediaGallery({
       key: "select-all",
       label: allSelected ? "Deselect all" : "Select all",
       icon: <CheckCheck />,
-      onSelect: () =>
-        setSelected(allSelected ? new Set() : new Set(all.map((i) => i.id))),
+      onSelect: () => setSelected(allSelected ? new Set() : new Set(scopeIds)),
     },
+    ...(trayKeys.length > 0
+      ? [
+          {
+            key: "cancel-upload",
+            label: "Cancel upload",
+            icon: <Ban />,
+            destructive: true,
+            onSelect: () => setConfirmCancel(trayKeys),
+          },
+        ]
+      : []),
     {
       key: "move",
       label: "Move to folder",
@@ -491,21 +542,28 @@ export function MediaGallery({
       label: "Rename",
       icon: <Pencil />,
       when: "single",
-      onSelect: () => setEditingId(selectedIds[0] ?? null),
+      onSelect: () => {
+        if (trayOnly) setEditingKey(trayKeys[0] ?? null);
+        else setEditingId(selectedIds[0] ?? null);
+      },
     },
     {
       key: "link-song",
       label: "Link to song",
       icon: <Music2 />,
-      onSelect: () => setPicker(selectedIds),
+      onSelect: () => setPicker([...trayKeys, ...selectedIds]),
     },
-    {
-      key: "download",
-      label: "Download",
-      icon: <Download />,
-      onSelect: download,
-    },
-    ...(shareSheet
+    ...(!galleryOnly
+      ? []
+      : [
+          {
+            key: "download",
+            label: "Download",
+            icon: <Download />,
+            onSelect: download,
+          },
+        ]),
+    ...(shareSheet && galleryOnly
       ? [
           {
             key: "share",
@@ -515,13 +573,17 @@ export function MediaGallery({
           },
         ]
       : []),
-    {
-      key: "delete",
-      label: "Delete",
-      icon: <Trash2 />,
-      destructive: true,
-      onSelect: () => setConfirmDelete(selectedIds),
-    },
+    ...(galleryOnly
+      ? [
+          {
+            key: "delete",
+            label: "Delete",
+            icon: <Trash2 />,
+            destructive: true,
+            onSelect: () => setConfirmDelete(selectedIds),
+          },
+        ]
+      : []),
   ];
 
   const viewerIndex = viewerId ? all.findIndex((i) => i.id === viewerId) : -1;
@@ -533,6 +595,20 @@ export function MediaGallery({
 
   const plural = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
 
+  function linkPicked(ids: string[], songId: string | null) {
+    const keys = ids.filter(isTrayKey);
+    const items = ids.filter((id) => !isTrayKey(id));
+    if (keys.length > 0) store.patch(keys, { songId });
+    if (items.length > 0) {
+      link.mutate(
+        { itemIds: items, songId },
+        fail(
+          songId ? "Could not link that song." : "Could not clear the song.",
+        ),
+      );
+    }
+  }
+
   let body;
   if (!data || !drive) {
     body = null;
@@ -542,12 +618,16 @@ export function MediaGallery({
     body = (
       <>
         {all.length === 0 ? (
-          <p
+          <button
+            type="button"
             data-testid="media-empty"
-            className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground"
+            onClick={() => fileInput.current?.click()}
+            className="flex w-full flex-col items-center gap-1 rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            No media yet
-          </p>
+            <Upload className="size-5" />
+            <span>No media yet</span>
+            <span className="text-xs">Drop files here or tap to add</span>
+          </button>
         ) : null}
         {sections.map((section, index) => {
           if (section.items.length === 0 && !section.folder) return null;
@@ -645,6 +725,21 @@ export function MediaGallery({
   return (
     <div
       data-testid="media-gallery"
+      style={{ "--tray-h": `${trayHeight}px` } as React.CSSProperties}
+      onDragOver={(e) => {
+        if (!ready || !e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!ready || !e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(false);
+        addFiles(Array.from(e.dataTransfer.files));
+      }}
       className="fixed inset-0 z-40 overflow-y-auto bg-background"
     >
       <div className="sticky top-0 z-20 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur">
@@ -725,7 +820,10 @@ export function MediaGallery({
         ) : null}
       </div>
 
-      <main data-density={density} className="mx-auto max-w-5xl px-3 pb-40">
+      <main
+        data-density={density}
+        className="mx-auto max-w-5xl px-3 pb-[calc(10rem+var(--tray-h,0px))]"
+      >
         {error ? (
           <p
             role="alert"
@@ -745,36 +843,80 @@ export function MediaGallery({
         {body}
       </main>
 
-      {ready && !selecting ? (
+      {ready ? (
         <>
-          {/* Upload tray hook point: replace the picker with the tray's add flow. */}
-          <Fab
-            label="Add media"
-            layout="desktop"
-            onClick={() => fileInput.current?.click()}
-          />
+          {!selecting ? (
+            <Fab
+              label="Add media"
+              layout="desktop"
+              className="bottom-[calc(var(--tray-h,0px)+1.5rem)]"
+              onClick={() => fileInput.current?.click()}
+            />
+          ) : null}
           <input
             ref={fileInput}
             type="file"
             multiple
-            accept="image/*,video/*"
+            accept={ACCEPT}
             hidden
             data-testid="media-file-input"
             onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
+              addFiles(Array.from(e.target.files ?? []));
               e.target.value = "";
-              if (files.length > 0) onAddMedia?.(files);
             }}
           />
         </>
       ) : null}
 
+      {ready && entries.length > 0 ? (
+        <UploadTray
+          entries={entries}
+          folders={folders}
+          defaults={defaults}
+          selected={selected}
+          editingKey={editingKey}
+          songTitle={(id) => (id ? (songTitles.get(id) ?? null) : null)}
+          onFolder={(folderId) => store.setDefaults(gigId, { folderId })}
+          onPickSong={() => setBulkPicker(true)}
+          onToggle={toggleTray}
+          onStartRename={setEditingKey}
+          onRename={(key, name) => {
+            setEditingKey(null);
+            const next = name?.trim();
+            if (next && next !== trayEntry(key)?.fileName) {
+              store.patch([key], { fileName: next });
+            }
+          }}
+          onRetry={(key) => store.retry(key)}
+          onCancelAll={() =>
+            store.cancel(
+              entries.filter((e) => e.status !== "done").map((e) => e.key),
+            )
+          }
+          onDismissDone={() => store.dismiss(entries.map((e) => e.key))}
+          onReadd={() => fileInput.current?.click()}
+          onHeight={onTrayHeight}
+        />
+      ) : null}
+
+      {dragging ? (
+        <div
+          data-testid="media-drop-overlay"
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-primary/10 ring-4 ring-primary/60 ring-inset"
+        >
+          <p className="rounded-full bg-background px-5 py-3 text-sm font-medium shadow-lift">
+            Drop files to upload
+          </p>
+        </div>
+      ) : null}
+
       <SelectionBar
-        count={selecting ? selectedIds.length : 0}
+        count={selecting ? selectedCount : 0}
         actions={actions}
         onClear={clearSelection}
         noun="selected"
         labels={false}
+        className="bottom-[calc(env(safe-area-inset-bottom)+var(--tray-h,0px)+0.75rem)]"
       />
 
       {viewerIndex >= 0 ? (
@@ -821,25 +963,54 @@ export function MediaGallery({
         onOpenChange={(o) => !o && setPicker(null)}
         firstSongIds={setlistSongIds}
         currentSongId={
-          picker?.length === 1 ? (byId.get(picker[0]!)?.songId ?? null) : null
+          picker?.length === 1
+            ? isTrayKey(picker[0]!)
+              ? (trayEntry(picker[0]!)?.songId ?? null)
+              : (byId.get(picker[0]!)?.songId ?? null)
+            : null
         }
         onClear={() => {
           if (picker) {
-            link.mutate(
-              { itemIds: picker, songId: null },
-              fail("Could not clear the song."),
-            );
+            linkPicked(picker, null);
             clearSelection();
           }
         }}
         onPick={(song) => {
           if (picker) {
-            link.mutate(
-              { itemIds: picker, songId: song.id },
-              fail("Could not link that song."),
-            );
+            linkPicked(picker, song.id);
             clearSelection();
           }
+        }}
+      />
+
+      <SongPickerDrawer
+        bandId={bandId}
+        open={bulkPicker}
+        onOpenChange={setBulkPicker}
+        title="Link uploads to a song"
+        firstSongIds={setlistSongIds}
+        currentSongId={defaults.songId}
+        onClear={() => {
+          store.setDefaults(gigId, { songId: null, songTitle: null });
+          setBulkPicker(false);
+        }}
+        onPick={(song) => {
+          store.setDefaults(gigId, { songId: song.id, songTitle: song.title });
+          setBulkPicker(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmCancel}
+        onOpenChange={(o) => !o && setConfirmCancel(null)}
+        title="Cancel these uploads?"
+        description={`Stop ${plural(confirmCancel?.length ?? 0)} and discard what was sent so far?`}
+        confirmLabel="Cancel uploads"
+        destructive
+        onConfirm={() => {
+          if (confirmCancel) store.cancel(confirmCancel);
+          setConfirmCancel(null);
+          clearSelection();
         }}
       />
 
