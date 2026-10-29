@@ -31,6 +31,28 @@ test("gig form requires a title and a date", async ({ page }) => {
   await expect(pane.getByText("Pick a date.")).toBeVisible();
 });
 
+test("an end time before the start time blocks creating the gig", async ({
+  page,
+}) => {
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const pane = await pickSide(page, "gig");
+  await pane.getByLabel("Title").fill("Backwards gig");
+  await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
+  await pane.getByLabel("Start time").fill("14:00");
+  await pane.getByLabel("End time").fill("12:00");
+  await pane.getByRole("button", { name: "Create gig" }).click();
+  await expect(
+    pane.getByText("End time must be after the start time"),
+  ).toBeVisible();
+  await expect(page.getByTestId("split-viewport")).toBeVisible();
+  await pane.getByLabel("End time").fill("16:00");
+  await pane.getByRole("button", { name: "Create gig" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Backwards gig" }),
+  ).toBeVisible();
+});
+
 test("clicking a day pre-fills the date", async ({ page }) => {
   await page.goto("/events");
   const date = isoDay(0);
@@ -129,6 +151,24 @@ test("a recurring practice shows a summary and creates its occurrences", async (
     page.getByRole("dialog", { name: "Horn section" }),
   ).toBeVisible();
   await expect(eventIn(page, "Horn section")).toHaveCount(4);
+});
+
+test("a practice ending before it starts is blocked on create", async ({
+  page,
+}) => {
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const pane = await pickSide(page, "practice");
+  await pane.getByLabel("Title").fill("Backwards jam");
+  await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
+  await pane.getByLabel("End time").fill("18:00");
+  await pane.getByRole("button", { name: "Create practice" }).click();
+  await expect(
+    pane.getByText("End time must be after the start time"),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Backwards jam" })).toHaveCount(
+    0,
+  );
 });
 
 const drawerClose = (page: import("@playwright/test").Page) =>

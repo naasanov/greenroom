@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Share2 } from "lucide-react";
+import { Check, Link2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -58,7 +58,7 @@ export function ShareButton({
         onClick={share}
         className={className}
       >
-        {copied ? <Check className="text-primary" /> : <Share2 />}
+        {copied ? <Check className="text-primary" /> : <Link2 />}
       </Button>
       <span role="status" aria-live="polite" className="sr-only">
         {copied ? "Link copied" : ""}

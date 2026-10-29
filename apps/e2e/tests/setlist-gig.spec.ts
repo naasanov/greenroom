@@ -39,7 +39,7 @@ async function expectRisen(page: Page, side: Locator) {
 }
 
 async function openLibrary(page: Page) {
-  await page.getByRole("button", { name: "Add songs" }).click();
+  await page.getByRole("button", { name: "Edit setlist" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
   // Drag tests measure rows right after opening, so wait out the slide on desktop.
   if (await librarySide(page).count()) {
@@ -71,13 +71,16 @@ async function fillSetlist(
   return sl.id as string;
 }
 
-test("empty setlist offers both ways to start", async ({ page }) => {
+test("empty setlist points at the edit pencil", async ({ page }) => {
   await openGig(page, seed.gigs.tentative);
-  await expect(page.getByTestId("setlist-empty")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add songs" })).toBeVisible();
+  await expect(page.getByTestId("setlist-empty")).toContainText("pencil");
+  await expect(
+    page.getByRole("button", { name: "Edit setlist" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add songs" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Copy from a past gig" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(total(page)).toHaveCount(0);
 });
 
@@ -344,7 +347,11 @@ test.describe("copy from a past gig", () => {
   });
 
   async function openHistory(page: Page) {
-    await page.getByRole("button", { name: "Copy from a past gig" }).click();
+    await openLibrary(page);
+    await page
+      .getByTestId("library-picker")
+      .getByRole("button", { name: "Copy from a past gig" })
+      .click();
     await expect(page.getByTestId("history-picker")).toBeVisible();
   }
 

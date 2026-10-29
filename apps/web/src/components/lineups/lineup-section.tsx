@@ -1,6 +1,6 @@
 "use client";
 
-import { History, UserPlus, X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { PickTarget, TargetRow } from "@/components/setlists/pick-dnd";
@@ -9,7 +9,8 @@ import { LINEUP_TARGET, type LineupBuilder } from "./use-lineup-builder";
 
 /**
  * The editable lineup inside the gig drawer: rows sorted by name with remove
- * buttons, plus Add people / Copy from last gig. Every change saves at once.
+ * buttons. The header's pencil opens the roster drawer. Every change saves at
+ * once.
  */
 export function LineupSection({ builder }: { builder: LineupBuilder }) {
   const { lineup, members, editor } = builder;
@@ -34,18 +35,34 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
       aria-labelledby="lineup-heading"
       className="flex flex-col gap-3"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 id="lineup-heading" className="text-base font-semibold">
-          Lineup
-        </h3>
-        {count ? (
-          <p
-            data-testid="lineup-count"
-            className="text-sm text-muted-foreground tabular-nums"
-          >
-            {count}
-          </p>
-        ) : null}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h3 id="lineup-heading" className="text-base font-semibold">
+            Lineup
+          </h3>
+          {count ? (
+            <p
+              data-testid="lineup-count"
+              className="text-sm text-muted-foreground tabular-nums"
+            >
+              {count}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Edit lineup"
+          className="-mr-1.5 shrink-0 text-muted-foreground"
+          aria-expanded={builder.rosterOpen}
+          onClick={() => {
+            editor.clearError();
+            builder.setRosterOpen(!builder.rosterOpen);
+          }}
+        >
+          <Pencil />
+        </Button>
       </div>
 
       {!rows ? (
@@ -69,7 +86,7 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
               data-testid="lineup-empty"
               className="flex h-14 items-center rounded-2xl border border-dashed px-4 text-sm text-muted-foreground"
             >
-              No one is in the lineup yet. Add people or copy the last gig.
+              No one is in the lineup yet. Tap the pencil to add people.
             </p>
           }
         >
@@ -111,38 +128,6 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
           Could not save that change. The lineup was reloaded.
         </p>
       ) : null}
-      {builder.noPrevious ? (
-        <p
-          role="status"
-          data-testid="lineup-no-previous"
-          className="text-sm text-muted-foreground"
-        >
-          No earlier gig has a lineup yet.
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          aria-expanded={builder.rosterOpen}
-          onClick={() => {
-            editor.clearError();
-            builder.setRosterOpen(!builder.rosterOpen);
-          }}
-        >
-          <UserPlus /> Add people
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={builder.copyPending || !rows}
-          onClick={builder.copyLast}
-        >
-          <History />{" "}
-          {builder.copyPending ? "Copying..." : "Copy from last gig"}
-        </Button>
-      </div>
     </section>
   );
 }

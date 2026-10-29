@@ -41,45 +41,56 @@ import {
 } from "@/components/events/recurrence";
 import { cn } from "@/lib/utils";
 
-const practiceFormSchema = z
-  .object({
-    title: z.string().trim().min(1, "Give the practice a title."),
-    location: z.string().trim().max(500),
-    startDate: localDateSchema,
-    startTime: localTimeSchema,
-    endTime: localTimeSchema,
-    freq: z.enum(["none", "weekly", "monthly"]),
-    interval: z.coerce.number().int().min(1).max(52),
-    byWeekday: z.array(weekdaySchema),
-    monthlyMode: z.enum(["dayOfMonth", "nthWeekday"]),
-    endType: z.enum(["never", "until", "count"]),
-    endDate: z.string(),
-    endCount: z.coerce.number().int().min(1).max(520),
-  })
-  .superRefine((v, ctx) => {
-    if (v.freq === "weekly" && v.byWeekday.length === 0) {
+const practiceFieldsSchema = z.object({
+  title: z.string().trim().min(1, "Give the practice a title."),
+  location: z.string().trim().max(500),
+  startDate: localDateSchema,
+  startTime: localTimeSchema,
+  endTime: localTimeSchema,
+  freq: z.enum(["none", "weekly", "monthly"]),
+  interval: z.coerce.number().int().min(1).max(52),
+  byWeekday: z.array(weekdaySchema),
+  monthlyMode: z.enum(["dayOfMonth", "nthWeekday"]),
+  endType: z.enum(["never", "until", "count"]),
+  endDate: z.string(),
+  endCount: z.coerce.number().int().min(1).max(520),
+});
+
+const practiceFormSchema = practiceFieldsSchema.superRefine((v, ctx) => {
+  if (
+    localTimeSchema.safeParse(v.startTime).success &&
+    localTimeSchema.safeParse(v.endTime).success &&
+    v.endTime <= v.startTime
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endTime"],
+      message: "End time must be after the start time",
+    });
+  }
+  if (v.freq === "weekly" && v.byWeekday.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["byWeekday"],
+      message: "Pick at least one day.",
+    });
+  }
+  if (v.freq !== "none" && v.endType === "until") {
+    if (!localDateSchema.safeParse(v.endDate).success) {
       ctx.addIssue({
         code: "custom",
-        path: ["byWeekday"],
-        message: "Pick at least one day.",
+        path: ["endDate"],
+        message: "Pick an end date.",
+      });
+    } else if (v.endDate < v.startDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "End date is before the start.",
       });
     }
-    if (v.freq !== "none" && v.endType === "until") {
-      if (!localDateSchema.safeParse(v.endDate).success) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["endDate"],
-          message: "Pick an end date.",
-        });
-      } else if (v.endDate < v.startDate) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["endDate"],
-          message: "End date is before the start.",
-        });
-      }
-    }
-  });
+  }
+});
 
 // The resolver's input type carries the coerced fields as unknown.
 type PracticeFormValues = z.input<typeof practiceFormSchema>;
@@ -280,7 +291,7 @@ export function PracticeForm({
   }
 
   function draftFor(v: PracticeFormOutput): PracticeEditDraft {
-    const base = practiceFormSchema.parse(baseline);
+    const base = practiceFieldsSchema.parse(baseline);
     const recurrence = recurrenceOf(v);
     const durationMinutes = minutesBetween(v.startTime, v.endTime);
     const recurrenceChanged =
@@ -385,7 +396,7 @@ export function PracticeForm({
         <FieldError message={errors.title?.message} />
       </FormField>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
         <FormField label="Date" htmlFor={id("date")} className="col-span-2">
           <Input
             id={id("date")}
@@ -412,7 +423,15 @@ export function PracticeForm({
             aria-invalid={!!errors.endTime}
             {...form.register("endTime")}
           />
-          {errors.endTime ? <FieldError message="Pick a time." /> : null}
+          {errors.endTime ? (
+            <FieldError
+              message={
+                errors.endTime.type === "custom"
+                  ? errors.endTime.message
+                  : "Pick a time."
+              }
+            />
+          ) : null}
         </FormField>
       </div>
 

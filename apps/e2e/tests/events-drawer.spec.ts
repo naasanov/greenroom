@@ -88,7 +88,7 @@ test("edit a gig", async ({ page }) => {
   const gig = seed.gigs.upcomingClub;
   await page.goto(`/gigs/${gig.id}`);
   const drawer = dialog(page, gig.title);
-  await drawer.getByRole("button", { name: "Edit" }).click();
+  await drawer.getByRole("button", { name: "Edit details" }).click();
   const title = drawer.getByLabel("Title");
   await expect(title).toHaveValue(gig.title);
   await title.fill("Club Meridian (late set)");
@@ -101,7 +101,7 @@ test("dirty edit asks before closing", async ({ page }) => {
   const gig = seed.gigs.upcomingClub;
   await page.goto(`/gigs/${gig.id}`);
   const drawer = dialog(page, gig.title);
-  await drawer.getByRole("button", { name: "Edit" }).click();
+  await drawer.getByRole("button", { name: "Edit details" }).click();
   await drawer.getByLabel("Title").fill("Changed");
   await drawer.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("Discard changes?");
@@ -109,10 +109,92 @@ test("dirty edit asks before closing", async ({ page }) => {
   await expect(page).toHaveURL(/\/events$/);
 });
 
+test("each section has its own edit button and there is no footer", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = dialog(page, gig.title);
+  for (const name of ["Edit details", "Edit setlist", "Edit lineup"]) {
+    await expect(drawer.getByRole("button", { name })).toBeVisible();
+  }
+  await expect(
+    drawer.getByRole("button", { name: "Edit", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "Delete", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("editing details swaps the block inline and saves", async ({ page }) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = dialog(page, gig.title);
+  const section = drawer.getByTestId("details-section");
+  await section.getByRole("button", { name: "Edit details" }).click();
+  await expect(section.getByLabel("Title")).toHaveValue(gig.title);
+  await expect(
+    section.getByRole("button", { name: "Edit details" }),
+  ).toHaveCount(0);
+  await expect(drawer.getByTestId("setlist-section")).toBeVisible();
+  await section.getByLabel("Notes").fill("Bring the long cable");
+  await section.getByRole("button", { name: "Save changes" }).click();
+  await expect(section.getByLabel("Title")).toHaveCount(0);
+  await expect(section).toContainText("Bring the long cable");
+});
+
+test("an end time before the start time is rejected when editing", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = dialog(page, gig.title);
+  await drawer.getByRole("button", { name: "Edit details" }).click();
+  await drawer.getByLabel("Start time").fill("14:00");
+  await drawer.getByLabel("End time").fill("12:00");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await expect(
+    drawer
+      .getByRole("alert")
+      .filter({ hasText: "End time must be after the start time" }),
+  ).toBeVisible();
+  await expect(drawer.getByLabel("Title")).toBeVisible();
+  await drawer.getByLabel("End time").fill("16:00");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await expect(drawer.getByLabel("Title")).toHaveCount(0);
+  await expect(drawer.getByTestId("details-section")).toContainText(
+    "2:00 PM - 4:00 PM",
+  );
+});
+
+test("the delete icon sits at the top left of the drawer and confirms", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = dialog(page, gig.title);
+  const trash = drawer.getByRole("button", { name: "Delete gig" });
+  const title = drawer.locator("[data-slot=drawer-title]");
+  await expect(trash).toBeVisible();
+  const t = (await trash.boundingBox())!;
+  const d = (await drawer.boundingBox())!;
+  const ti = (await title.boundingBox())!;
+  expect(t.x - d.x).toBeLessThan(40);
+  expect(t.y - d.y).toBeLessThan(40);
+  expect(t.x + t.width).toBeLessThanOrEqual(ti.x);
+  await trash.click();
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("Delete this gig?");
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(drawer).toBeVisible();
+});
+
 test("deleting a gig warns that media stays in Drive", async ({ page }) => {
   const gig = seed.gigs.upcomingClub;
   await page.goto(`/gigs/${gig.id}`);
-  await dialog(page, gig.title).getByRole("button", { name: "Delete" }).click();
+  await dialog(page, gig.title)
+    .getByRole("button", { name: "Delete gig" })
+    .click();
   const confirm = page.getByRole("alertdialog");
   await expect(confirm).toContainText("remain in Google Drive");
   await confirm.getByRole("button", { name: "Delete gig" }).click();
@@ -150,7 +232,7 @@ async function openMovedPracticeEdit(page: Page) {
   const date = seed.practice.moved.startsAt.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   const drawer = dialog(page, seed.practice.title);
-  await drawer.getByRole("button", { name: "Edit" }).click();
+  await drawer.getByRole("button", { name: "Edit details" }).click();
   await expect(drawer.getByLabel("Title")).toHaveValue(seed.practice.title);
   return drawer;
 }
@@ -237,16 +319,57 @@ test("'All events' with an untouched date keeps the series start", async ({
   expect(after.dtstart.toISOString()).toBe(before.dtstart.toISOString());
 });
 
-test("an end time before the start runs past midnight", async ({ page }) => {
+test("an end time before the start blocks saving an edit", async ({ page }) => {
   const drawer = await openMovedPracticeEdit(page);
-  await drawer.getByLabel("Start time").fill("22:00");
-  await expect(drawer.getByLabel("End time")).toHaveValue("00:00");
-  await drawer.getByLabel("End time").fill("01:00");
+  await drawer.getByLabel("End time").fill("18:00");
   await drawer.getByRole("button", { name: "Save changes" }).click();
-  await scopeDialog(page).getByRole("button", { name: "OK" }).click();
-  await expect(dialog(page, seed.practice.title)).toContainText(
-    "10:00 PM - 1:00 AM",
-  );
+  await expect(
+    drawer.getByText("End time must be after the start time"),
+  ).toBeVisible();
+  await expect(scopeDialog(page)).toHaveCount(0);
+  await drawer.getByLabel("End time").fill("20:00");
+  await drawer.getByRole("button", { name: "Save changes" }).click();
+  await expect(scopeDialog(page)).toBeVisible();
+});
+
+test("practice drawer has per-section buttons and no footer", async ({
+  page,
+}) => {
+  const date = seed.practice.moved.startsAt.slice(0, 10);
+  await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
+  const drawer = dialog(page, seed.practice.title);
+  await expect(
+    drawer.getByRole("button", { name: "Edit details" }),
+  ).toBeVisible();
+  await expect(
+    drawer.getByRole("button", { name: "Edit setlist" }),
+  ).toBeVisible();
+  await expect(
+    drawer.getByRole("button", { name: "Delete practice" }),
+  ).toBeVisible();
+  await expect(
+    drawer.getByRole("button", { name: "Share link" }),
+  ).toBeVisible();
+  await expect(
+    drawer.getByRole("button", { name: "Edit", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "Delete", exact: true }),
+  ).toHaveCount(0);
+  await expect(drawer.getByTestId("practice-when")).toContainText("7:00 PM");
+});
+
+test("editing practice details swaps only the details block inline", async ({
+  page,
+}) => {
+  const drawer = await openMovedPracticeEdit(page);
+  await expect(
+    drawer.getByRole("button", { name: "Edit details" }),
+  ).toHaveCount(0);
+  await expect(drawer.getByTestId("setlist-section")).toBeVisible();
+  await expect(drawer.getByTestId("practice-when")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "Cancel" }).click();
+  await expect(drawer.getByTestId("practice-when")).toBeVisible();
 });
 
 test("a one-off practice saves without a scope dialog", async ({
@@ -272,7 +395,7 @@ test("a one-off practice saves without a scope dialog", async ({
   const series = await res.json();
   await page.goto(`/practices/${series.id}?date=${date}`);
   const drawer = dialog(page, "One-off jam");
-  await drawer.getByRole("button", { name: "Edit" }).click();
+  await drawer.getByRole("button", { name: "Edit details" }).click();
   await expect(drawer.getByLabel("End time")).toHaveValue("19:30");
   await drawer.getByLabel("Title").fill("One-off jam v2");
   await drawer.getByRole("button", { name: "Save changes" }).click();
@@ -284,7 +407,7 @@ test("deleting a recurring practice asks for a scope", async ({ page }) => {
   const date = seed.practice.moved.startsAt.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   await dialog(page, seed.practice.title)
-    .getByRole("button", { name: "Delete" })
+    .getByRole("button", { name: "Delete practice" })
     .click();
   const scope = page.getByRole("dialog", { name: "Cancel recurring event" });
   await expect(scope).toBeVisible();

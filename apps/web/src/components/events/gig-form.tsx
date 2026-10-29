@@ -53,6 +53,12 @@ const gigFormSchema = z
         path: ["endTime"],
         message: "Add a start time first.",
       });
+    } else if (v.endTime && v.startTime && v.endTime < v.startTime) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endTime"],
+        message: "End time must be after the start time",
+      });
     }
   });
 
@@ -182,7 +188,7 @@ export function GigForm({
         {errors.date ? <FieldError message="Pick a date." /> : null}
       </FormField>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
         <FormField label="Start time" htmlFor={id("start")}>
           <Input
             id={id("start")}

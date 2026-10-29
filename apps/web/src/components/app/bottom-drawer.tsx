@@ -24,6 +24,8 @@ export interface BottomDrawerProps {
   hideHeader?: boolean;
   /** Icon button(s) shown in the header beside the close button. */
   headerAction?: ReactNode;
+  /** Icon button(s) pinned to the header's left edge, mirroring headerAction. */
+  headerLeading?: ReactNode;
   /** Optional trigger element for uncontrolled use. */
   trigger?: ReactNode;
   /** Pinned below the scrolling body, above the safe area. */
@@ -55,6 +57,7 @@ export function BottomDrawer({
   description,
   hideHeader,
   headerAction,
+  headerLeading,
   trigger,
   footer,
   aside,
@@ -124,12 +127,17 @@ export function BottomDrawer({
           <DrawerHeader
             className={cn(
               "relative pt-3 pb-2 text-center md:text-center",
-              headerAction ? "px-24" : "px-12",
+              headerAction || headerLeading ? "px-24" : "px-12",
             )}
           >
             <DrawerTitle className="text-lg font-semibold">{title}</DrawerTitle>
             {description ? (
               <DrawerDescription>{description}</DrawerDescription>
+            ) : null}
+            {headerLeading ? (
+              <div className="absolute top-1 left-3 flex items-center">
+                {headerLeading}
+              </div>
             ) : null}
             <div className="absolute top-1 right-3 flex items-center">
               {headerAction}

@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
 import type {
   EditScope as ApiScope,
   PracticeEditResult,
@@ -41,7 +41,7 @@ import {
   type PracticeSubmit,
 } from "@/components/events/practice-form";
 import { recurrenceSummary } from "@/components/events/recurrence";
-import { whenLabel, wallClock } from "@/components/events/time";
+import { dayLabel, timeRange, wallClock } from "@/components/events/time";
 import { useMe } from "@/lib/queries";
 import {
   useDeletePractice,
@@ -71,15 +71,25 @@ const RSVP_OPTIONS = [
   { value: "not_going", label: "Not going" },
 ] as const;
 
+function mapsUrl(location: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 function PracticeDetails({
   bandId,
   occ,
+  editing,
+  onEdit,
+  editForm,
   setlist,
   onRemoveSetlist,
   setlistError,
 }: {
   bandId: string;
   occ: PracticeOccurrence;
+  editing: boolean;
+  onEdit: () => void;
+  editForm: ReactNode;
   setlist: SetlistBuilder;
   onRemoveSetlist: () => void;
   setlistError: string | null;
@@ -95,17 +105,72 @@ function PracticeDetails({
   }));
   return (
     <div className="flex flex-col gap-5">
-      <dl className="flex flex-col gap-4 pt-1">
-        <Fact label="When">
-          <span data-testid="practice-when">{whenLabel(occ)}</span>
-        </Fact>
-        {occ.location ? <Fact label="Location">{occ.location}</Fact> : null}
-        {occ.recurring && series.data ? (
-          <Fact label="Repeats">
-            {recurrenceSummary(series.data.recurrence, series.data.startDate)}
-          </Fact>
-        ) : null}
-      </dl>
+      <section
+        data-testid="details-section"
+        aria-labelledby="details-heading"
+        className="flex flex-col gap-3"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="details-heading" className="text-base font-semibold">
+            Details
+          </h3>
+          {editing ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Edit details"
+              className="-mr-1.5 text-muted-foreground"
+              onClick={onEdit}
+            >
+              <Pencil />
+            </Button>
+          )}
+        </div>
+        {editing ? (
+          editForm
+        ) : (
+          <dl className="flex flex-col gap-4">
+            <Fact label="When">
+              <span
+                data-testid="practice-when"
+                className="flex flex-wrap justify-between gap-x-3"
+              >
+                <span>{dayLabel(occ.date)}</span>
+                <span className="ml-auto">
+                  {timeRange(occ) ?? "No time yet"}
+                </span>
+              </span>
+            </Fact>
+            {occ.location ? (
+              <Fact label="Location">
+                <span className="flex items-start gap-2">
+                  <span className="min-w-0 flex-1 font-medium break-words">
+                    {occ.location}
+                  </span>
+                  <a
+                    href={mapsUrl(occ.location)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open in Maps"
+                    className="mt-0.5 shrink-0 text-primary"
+                  >
+                    <ExternalLink className="size-4" />
+                  </a>
+                </span>
+              </Fact>
+            ) : null}
+            {occ.recurring && series.data ? (
+              <Fact label="Repeats">
+                {recurrenceSummary(
+                  series.data.recurrence,
+                  series.data.startDate,
+                )}
+              </Fact>
+            ) : null}
+          </dl>
+        )}
+      </section>
 
       <section aria-label="Your RSVP" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Your RSVP</h3>
@@ -257,30 +322,21 @@ export function PracticeDrawer({
           title={title}
           description={EVENT_TYPES.practice.label}
           headerAction={<ShareButton path={path} title={title} />}
-          footer={
-            occ && !editing ? (
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1"
-                  variant="outline"
-                  onClick={() => {
-                    setSaveError(null);
-                    setEditing(true);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() =>
-                    occ.recurring
-                      ? setDeleteScopeOpen(true)
-                      : setConfirmDelete(true)
-                  }
-                >
-                  Delete
-                </Button>
-              </div>
+          headerLeading={
+            occ ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Delete practice"
+                className="text-muted-foreground"
+                onClick={() =>
+                  occ.recurring
+                    ? setDeleteScopeOpen(true)
+                    : setConfirmDelete(true)
+                }
+              >
+                <Trash2 />
+              </Button>
             ) : undefined
           }
         >
@@ -291,32 +347,38 @@ export function PracticeDrawer({
                 className="size-5 animate-spin text-muted-foreground"
               />
             </div>
-          ) : editing ? (
-            editInitial ? (
-              <PracticeForm
-                idPrefix="practice-edit"
-                initial={editInitial}
-                editing
-                seriesStartDate={series.data?.startDate}
-                externalError={saveError}
-                timeZone={series.data?.timeZone ?? occ.timeZone}
-                submitLabel="Save changes"
-                onSubmit={save}
-                onCancel={cancelEdit}
-                onDirtyChange={onDirty}
-              />
-            ) : (
-              <div className="flex justify-center py-10">
-                <Loader2
-                  aria-label="Loading"
-                  className="size-5 animate-spin text-muted-foreground"
-                />
-              </div>
-            )
           ) : (
             <PracticeDetails
               bandId={bandId}
               occ={occ}
+              editing={editing}
+              onEdit={() => {
+                setSaveError(null);
+                setEditing(true);
+              }}
+              editForm={
+                editInitial ? (
+                  <PracticeForm
+                    idPrefix="practice-edit"
+                    initial={editInitial}
+                    editing
+                    seriesStartDate={series.data?.startDate}
+                    externalError={saveError}
+                    timeZone={series.data?.timeZone ?? occ.timeZone}
+                    submitLabel="Save changes"
+                    onSubmit={save}
+                    onCancel={cancelEdit}
+                    onDirtyChange={onDirty}
+                  />
+                ) : (
+                  <div className="flex justify-center py-10">
+                    <Loader2
+                      aria-label="Loading"
+                      className="size-5 animate-spin text-muted-foreground"
+                    />
+                  </div>
+                )
+              }
               setlist={setlist}
               onRemoveSetlist={() => void practiceSetlist.remove()}
               setlistError={practiceSetlist.error}

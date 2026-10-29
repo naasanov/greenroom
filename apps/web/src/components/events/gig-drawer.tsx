@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
-import { time12, whenLabel } from "@/components/events/time";
+import { dayLabel, time12, timeRange } from "@/components/events/time";
 import { MediaSection } from "@/components/media/media-section";
 import { UploadLinkButton } from "@/components/media/upload-link-dialog";
 import { LineupAside } from "@/components/lineups/lineup-aside";
@@ -44,67 +44,127 @@ function mapsUrl(gig: Gig): string {
 function GigDetails({
   bandId,
   gig,
+  editing,
+  onEdit,
+  onSave,
+  onCancel,
+  onDirty,
   setlist,
   lineup,
 }: {
   bandId: string;
   gig: Gig;
+  editing: boolean;
+  onEdit: () => void;
+  onSave: (payload: CreateGig) => Promise<void>;
+  onCancel: () => void;
+  onDirty: (dirty: boolean) => void;
   setlist: SetlistBuilder;
   lineup: LineupBuilder;
 }) {
   const hasContact = gig.contactName || gig.contactPhone || gig.contactEmail;
+  const time = timeRange(gig);
   return (
-    <div className="flex flex-col gap-5">
-      <dl className="flex flex-col gap-4 pt-1">
-        <Fact label="When">
-          <span data-testid="gig-when">{whenLabel(gig)}</span>
-        </Fact>
-        {gig.loadInTime ? (
-          <Fact label="Load-in">{time12(gig.loadInTime)}</Fact>
-        ) : null}
-        {gig.venueName || gig.address ? (
-          <Fact label="Venue">
-            <span className="font-medium">{gig.venueName}</span>
-            {gig.address ? (
-              <span className="block text-muted-foreground">{gig.address}</span>
-            ) : null}
-            <a
-              href={mapsUrl(gig)}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block text-primary underline-offset-4 hover:underline"
+    <div className="flex flex-col gap-6">
+      <section
+        data-testid="details-section"
+        aria-labelledby="details-heading"
+        className="flex flex-col gap-3"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="details-heading" className="text-base font-semibold">
+            Details
+          </h3>
+          {editing ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Edit details"
+              className="-mr-1.5 text-muted-foreground"
+              onClick={onEdit}
             >
-              Open in Maps
-            </a>
-          </Fact>
-        ) : null}
-        {hasContact ? (
-          <Fact label="Point of contact">
-            {gig.contactName ? <span>{gig.contactName}</span> : null}
-            {gig.contactPhone ? (
-              <a
-                href={`tel:${gig.contactPhone}`}
-                className="block text-primary underline-offset-4 hover:underline"
+              <Pencil />
+            </Button>
+          )}
+        </div>
+        {editing ? (
+          <GigForm
+            idPrefix="gig-edit"
+            bandId={bandId}
+            gig={gig}
+            timeZone={gig.timeZone}
+            submitLabel="Save changes"
+            onSubmit={onSave}
+            onCancel={onCancel}
+            onDirtyChange={onDirty}
+          />
+        ) : (
+          <dl className="flex flex-col gap-4">
+            <Fact label="When">
+              <span
+                data-testid="gig-when"
+                className="flex flex-wrap justify-between gap-x-3"
               >
-                {gig.contactPhone}
-              </a>
+                <span>{dayLabel(gig.date)}</span>
+                <span className="ml-auto">{time ?? "No time yet"}</span>
+              </span>
+            </Fact>
+            {gig.loadInTime ? (
+              <Fact label="Load-in">{time12(gig.loadInTime)}</Fact>
             ) : null}
-            {gig.contactEmail ? (
-              <a
-                href={`mailto:${gig.contactEmail}`}
-                className="block text-primary underline-offset-4 hover:underline"
-              >
-                {gig.contactEmail}
-              </a>
+            {gig.venueName || gig.address ? (
+              <Fact label="Venue">
+                <span className="flex items-start gap-2">
+                  <span className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3">
+                    <span className="font-medium">{gig.venueName}</span>
+                    {gig.address ? (
+                      <span className="ml-auto min-w-0 text-right break-words text-muted-foreground">
+                        {gig.address}
+                      </span>
+                    ) : null}
+                  </span>
+                  <a
+                    href={mapsUrl(gig)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open in Maps"
+                    className="mt-0.5 shrink-0 text-primary"
+                  >
+                    <ExternalLink className="size-4" />
+                  </a>
+                </span>
+              </Fact>
             ) : null}
-          </Fact>
-        ) : null}
-        {gig.notes ? (
-          <Fact label="Notes">
-            <span className="whitespace-pre-wrap">{gig.notes}</span>
-          </Fact>
-        ) : null}
-      </dl>
+            {hasContact ? (
+              <Fact label="Point of contact">
+                {gig.contactName ? <span>{gig.contactName}</span> : null}
+                {gig.contactPhone ? (
+                  <a
+                    href={`tel:${gig.contactPhone}`}
+                    className="block text-primary underline-offset-4 hover:underline"
+                  >
+                    {gig.contactPhone}
+                  </a>
+                ) : null}
+                {gig.contactEmail ? (
+                  <a
+                    href={`mailto:${gig.contactEmail}`}
+                    className="block text-primary underline-offset-4 hover:underline"
+                  >
+                    {gig.contactEmail}
+                  </a>
+                ) : null}
+              </Fact>
+            ) : null}
+            {gig.notes ? (
+              <Fact label="Notes">
+                <span className="whitespace-pre-wrap">{gig.notes}</span>
+              </Fact>
+            ) : null}
+          </dl>
+        )}
+      </section>
       <div data-testid="gig-sections" className="flex flex-col gap-6">
         <SetlistSection builder={setlist} />
         <LineupSection builder={lineup} />
@@ -196,20 +256,17 @@ export function GigDrawer({
           title={title}
           description={EVENT_TYPES.gig.label}
           headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}
-          footer={
-            gig && !editing ? (
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1"
-                  variant="outline"
-                  onClick={() => setEditing(true)}
-                >
-                  Edit
-                </Button>
-                <Button variant="destructive" onClick={() => setDeleting(true)}>
-                  Delete
-                </Button>
-              </div>
+          headerLeading={
+            gig ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Delete gig"
+                className="text-muted-foreground"
+                onClick={() => setDeleting(true)}
+              >
+                <Trash2 />
+              </Button>
             ) : undefined
           }
         >
@@ -220,21 +277,15 @@ export function GigDrawer({
                 className="size-5 animate-spin text-muted-foreground"
               />
             </div>
-          ) : editing ? (
-            <GigForm
-              idPrefix="gig-edit"
-              bandId={bandId}
-              gig={gig}
-              timeZone={gig.timeZone}
-              submitLabel="Save changes"
-              onSubmit={save}
-              onCancel={cancelEdit}
-              onDirtyChange={onDirty}
-            />
           ) : (
             <GigDetails
               bandId={bandId}
               gig={gig}
+              editing={editing}
+              onEdit={() => setEditing(true)}
+              onSave={save}
+              onCancel={cancelEdit}
+              onDirty={onDirty}
               setlist={setlist}
               lineup={lineup}
             />

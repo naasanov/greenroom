@@ -120,7 +120,7 @@ test("desktop agenda pushes the calendar instead of covering it", async ({
     .toBe(true);
 });
 
-test("drawer title is centered and the footer clears the bottom edge", async ({
+test("drawer title is centered and the last content clears the bottom edge", async ({
   page,
 }) => {
   const gig = seed.gigs.upcomingClub;
@@ -147,16 +147,20 @@ test("drawer title is centered and the footer clears the bottom edge", async ({
     Math.abs(textBox.x + textBox.w / 2 - (d.x + d.width / 2)),
   ).toBeLessThan(1.5);
 
-  const edit = drawer.getByRole("button", { name: "Edit" });
   await expect
     .poll(async () => {
       const dr = (await drawer.boundingBox())!;
       return Math.round(dr.y + dr.height);
     })
     .toBeLessThanOrEqual(page.viewportSize()!.height);
-  const e = (await edit.boundingBox())!;
+  await expect(
+    drawer.getByRole("button", { name: "Edit", exact: true }),
+  ).toHaveCount(0);
+  const last = drawer.getByTestId("gig-sections").locator("> *").last();
+  await last.scrollIntoViewIfNeeded();
+  const l = (await last.boundingBox())!;
   const dr = (await drawer.boundingBox())!;
-  expect(dr.y + dr.height - (e.y + e.height)).toBeGreaterThanOrEqual(12);
+  expect(dr.y + dr.height - (l.y + l.height)).toBeGreaterThanOrEqual(12);
   expect(page.viewportSize()!.height - (dr.y + dr.height)).toBeLessThan(1);
 });
 

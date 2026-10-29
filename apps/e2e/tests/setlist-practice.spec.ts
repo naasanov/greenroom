@@ -89,7 +89,7 @@ async function openOcc(page: Page, k: number) {
 }
 
 async function addFromLibrary(page: Page, ...titles: string[]) {
-  await page.getByRole("button", { name: "Add songs" }).click();
+  await page.getByRole("button", { name: "Edit setlist" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
   for (const t of titles) await libraryRow(page, t).click();
   await page.getByRole("button", { name: "Done" }).click();
@@ -97,7 +97,7 @@ async function addFromLibrary(page: Page, ...titles: string[]) {
 }
 
 async function openLibrary(page: Page) {
-  await page.getByRole("button", { name: "Add songs" }).click();
+  await page.getByRole("button", { name: "Edit setlist" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
 }
 
@@ -114,8 +114,11 @@ test("adding songs to a practice with no setlist forks from that occurrence", as
   await openOcc(page, 1);
   await expect(page.getByTestId("setlist-empty")).toHaveText("No setlist");
   await expect(
-    page.getByRole("button", { name: "Copy from a past gig" }),
+    page.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Copy from a past gig" }),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Changes apply to this and later practices."),
   ).toBeVisible();

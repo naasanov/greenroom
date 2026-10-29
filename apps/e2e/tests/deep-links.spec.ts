@@ -65,7 +65,10 @@ test("practice link on a date with no occurrence shows a message", async ({
   const date = seed.practice.moved.originalStart.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   await expect(page.getByRole("status")).toContainText("no occurrence");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // The desktop agenda sheet is also a dialog, so only the practice drawer is checked.
+  await expect(
+    page.getByRole("dialog", { name: seed.practice.title }),
+  ).toHaveCount(0);
   await expect(page.getByTestId("events-tab")).toBeVisible();
 });
 

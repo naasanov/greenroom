@@ -30,7 +30,7 @@ async function openGig(page: Page, gig: { id: string }) {
 }
 
 async function openRoster(page: Page) {
-  await page.getByRole("button", { name: "Add people" }).click();
+  await page.getByRole("button", { name: "Edit lineup" }).click();
   await expect(page.getByTestId("roster-picker")).toBeVisible();
 }
 
@@ -119,30 +119,99 @@ test("opening the setlist library closes the roster drawer", async ({
   page,
   isMobile,
 }) => {
-  test.skip(isMobile, "The stacked phone drawer covers the Add songs button");
+  test.skip(
+    isMobile,
+    "The stacked phone drawer covers the Edit setlist button",
+  );
+  // Below 1300px the roster overlays the gig drawer and covers the Edit setlist button.
+  await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await openRoster(page);
-  await page.getByRole("button", { name: "Add songs" }).click();
+  await page.getByRole("button", { name: "Edit setlist" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
   await expect(page.getByTestId("roster-picker")).toBeHidden();
 });
 
-test("copy from last gig fills the lineup", async ({ page }) => {
+// Only past gigs appear in history; the seed gives none a lineup, so give The Rusty Anchor one.
+async function seedPastLineup(testApi: Parameters<typeof apiAs>[0]) {
+  const api = await apiAs(testApi, AVA);
+  const res = await api.put(
+    `${bandPath()}/gigs/${seed.gigs.pastBar.id}/lineup`,
+    {
+      data: {
+        membershipIds: [
+          seed.memberships.ava,
+          seed.memberships.ben,
+          seed.memberships.dev,
+        ],
+      },
+    },
+  );
+  expect(res.status()).toBe(200);
+  await api.dispose();
+}
+
+const openHistory = async (page: Page) => {
+  await openRoster(page);
+  await page.getByRole("button", { name: "Copy from a past gig" }).click();
+  await expect(page.getByTestId("lineup-history-picker")).toBeVisible();
+};
+
+test("copying from a past gig replaces the lineup", async ({
+  page,
+  testApi,
+}) => {
+  await seedPastLineup(testApi);
   await openGig(page, seed.gigs.tentative);
   await expect(page.getByTestId("lineup-empty")).toBeVisible();
-  await page.getByRole("button", { name: "Copy from last gig" }).click();
+  await openHistory(page);
+  await page
+    .getByTestId("lineup-history-entry")
+    .filter({ hasText: seed.gigs.pastBar.title })
+    .click();
+  await expect(page.getByTestId("roster-picker")).toBeVisible();
   await expect(rows(page)).toHaveCount(3);
-  await expect(page.getByTestId("lineup-no-previous")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Remove Dev/ })).toBeVisible();
   await expect(count(page)).toHaveText("3 of 4 members");
+  await page.reload();
+  await expect(rows(page)).toHaveCount(3);
 });
 
-test("copy from last gig reports when no earlier gig has a lineup", async ({
+test("a past gig's lineup can be previewed before copying", async ({
+  page,
+  testApi,
+}) => {
+  await seedPastLineup(testApi);
+  await openGig(page, seed.gigs.tentative);
+  await openHistory(page);
+  const entry = page
+    .getByTestId("lineup-history-picker")
+    .getByRole("listitem")
+    .filter({ hasText: seed.gigs.pastBar.title });
+  await expect(entry.getByTestId("lineup-history-entry")).toContainText(
+    "3 members",
+  );
+  await entry.getByTestId("lineup-history-preview-toggle").click();
+  const preview = entry.getByTestId("lineup-history-preview");
+  await expect(preview).toContainText(USERS.dev.displayName);
+  await expect(preview).toContainText(USERS.ben.displayName);
+  await expect(rows(page)).toHaveCount(0);
+});
+
+test("the history view goes back to the member list", async ({ page }) => {
+  await openGig(page, seed.gigs.tentative);
+  await openHistory(page);
+  await page.getByRole("button", { name: "Back to band members" }).click();
+  await expect(page.getByTestId("roster-picker")).toBeVisible();
+  await expect(page.getByTestId("lineup-history-picker")).toHaveCount(0);
+});
+
+test("the history view reports when no earlier gig has a lineup", async ({
   page,
 }) => {
   await openGig(page, seed.gigs.pastFestival);
-  await page.getByRole("button", { name: "Copy from last gig" }).click();
-  await expect(page.getByTestId("lineup-no-previous")).toHaveText(
+  await openHistory(page);
+  await expect(page.getByTestId("lineup-history-picker")).toContainText(
     "No earlier gig has a lineup yet.",
   );
 });

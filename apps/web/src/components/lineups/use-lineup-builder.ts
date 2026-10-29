@@ -1,12 +1,18 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { BandMember, Lineup, LineupMember } from "@greenroom/shared";
+import type {
+  BandMember,
+  Lineup,
+  LineupHistoryEntry,
+  LineupMember,
+} from "@greenroom/shared";
 import { SETLIST_ERROR_CODES } from "@greenroom/shared";
 import { isApiError } from "@/lib/api";
 import { useMembers } from "@/lib/queries";
 import {
   useCopyLastLineup,
+  useCopyLineup,
   useLineup,
   useLineupEditor,
   type LineupEditor,
@@ -17,6 +23,7 @@ export const LINEUP_TARGET = "lineup";
 
 export interface LineupBuilder {
   bandId: string;
+  gigId: string;
   lineup: Lineup | undefined;
   loadError: boolean;
   /** Active band members, or undefined while loading. */
@@ -34,6 +41,11 @@ export interface LineupBuilder {
   /** Set after copy-from-last finds no earlier lineup. */
   noPrevious: boolean;
   copyFailed: boolean;
+  /** True while the roster drawer shows the past-gig history view. */
+  historyOpen: boolean;
+  setHistoryOpen: (open: boolean) => void;
+  /** Replaces the lineup with the chosen gig's and returns to the member list. */
+  copyFromGig: (entry: LineupHistoryEntry) => void;
   mode: LibraryMode;
 }
 
@@ -65,7 +77,9 @@ export function useLineupBuilder({
   const membersQuery = useMembers(bandId);
   const editor = useLineupEditor(bandId, gigId);
   const copyMutation = useCopyLastLineup(bandId, gigId);
+  const copyGigMutation = useCopyLineup(bandId, gigId);
   const [rosterOpen, setRosterOpenState] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const lineup = lineupQuery.data;
   const members = membersQuery.data;
@@ -75,6 +89,7 @@ export function useLineupBuilder({
   const setRosterOpen = useCallback(
     (open: boolean) => {
       setRosterOpenState(open);
+      if (!open) setHistoryOpen(false);
       if (open) onOpenRoster?.();
     },
     [onOpenRoster],
@@ -122,12 +137,26 @@ export function useLineupBuilder({
     mutate();
   }, [editor, mutate, reset]);
 
+  const { mutate: mutateGig, reset: resetGig } = copyGigMutation;
+  const copyFromGig = useCallback(
+    (entry: LineupHistoryEntry) => {
+      editor.clearError();
+      resetGig();
+      mutateGig(
+        { sourceGigId: entry.gigId },
+        { onSuccess: () => setHistoryOpen(false) },
+      );
+    },
+    [editor, mutateGig, resetGig],
+  );
+
   const err = copyMutation.error;
   const noPrevious =
     isApiError(err, 404) && err.code === SETLIST_ERROR_CODES.noPreviousLineup;
 
   return {
     bandId,
+    gigId,
     lineup,
     loadError: lineupQuery.isError,
     members,
@@ -138,9 +167,13 @@ export function useLineupBuilder({
     remove,
     applyIds,
     copyLast,
-    copyPending: copyMutation.isPending,
+    copyPending: copyMutation.isPending || copyGigMutation.isPending,
     noPrevious,
-    copyFailed: copyMutation.isError && !noPrevious,
+    copyFailed:
+      (copyMutation.isError && !noPrevious) || copyGigMutation.isError,
+    historyOpen,
+    setHistoryOpen,
+    copyFromGig,
     mode,
   };
 }

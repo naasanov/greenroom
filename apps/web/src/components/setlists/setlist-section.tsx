@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, History, ListPlus, Upload, X } from "lucide-react";
+import { GripVertical, Pencil, Upload, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
@@ -33,8 +33,8 @@ function useEventFromUrl(): {
 
 /**
  * The editable setlist inside an event drawer: ordered rows with reorder
- * handles and remove buttons, plus the Add songs / Copy buttons. Every change
- * saves immediately through the builder's editor.
+ * handles and remove buttons. The header's pencil opens the music library
+ * drawer. Every change saves immediately through the builder's editor.
  */
 export function SetlistSection({
   builder,
@@ -44,7 +44,7 @@ export function SetlistSection({
   builder: SetlistBuilder;
   /** Quiet line under the heading. */
   caption?: ReactNode;
-  /** Trailing action in the button row (e.g. remove the setlist). */
+  /** Trailing action below the list (e.g. remove the setlist). */
   extra?: ReactNode;
 }) {
   const { setlist, editor, guarded, songs } = builder;
@@ -94,22 +94,53 @@ export function SetlistSection({
       aria-labelledby="setlist-heading"
       className="flex flex-col gap-3"
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 id="setlist-heading" className="text-base font-semibold">
-          Setlist
-        </h3>
-        {setlist && setlist.songCount > 0 ? (
-          <p
-            data-testid="setlist-total"
-            className="text-sm text-muted-foreground tabular-nums"
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h3 id="setlist-heading" className="text-base font-semibold">
+            Setlist
+          </h3>
+          {setlist && setlist.songCount > 0 ? (
+            <p
+              data-testid="setlist-total"
+              className="text-sm text-muted-foreground tabular-nums"
+            >
+              {setlistSummary(
+                setlist.songCount,
+                setlist.totalDurationSeconds,
+                setlist.unknownDurationCount,
+              )}
+            </p>
+          ) : null}
+        </div>
+        <div className="-mr-1.5 flex shrink-0 items-center">
+          {setlist && setlist.songCount > 0 && builder.setlistId ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Export to Spotify"
+              className="text-muted-foreground"
+              onClick={() => setExporting(true)}
+            >
+              <Upload />
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Edit setlist"
+            className="text-muted-foreground"
+            disabled={!builder.ready}
+            aria-expanded={builder.libraryOpen}
+            onClick={() => {
+              editor.clearError();
+              builder.setLibraryOpen(!builder.libraryOpen);
+            }}
           >
-            {setlistSummary(
-              setlist.songCount,
-              setlist.totalDurationSeconds,
-              setlist.unknownDurationCount,
-            )}
-          </p>
-        ) : null}
+            <Pencil />
+          </Button>
+        </div>
       </div>
       {caption ? (
         <p className="-mt-2 text-sm text-muted-foreground">{caption}</p>
@@ -137,7 +168,7 @@ export function SetlistSection({
               className="flex h-14 items-center rounded-2xl border border-dashed px-4 text-sm text-muted-foreground"
             >
               {builder.setlistId
-                ? "No songs yet. Add some from your library or copy a past gig."
+                ? "No songs yet. Tap the pencil to add songs from your library or copy a past gig."
                 : "No setlist"}
             </p>
           }
@@ -215,42 +246,7 @@ export function SetlistSection({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!builder.ready}
-          aria-expanded={builder.libraryOpen}
-          onClick={() => {
-            editor.clearError();
-            builder.setLibraryOpen(!builder.libraryOpen);
-          }}
-        >
-          <ListPlus /> Add songs
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!builder.ready}
-          aria-expanded={builder.historyOpen}
-          onClick={() => {
-            editor.clearError();
-            builder.setHistoryOpen(!builder.historyOpen);
-          }}
-        >
-          <History /> Copy from a past gig
-        </Button>
-        {setlist && setlist.songCount > 0 && builder.setlistId ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setExporting(true)}
-          >
-            <Upload /> Export to Spotify
-          </Button>
-        ) : null}
-        {extra}
-      </div>
+      {extra ? <div className="flex flex-wrap gap-2">{extra}</div> : null}
       {builder.setlistId ? (
         <ExportDialog
           bandId={builder.bandId}
