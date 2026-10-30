@@ -134,7 +134,7 @@ export function MediaSection({
         <button
           type="button"
           data-testid="media-strip"
-          onClick={() => openMediaView(router, gigId)}
+          onClick={(e) => openMediaView(router, gigId, e.currentTarget)}
           className="flex flex-col gap-2 text-left"
         >
           {inner}
