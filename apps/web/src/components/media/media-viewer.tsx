@@ -94,10 +94,10 @@ export function MediaViewer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Dialogs and drawers above the viewer own the keyboard.
+      // Dialogs and drawers above the viewer own the keyboard; right sheets sit below it.
       if (
         document.querySelector(
-          '[role="dialog"][data-state="open"], [role="alertdialog"]',
+          '[role="dialog"][data-state="open"]:not([data-testid="right-sheet"]), [role="alertdialog"]',
         )
       )
         return;

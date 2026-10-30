@@ -75,7 +75,9 @@ export function RightSheet({
       data-state={open ? "open" : "closed"}
       data-testid="right-sheet"
       className={cn(
-        placement === "fixed" ? "fixed" : "absolute",
+        placement === "fixed"
+          ? "fixed md:top-[calc(env(safe-area-inset-top)+3.5rem+1px)]"
+          : "absolute",
         "inset-y-0 right-0 z-40 flex w-full flex-col bg-card shadow-lift transition-[translate,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:w-[26rem] md:rounded-l-3xl md:border-l",
         open ? "visible translate-x-0" : "invisible translate-x-full",
         className,
