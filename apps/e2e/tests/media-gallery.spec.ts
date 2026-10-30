@@ -98,13 +98,16 @@ test("collapse, expand and jump between sections", async ({ page }) => {
   await expect(unsorted.getByTestId("media-tile")).toHaveCount(0);
   await unsorted.getByTestId("section-toggle").click();
   await expect(unsorted.getByTestId("media-tile")).toHaveCount(3);
-  await expect(unsorted.getByTestId("section-up")).toBeDisabled();
-  await unsorted.getByTestId("section-down").click();
+  // One pair of FABs jumps to the nearest section by scroll position.
+  await expect(page.getByTestId("jump-up")).toBeDisabled();
+  await page.getByTestId("jump-down").click();
   await expect(
     section(page, "Stage").getByTestId("section-toggle"),
   ).toBeInViewport();
-  await section(page, "Stage").getByTestId("section-up").click();
+  await expect(page.getByTestId("jump-up")).toBeEnabled();
+  await page.getByTestId("jump-up").click();
   await expect(unsorted.getByTestId("section-toggle")).toBeInViewport();
+  await expect(unsorted.getByTestId("section-up")).toHaveCount(0);
   // Collapsed state is not persisted.
   await unsorted.getByTestId("section-toggle").click();
   await page.reload();
@@ -247,19 +250,20 @@ test("folders: create, rename, reorder and delete when empty", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("new-folder").click();
+  await page.getByRole("button", { name: "Add media" }).click();
+  await page.getByTestId("fab-action-new-folder").click();
   await page.getByLabel("Folder name").fill("Flyer");
   await page.getByRole("button", { name: "Create folder" }).click();
   await expect(section(page, "Flyer")).toBeVisible();
 
   await page.getByRole("button", { name: "Options for Flyer" }).click();
-  await page.getByRole("menuitem", { name: "Rename folder" }).click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   await page.getByLabel("Folder name").fill("Posters");
   await page.getByRole("button", { name: "Rename", exact: true }).click();
   await expect(section(page, "Posters")).toBeVisible();
 
   await page.getByRole("button", { name: "Options for Posters" }).click();
-  await page.getByRole("menuitem", { name: "Move folder up" }).click();
+  await page.getByRole("menuitem", { name: "Move up", exact: true }).click();
   await expect
     .poll(async () => (await mediaState()).folders.map((f) => f.name))
     .toEqual(["Stage", "Posters", "Posed"]);
@@ -269,13 +273,14 @@ test("folders: create, rename, reorder and delete when empty", async ({
   expect(names).toEqual(["Unsorted", "Stage", "Posters", "Posed"]);
 
   await page.getByRole("button", { name: "Options for Stage" }).click();
-  await expect(
-    page.getByRole("menuitem", { name: /Delete folder/ }),
-  ).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("menuitem", { name: /^Delete/ })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Options for Posters" }).click();
-  await page.getByRole("menuitem", { name: "Delete folder" }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await expect(section(page, "Posters")).toHaveCount(0);
   await expect
     .poll(async () => (await mediaState()).folders.map((f) => f.name))
@@ -341,7 +346,10 @@ test("link to song lists setlist songs first and renames unrenamed items", async
   await expect(tile(page, "keep.png")).toBeVisible();
   await tile(page, "keep.png").getByTestId("media-open").click();
   await page.getByTestId("viewer-position").waitFor();
-  await page.getByRole("button", { name: "Link to song" }).click();
+  await page
+    .getByTestId("media-viewer")
+    .getByRole("button", { name: "Link to song" })
+    .click();
   await page.getByTestId("song-pick-row").first().click();
   await expect(page.getByTestId("viewer-song")).toHaveText(SONGS.lowTide.title);
   await expect(tile(page, "keep.png")).toBeVisible();
@@ -359,4 +367,122 @@ test("a file removed from Drive shows the missing placeholder", async ({
   await expect(page.getByTestId("media-missing")).toContainText(
     "No longer in Drive",
   );
+});
+
+test("list view: name click renames, selection shows trailing circles", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  await page.getByRole("radio", { name: "Names only" }).click();
+  await tile(page, "u1.png").getByTestId("media-name").click();
+  await expect(page.getByTestId("media-viewer")).toHaveCount(0);
+  const input = page.getByTestId("media-name-input");
+  await input.fill("listed.png");
+  await input.press("Enter");
+  await expect(tile(page, "listed.png")).toBeVisible();
+
+  await page.getByTestId("select-fab").click();
+  await expect(page.getByTestId("row-check")).toHaveCount(4);
+  await expect(page.getByTestId("row-check").first()).toHaveAttribute(
+    "data-checked",
+    "false",
+  );
+  await tile(page, "listed.png").getByTestId("media-name").click();
+  await expect(
+    tile(page, "listed.png").getByTestId("row-check"),
+  ).toHaveAttribute("data-checked", "true");
+  await expect(page.getByTestId("selection-count")).toHaveText("1");
+});
+
+test("grid rename input stays in place and its focus ring is not covered", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const label = tile(page, "u1.png").getByTestId("media-name");
+  const before = (await label.locator("span").boundingBox())!;
+  await label.click();
+  const input = page.getByTestId("media-name-input");
+  await expect(input).toBeFocused();
+  const after = (await input.boundingBox())!;
+  const preview = (await tile(page, "u1.png")
+    .getByTestId("media-open")
+    .boundingBox())!;
+  expect(Math.abs(after.x - (before.x - 4))).toBeLessThanOrEqual(1);
+  expect(after.y).toBeGreaterThanOrEqual(preview.y + preview.height - 1);
+});
+
+test("viewer name is click-to-rename", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  await tile(page, "u1.png").getByTestId("media-open").click();
+  await page.getByTestId("viewer-name").click();
+  const input = page.getByTestId("viewer-name-input");
+  await input.fill("viewed.png");
+  await input.press("Enter");
+  await expect(page.getByTestId("viewer-name")).toHaveText("viewed.png");
+  await expect(page.getByTestId("media-viewer")).toBeVisible();
+  await expect
+    .poll(async () => (await mediaState()).unsorted.map((i) => i.name))
+    .toContain("viewed.png");
+});
+
+test("select FAB toggles selection mode", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("select-fab").click();
+  await tile(page, "u1.png").getByTestId("media-open").click();
+  await expect(page.getByTestId("selection-count")).toHaveText("1");
+  await page.getByTestId("select-fab").click();
+  await expect(tile(page, "u1.png")).toHaveAttribute("data-selected", "false");
+  await expect(bar(page)).toHaveAttribute("data-visible", "false");
+});
+
+test("+ FAB offers Upload and New folder", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  await page.getByRole("button", { name: "Add media" }).click();
+  await expect(page.getByTestId("fab-action-upload")).toBeVisible();
+  await expect(page.getByTestId("fab-action-new-folder")).toBeVisible();
+  await expect(page.getByTestId("new-folder")).toHaveCount(0);
+});
+
+test("empty gallery shows one large upload button", async ({ page }) => {
+  await openGallery(page, seed.gigs.pastBar.id);
+  const empty = page.getByTestId("media-empty");
+  await expect(empty).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await empty.click();
+  await chooser;
+});
+
+test("dragging a tile onto a folder section moves it; a selection moves together", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const drag = async (name: string, target: string) => {
+    const from = (await tile(page, name)
+      .getByTestId("media-open")
+      .boundingBox())!;
+    const to = (await section(page, target)
+      .getByTestId("media-section-header")
+      .boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 30, from.y + 30, { steps: 5 });
+    await page.mouse.move(to.x + 40, to.y + to.height / 2, { steps: 15 });
+    await page.mouse.up();
+  };
+  await drag("u1.png", "Posed");
+  await expect(section(page, "Posed").getByTestId("media-tile")).toHaveCount(1);
+  await expect(page.getByTestId("media-viewer")).toHaveCount(0);
+  await expect
+    .poll(
+      async () =>
+        (await mediaState()).folders.find((f) => f.name === "Posed")!.items
+          .length,
+    )
+    .toBe(1);
+
+  await page.getByTestId("select-fab").click();
+  await tile(page, "u2.png").getByTestId("media-open").click();
+  await tile(page, "clip.mp4").getByTestId("media-open").click();
+  await drag("u2.png", "Posed");
+  await expect(section(page, "Posed").getByTestId("media-tile")).toHaveCount(3);
 });

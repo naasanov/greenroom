@@ -23,7 +23,7 @@ async function bandWithClient(testApi: TestApi, email = "a@example.com") {
   return { user, api, base: `/bands/${band.id}/songs` as string };
 }
 
-test("start redirects to the authorize URL with the loopback redirect URI and import scopes", async ({
+test("start redirects to the authorize URL with the loopback redirect URI and all scopes", async ({
   testApi,
 }) => {
   const { api } = await bandWithClient(testApi);
@@ -32,7 +32,7 @@ test("start redirects to the authorize URL with the loopback redirect URI and im
     `http://127.0.0.1:4100${CALLBACK}`,
   );
   expect(location.searchParams.get("scope")).toBe(
-    "playlist-read-private playlist-read-collaborative",
+    "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public",
   );
   expect(state.length).toBeGreaterThan(20);
   await api.dispose();
@@ -175,7 +175,7 @@ test("import without a connection is 409 SPOTIFY_LOGIN_REQUIRED", async ({
   await api.dispose();
 });
 
-test("import with a connection reads the seeded playlist; private stays 404", async ({
+test("import with a connection reads the seeded playlist; private is 403 for another account, readable by its owner", async ({
   testApi,
 }) => {
   const { api, base } = await bandWithClient(testApi);
@@ -197,7 +197,23 @@ test("import with a connection reads the seeded playlist; private stays 404", as
   const priv = await api.post(`${base}/import`, {
     data: { url: "https://open.spotify.com/playlist/fakePlaylistPrivate" },
   });
-  expect(priv.status()).toBe(404);
+  expect(priv.status()).toBe(403);
+  expect(await priv.json()).toMatchObject({ code: "PLAYLIST_FORBIDDEN" });
+
+  const missing = await api.post(`${base}/import`, {
+    data: { url: "https://open.spotify.com/playlist/nope" },
+  });
+  expect(missing.status()).toBe(404);
+  expect(await missing.json()).toMatchObject({
+    code: "PLAYLIST_NOT_FOUND_OR_PRIVATE",
+  });
+
+  // Linking the owning Spotify account makes the private playlist readable.
+  await connectSpotify(api, "owner");
+  const own = await api.post(`${base}/import`, {
+    data: { url: "https://open.spotify.com/playlist/fakePlaylistPrivate" },
+  });
+  expect(own.status()).toBe(202);
   await api.dispose();
 });
 

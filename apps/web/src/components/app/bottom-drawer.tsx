@@ -240,8 +240,8 @@ export function SideDrawer({
       className={cn(
         "absolute inset-y-0 right-[calc(100%+0.75rem)] left-auto z-20 flex w-80 flex-col overflow-hidden bg-popover shadow-lift motion-reduce:transition-none",
         rise
-          ? "rounded-t-3xl border border-b-0 transition-[transform,visibility] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-          : "rounded-3xl border transition-[transform,opacity,visibility] duration-300 ease-out",
+          ? "rounded-t-3xl border border-b-0 transition-[translate,visibility] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          : "rounded-3xl border transition-[translate,opacity,visibility] duration-300 ease-out",
         open
           ? cn("visible", rise ? "translate-y-0" : "translate-x-0 opacity-100")
           : cn(

@@ -179,3 +179,15 @@ test("a month chip fills the width and most of the height of its day", async ({
   expect(filled).toBeGreaterThan(c.height * 0.5);
   expect(boxes[0]!.width).toBeGreaterThan(c.width - 12);
 });
+
+test("a month chip shows its time range under the title", async ({ page }) => {
+  const gig = seed.gigs.upcomingClub;
+  await showGigDate(page, gig.id, gig.title);
+  const chip = calendar(page)
+    .locator(`td[data-date="${gig.date}"] .fc-event`)
+    .first();
+  await expect(chip.getByTestId("chip-details")).toContainText("8:00 PM");
+  const head = (await chip.locator(".gr-chip-head").boundingBox())!;
+  const box = (await chip.boundingBox())!;
+  expect(head.y - box.y).toBeLessThan(8);
+});

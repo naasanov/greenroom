@@ -47,7 +47,7 @@ export async function seedGigMedia(
     await ava.delete(`/bands/${BAND}/media/folders/${tmp.id}`);
   }
   const files = await fake.files();
-  const gigFolder = files.find((f) => /^\d{4}-\d\d-\d\d /.test(f.name))!;
+  const gigFolder = files.find((f) => /^\d\d-\d\d-\d\d /.test(f.name))!;
   const mime = (n: string) => (n.endsWith(".mp4") ? "video/mp4" : "image/png");
   for (const n of opts.unsorted ?? []) {
     await fake.external({

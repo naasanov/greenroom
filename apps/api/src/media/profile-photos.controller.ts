@@ -74,29 +74,6 @@ export class ProfilePhotosController {
   }
 
   @BandMember()
-  @Put("members/me/photo")
-  @UseInterceptors(upload())
-  async setMyPhoto(
-    @Param("bandId") bandId: string,
-    @CurrentUser() user: User,
-    @UploadedFile() file: UploadedImage | undefined,
-  ): Promise<MemberPhoto> {
-    return {
-      photoUrl: await this.photos.setMemberPhoto(bandId, user.id, file),
-    };
-  }
-
-  @BandMember()
-  @Delete("members/me/photo")
-  @HttpCode(204)
-  clearMyPhoto(
-    @Param("bandId") bandId: string,
-    @CurrentUser() user: User,
-  ): Promise<void> {
-    return this.photos.clearMemberPhoto(bandId, user.id);
-  }
-
-  @BandMember()
   @Get("members/:userId/photo")
   async memberPhoto(
     @Param("bandId") bandId: string,
@@ -110,5 +87,41 @@ export class ProfilePhotosController {
       await this.photos.openMemberPhoto(bandId, target),
       "private, max-age=3600",
     );
+  }
+}
+
+@Controller("users")
+export class UserPhotosController {
+  constructor(private readonly photos: ProfilePhotosService) {}
+
+  @Put("me/photo")
+  @UseInterceptors(upload())
+  async setMyPhoto(
+    @CurrentUser() user: User,
+    @UploadedFile() file: UploadedImage | undefined,
+  ): Promise<MemberPhoto> {
+    return { photoUrl: await this.photos.setUserPhoto(user.id, file) };
+  }
+
+  @Delete("me/photo")
+  @HttpCode(204)
+  clearMyPhoto(@CurrentUser() user: User): Promise<void> {
+    return this.photos.clearUserPhoto(user.id);
+  }
+
+  @Get(":userId/photo")
+  async userPhoto(
+    @Param("userId") userId: string,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ): Promise<void> {
+    const p = await this.photos.openUserPhoto(
+      userId === "me" ? user.id : userId,
+    );
+    res.setHeader("Content-Type", p.mimeType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.send(p.data);
   }
 }

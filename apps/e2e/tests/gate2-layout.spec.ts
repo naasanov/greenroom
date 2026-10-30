@@ -1,7 +1,7 @@
 import type { BandSeedResult } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { agendaCard, agendaSheet, openAgenda } from "./agenda-helpers.js";
-import { AVA, calendar } from "./events-helpers.js";
+import { AVA, calendar, eventIn, showGigDate } from "./events-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -21,7 +21,11 @@ test("desktop event drawer sits left of the floating buttons", async ({
 }) => {
   test.skip(!isWide(page), "desktop layout");
   const gig = seed.gigs.upcomingClub;
-  await page.goto(`/gigs/${gig.id}`);
+  // With the agenda closed the FAB sits at the page edge; the drawer stays left of it.
+  await showGigDate(page, gig.id, gig.title);
+  await agendaSheet(page).getByRole("button", { name: "Close" }).click();
+  await expect(agendaSheet(page)).toHaveAttribute("data-state", "closed");
+  await eventIn(page, gig.title).click();
   const drawer = live(page, gig.title);
   await expect(drawer).toBeVisible();
   const fab = page.getByRole("button", { name: "Add event" });
@@ -38,7 +42,7 @@ test("desktop event drawer sits left of the floating buttons", async ({
   expect(d.x + d.width).toBeGreaterThan(page.viewportSize()!.width / 2);
 });
 
-test("desktop event drawer follows the FAB column beside the agenda sheet", async ({
+test("desktop event drawer covers the FAB column beside the agenda sheet", async ({
   page,
 }) => {
   test.skip(!isWide(page), "desktop layout");
@@ -59,7 +63,8 @@ test("desktop event drawer follows the FAB column beside the agenda sheet", asyn
         .boundingBox())!;
       return (
         Math.round(sheet.x - fab.x - fab.width) > 0 &&
-        Math.round(fab.x - (d.x + d.width))
+        Math.round(d.x + d.width - (fab.x + fab.width)) >= 0 &&
+        Math.round(sheet.x - (d.x + d.width))
       );
     })
     .toBe(16);

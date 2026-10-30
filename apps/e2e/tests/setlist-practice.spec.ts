@@ -112,7 +112,7 @@ test("adding songs to a practice with no setlist forks from that occurrence", as
   page,
 }) => {
   await openOcc(page, 1);
-  await expect(page.getByTestId("setlist-empty")).toHaveText("No setlist");
+  await expect(page.getByTestId("setlist-empty")).toHaveText("Add songs");
   await expect(
     page.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
@@ -232,7 +232,7 @@ test("removing the setlist clears it for this and later practices", async ({
   await openOcc(page, 1);
   await expect(rows(page)).toHaveCount(1);
   await page.getByRole("button", { name: "Remove setlist" }).click();
-  await expect(page.getByTestId("setlist-empty")).toHaveText("No setlist");
+  await expect(page.getByTestId("setlist-empty")).toHaveText("Add songs");
   await expect(
     page.getByRole("button", { name: "Remove setlist" }),
   ).toHaveCount(0);
@@ -266,5 +266,5 @@ test("creating a practice opens its first occurrence", async ({ page }) => {
   await expect(page).toHaveURL(
     new RegExp(`/practices/[0-9a-f-]+\\?date=${isoDay(2)}$`),
   );
-  await expect(page.getByTestId("setlist-empty")).toHaveText("No setlist");
+  await expect(page.getByTestId("setlist-empty")).toHaveText("Add songs");
 });

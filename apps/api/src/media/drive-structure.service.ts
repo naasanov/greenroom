@@ -191,7 +191,7 @@ export class DriveStructureService {
     return gig;
   }
 
-  /** Returns the gig's Drive folder id, creating `YYYY-MM-DD title` on first use. */
+  /** Returns the gig's Drive folder id, creating `YY-MM-DD title` on first use. */
   ensureGigFolder(ctx: DriveContext, gigId: string): Promise<string> {
     const pending = this.gigLocks.get(gigId);
     if (pending) return pending;
@@ -209,7 +209,7 @@ export class DriveStructureService {
     const gig = await this.loadGig(ctx.bandId, gigId);
     if (gig.driveFolderId) return gig.driveFolderId;
     const folder = await this.drive.createFolder(ctx.token, {
-      name: `${gig.date} ${gig.title}`.trim(),
+      name: `${gig.date.slice(2)} ${gig.title}`.trim(),
       parentId: ctx.gigsFolderId,
     });
     const [won] = await this.db

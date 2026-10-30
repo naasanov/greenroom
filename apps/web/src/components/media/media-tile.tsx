@@ -8,6 +8,7 @@ import {
   Music2,
   Play,
 } from "lucide-react";
+import { useDraggable } from "@dnd-kit/core";
 import { useRef, useState, type PointerEvent } from "react";
 import type { MediaItem } from "@greenroom/shared";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function MediaThumb({
   compact?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
+  const [videoBroken, setVideoBroken] = useState(false);
   const base = cn(
     "relative flex size-full items-center justify-center overflow-hidden bg-muted text-muted-foreground",
     className,
@@ -49,9 +51,22 @@ export function MediaThumb({
     );
   }
   const Icon = isVideo(item) ? FileVideo : ImageIcon;
+  const noThumb = !item.thumbnailUrl || broken;
   return (
     <div className={base}>
-      {item.thumbnailUrl && !broken ? (
+      {noThumb && isVideo(item) && !videoBroken ? (
+        // A frame from the file itself when Drive has no thumbnail for the video.
+        <video
+          data-testid="media-video-frame"
+          src={`${item.contentUrl}#t=0.1`}
+          preload="metadata"
+          muted
+          playsInline
+          crossOrigin="use-credentials"
+          onError={() => setVideoBroken(true)}
+          className="size-full object-cover"
+        />
+      ) : item.thumbnailUrl && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           data-testid="media-thumb"
@@ -60,7 +75,7 @@ export function MediaThumb({
           loading="lazy"
           draggable={false}
           onError={() => setBroken(true)}
-          className="size-full object-cover"
+          className="size-full object-cover [image-orientation:from-image]"
         />
       ) : (
         <Icon className="size-6" />
@@ -74,6 +89,25 @@ export function MediaThumb({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** Trailing circle for list rows in selection mode; fills when selected. */
+function RowCheck({ selected }: { selected: boolean }) {
+  return (
+    <span
+      aria-hidden
+      data-testid="row-check"
+      data-checked={selected}
+      className={cn(
+        "mr-1 flex size-6 shrink-0 items-center justify-center rounded-full border-2",
+        selected
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-muted-foreground/50 text-transparent",
+      )}
+    >
+      <Check className="size-3.5" strokeWidth={3} />
+    </span>
   );
 }
 
@@ -161,7 +195,7 @@ function NameEditor({
         if (e.key === "Enter") finish(e.currentTarget.value);
         if (e.key === "Escape") finish(null);
       }}
-      className="h-11 w-full min-w-0 rounded-lg border bg-background px-2 text-base outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:text-xs"
+      className="relative z-10 h-11 w-full min-w-0 rounded-md bg-muted px-1 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:text-xs"
     />
   );
 }
@@ -177,12 +211,25 @@ export interface TileProps {
   onLongPress: () => void;
   onStartRename: () => void;
   onRename: (name: string | null) => void;
+  /** Ids a drag from this tile carries (the whole selection when selected). */
+  dragCount?: number;
 }
 
 /** One gallery item: thumbnail (tap opens or toggles) and a name label (tap renames). */
 export function MediaTile(props: TileProps) {
   const { item, density, selected, selecting, songTitle, editing } = props;
   const press = usePressHandlers(props.onLongPress);
+  const drag = useDraggable({
+    id: item.id,
+    disabled: editing,
+    data: { count: props.dragCount ?? 1 },
+  });
+  // Mouse only: touch keeps scrolling and long-press selection.
+  const dragProps = {
+    ref: drag.setNodeRef,
+    onMouseDown: drag.listeners?.onMouseDown as
+      ((e: React.MouseEvent) => void) | undefined,
+  };
   const activate = () => {
     if (press.consumeLongPress()) return;
     props.onActivate();
@@ -197,6 +244,7 @@ export function MediaTile(props: TileProps) {
         className={cn(
           "flex items-center gap-3 rounded-xl px-1.5 py-1",
           selected && "bg-primary/10",
+          drag.isDragging && "opacity-40",
         )}
       >
         <button
@@ -206,44 +254,40 @@ export function MediaTile(props: TileProps) {
           data-testid="media-open"
           onClick={activate}
           {...press.handlers}
+          {...dragProps}
           className="relative size-11 shrink-0 touch-manipulation overflow-hidden rounded-lg select-none [-webkit-touch-callout:none]"
         >
           <MediaThumb item={item} compact />
-          {selected ? (
-            <span className="absolute inset-0 flex items-center justify-center bg-primary/50 text-primary-foreground">
-              <Check className="size-5" strokeWidth={3} />
-            </span>
-          ) : null}
         </button>
         {editing ? (
           <div className="min-w-0 flex-1">
             <NameEditor initial={item.name} onDone={props.onRename} />
           </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={activate}
-          {...press.handlers}
-          className={cn(
-            "min-h-11 min-w-0 flex-1 flex-col justify-center text-left select-none [-webkit-touch-callout:none]",
-            editing ? "hidden" : "flex",
-          )}
-        >
-          {editing ? null : (
-            <span data-testid="media-name" className="truncate text-sm">
-              {item.name}
-            </span>
-          )}
-          {songTitle ? (
-            <span
-              data-testid="media-song"
-              className="flex items-center gap-1 truncate text-xs text-muted-foreground"
-            >
-              <Music2 className="size-3 shrink-0" />
-              {songTitle}
-            </span>
-          ) : null}
-        </button>
+        ) : (
+          <button
+            type="button"
+            data-testid="media-name"
+            onClick={() => {
+              if (press.consumeLongPress()) return;
+              if (selecting) props.onActivate();
+              else props.onStartRename();
+            }}
+            {...press.handlers}
+            className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left select-none [-webkit-touch-callout:none]"
+          >
+            <span className="truncate text-sm">{item.name}</span>
+            {songTitle ? (
+              <span
+                data-testid="media-song"
+                className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+              >
+                <Music2 className="size-3 shrink-0" />
+                {songTitle}
+              </span>
+            ) : null}
+          </button>
+        )}
+        {selecting ? <RowCheck selected={selected} /> : null}
       </li>
     );
   }
@@ -253,7 +297,7 @@ export function MediaTile(props: TileProps) {
       data-testid="media-tile"
       data-name={item.name}
       data-selected={selected}
-      className="flex min-w-0 flex-col"
+      className={cn("flex min-w-0 flex-col", drag.isDragging && "opacity-40")}
     >
       <button
         type="button"
@@ -262,6 +306,7 @@ export function MediaTile(props: TileProps) {
         data-testid="media-open"
         onClick={activate}
         {...press.handlers}
+        {...dragProps}
         className={cn(
           "relative aspect-square w-full touch-manipulation overflow-hidden rounded-2xl outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 [-webkit-touch-callout:none]",
           selected && "ring-3 ring-primary",
@@ -280,7 +325,7 @@ export function MediaTile(props: TileProps) {
           type="button"
           data-testid="media-name"
           onClick={props.onStartRename}
-          className="flex min-h-11 w-full min-w-0 items-center px-0.5 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="flex min-h-11 w-full min-w-0 items-center px-1 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <span className="truncate">{item.name}</span>
         </button>
@@ -288,7 +333,7 @@ export function MediaTile(props: TileProps) {
       {songTitle ? (
         <span
           data-testid="media-song"
-          className="-mt-2 mb-1 flex items-center gap-1 truncate px-0.5 text-[11px] text-muted-foreground"
+          className="-mt-2 mb-1 flex items-center gap-1 truncate px-1 text-[11px] text-muted-foreground"
         >
           <Music2 className="size-3 shrink-0" />
           <span className="truncate">{songTitle}</span>

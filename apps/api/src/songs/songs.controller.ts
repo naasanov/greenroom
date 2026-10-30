@@ -24,6 +24,7 @@ import {
   type ImportPlaylist,
   type ImportProgress,
   type ListSongsQuery,
+  type ReferenceTag,
   type ResolveResult,
   type ResolveSong,
   type SongCreated,
@@ -63,6 +64,13 @@ export class SongsController {
     @Query(new ZodPipe(listSongsQuerySchema)) query: ListSongsQuery,
   ): Promise<SongSummary[]> {
     return this.songs.list(m.bandId, query);
+  }
+
+  @Get("reference-tags")
+  referenceTags(
+    @CurrentMembership() m: BandMembership,
+  ): Promise<ReferenceTag[]> {
+    return this.songs.referenceTags(m.bandId);
   }
 
   @Post()

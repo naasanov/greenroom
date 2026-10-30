@@ -2,7 +2,7 @@
 
 Lazy per-user Spotify login. Search and track lookup use app-level credentials; reading playlist contents needs the user's own token, so playlist import requires a connection. One Spotify connection per user (`oauth_connections`, unique on `user_id + provider`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
 
-Scopes requested: `playlist-read-private playlist-read-collaborative` by default. `start?scopes=export` additionally requests `playlist-modify-private playlist-modify-public`, used on the user's first playlist export (or when their stored grant lacks them). The callback stores the granted scopes in `oauth_connections.scopes`.
+Scopes requested on every connect: `playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public`, so one consent covers private playlist import and export. The callback stores the granted scopes in `oauth_connections.scopes`. Links made before the modify scopes were requested are read-only and get one `SPOTIFY_RECONNECT_REQUIRED` prompt on their first export.
 
 ## Routes
 All routes need a session except the callback.
@@ -10,7 +10,7 @@ All routes need a session except the callback.
 | Route | Behavior |
 | --- | --- |
 | `GET /integrations/spotify` | `200 { connected: boolean, displayName: string \| null }` for the current user. |
-| `GET /integrations/spotify/start?redirectTo=<path>[&scopes=export]` | `302` to Spotify's authorize URL. This is a full-page navigation (not fetch): send the browser to `${API}/integrations/spotify/start?redirectTo=...`. `redirectTo` must be a same-site relative path (e.g. `/library`); anything else becomes `/`. |
+| `GET /integrations/spotify/start?redirectTo=<path>` | `302` to Spotify's authorize URL. This is a full-page navigation (not fetch): send the browser to `${API}/integrations/spotify/start?redirectTo=...`. `redirectTo` must be a same-site relative path (e.g. `/library`); anything else becomes `/`. |
 | `GET /integrations/spotify/callback?code&state` | Public; authorized by `state`. Exchanges the code, upserts the connection, then `302` to `${WEB_URL}${redirectTo}` with `spotify=connected` set as a query param. |
 | `DELETE /integrations/spotify` | `204`. Deletes the connection (idempotent). |
 
@@ -27,13 +27,17 @@ After the round trip the browser lands on `${WEB_URL}${redirectTo}?...&spotify=c
 ## Playlist import contract
 `POST /bands/:bandId/songs/import` with `{ url }`:
 - No connection, or the grant was revoked (connection removed): `409 { "code": "SPOTIFY_LOGIN_REQUIRED", "message": ... }`. The UI should send the user through `start` with `redirectTo` set to the page they were on, then retry the import on return with `spotify=connected`.
-- Playlist missing or not accessible to that Spotify account: `404 { "code": "PLAYLIST_NOT_FOUND_OR_PRIVATE" }`.
+- Spotify answers 403 (private playlist the linked account cannot read): `403 { "code": "PLAYLIST_FORBIDDEN" }`.
+- Spotify answers 404 (missing playlist): `404 { "code": "PLAYLIST_NOT_FOUND_OR_PRIVATE" }`.
+- Reads always use the user's token; the app token cannot read playlist items, so there is no unconnected fallback.
 - Otherwise `202` with import progress (unchanged).
 
 ## Playlist export contract
 `POST /bands/:bandId/songs/export` `{ name, sort? }` (library, in the given sort) and `POST /bands/:bandId/setlists/:setlistId/export` `{ name }` (setlist order) create a private playlist in the user's account and answer `200 { playlistId, playlistUrl, name, exported, skipped: [{ songId, title }] }`.
-- No connection, a revoked grant, or stored scopes lacking the modify scopes: `409 { "code": "SPOTIFY_LOGIN_REQUIRED", "scopes": "export", "message": ... }`. Send the user through `start?scopes=export&redirectTo=...` and retry on `spotify=connected`.
+- No connection or a revoked grant: `409 { "code": "SPOTIFY_LOGIN_REQUIRED", "scopes": "export", "message": ... }`.
+- Stored scopes lacking the modify scopes (legacy read-only link): `409 { "code": "SPOTIFY_RECONNECT_REQUIRED", "message": "Reconnect Spotify to grant playlist access" }`.
+- Either way send the user through `start?redirectTo=...` and retry on `spotify=connected`.
 - No song has a Spotify track: `422 { "code": "NOTHING_TO_EXPORT" }`, and no playlist is created.
 
 ## Fakes and staging
-With `INTEGRATIONS_MODE=fake` the authorize URL is a dead domain, except when `STAGING_LOGIN_PASSCODE` is set (staging): then it is `${API_PUBLIC_URL}/fake-spotify/authorize`, an API-served page with a "Connect demo Spotify" button (and Cancel, which returns `error=access_denied`). On staging any playlist id imports a 10-track demo set. Fake codes are `fake-code:<name>`, and the fake grants the scopes of the most recent authorize URL; `GET /__test__/spotify/created-playlists` lists playlists created by export; `POST /__test__/spotify/revoke-refresh-tokens` makes refreshes fail with invalid-grant.
+With `INTEGRATIONS_MODE=fake` the authorize URL is a dead domain, except when `STAGING_LOGIN_PASSCODE` is set (staging): then it is `${API_PUBLIC_URL}/fake-spotify/authorize`, an API-served page with a "Connect demo Spotify" button (and Cancel, which returns `error=access_denied`). On staging any playlist id imports a 10-track demo set. Fake codes are `fake-code:<name>`, and the fake grants the scopes of the most recent authorize URL, and connecting as `fake-code:owner` links the account that owns the private playlist `fakePlaylistPrivate` (any other account gets 403); `GET /__test__/spotify/created-playlists` lists playlists created by export; `POST /__test__/spotify/revoke-refresh-tokens` makes refreshes fail with invalid-grant.

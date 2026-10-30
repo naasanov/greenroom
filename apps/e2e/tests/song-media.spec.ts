@@ -19,7 +19,7 @@ async function addFiles(
   ).json();
   await ava.delete(`/bands/${BAND}/media/folders/${media.folders[0].id}`);
   const folder = (await fake.files()).find(
-    (f) => /^\d{4}-\d\d-\d\d /.test(f.name) && f.name.endsWith(gig.title),
+    (f) => /^\d\d-\d\d-\d\d /.test(f.name) && f.name.endsWith(gig.title),
   )!;
   for (const f of files) {
     await fake.external({

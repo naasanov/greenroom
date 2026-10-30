@@ -47,7 +47,9 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
 
 Band calendars are owned by a Google service account, not a member. Use `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` in the `greenroom-fyi` project and make sure the **Google Calendar API** is enabled there. Create a JSON key for the account (**IAM & Admin > Service accounts > Keys > Add key**), base64 it onto one line (`base64 -w0 key.json`), and stage it as the Fly secret `CALENDAR_SA_KEY` with `fly secrets set -a greenroom-staging-api CALENDAR_SA_KEY=<base64>`; delete the key file afterwards. The variable is optional: without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. Members receive the calendar as a share by email (no domain-wide delegation is needed). Keychain name: `CALENDAR_SA_KEY`.
 
-Keychain names: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER`.
+Optional: enable **YouTube Data API v3** and store a server key restricted to it as `YOUTUBE_API_KEY` (lets YouTube songs get their duration automatically).
+
+Keychain names: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_PLACES_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER`.
 
 ## Spotify developer app
 Used for song search, track lookup, and public playlist import (app-level), and later for exporting playlists and importing private ones (user login).

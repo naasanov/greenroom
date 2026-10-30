@@ -241,6 +241,29 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
     if (selRef.current) go(null, "replace");
     setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
   };
+  // Close functions the open drawers register, so the FAB closes them through
+  // their own unsaved-changes prompts.
+  const createClose = useRef<(() => void) | null>(null);
+  const eventClose = useRef<(() => void) | null>(null);
+  const registerCreateClose = useCallback((fn: (() => void) | null) => {
+    createClose.current = fn;
+  }, []);
+  const registerEventClose = useCallback((fn: (() => void) | null) => {
+    eventClose.current = fn;
+  }, []);
+  // A press on the FAB first lands as an outside press that closes whatever is
+  // open, so the click must know a drawer was open when the press began.
+  const fabHadDrawer = useRef(false);
+  const onFabPressStart = () => {
+    fabHadDrawer.current = create.open || selRef.current !== null;
+  };
+  const onFabClick = () => {
+    const hadDrawer = fabHadDrawer.current;
+    fabHadDrawer.current = false;
+    if (create.open) return createClose.current?.();
+    if (selRef.current) return eventClose.current?.();
+    if (!hadDrawer) openCreate("");
+  };
   // The agenda defaults open on wide screens until the user picks a state.
   const wide = useMediaQuery("(min-width: 768px)");
   const [agendaChoice, setAgendaOpen] = useState<boolean | null>(null);
@@ -416,7 +439,8 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         {agendaOpen && !wide ? null : (
           <Fab
             label="Add event"
-            onClick={() => openCreate("")}
+            onPressStart={onFabPressStart}
+            onClick={onFabClick}
             className={cn(
               "transition-[right] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
               agendaOpen && "md:right-[27rem]",
@@ -438,6 +462,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
             open={create.open}
             defaultDate={create.date}
             beside={agendaOpen}
+            registerClose={registerCreateClose}
             onOpenChange={(open) => {
               if (!open) lastClosed.current = performance.now();
               setCreate((c) => ({ ...c, open }));
@@ -458,6 +483,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
               gig={entry.data.gig}
               fallbackTitle={entry.data.fallbackTitle}
               onClose={() => close(target)}
+              registerClose={registerEventClose}
             />
           ) : (
             <PracticeDrawer
@@ -470,6 +496,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
               occ={entry.data.occ}
               fallbackTitle={entry.data.fallbackTitle}
               onClose={() => close(target)}
+              registerClose={registerEventClose}
               onEdited={followEdit}
             />
           );

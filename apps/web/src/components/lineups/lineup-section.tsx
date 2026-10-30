@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, X } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { PickTarget, TargetRow } from "@/components/setlists/pick-dnd";
@@ -82,12 +82,17 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
           ids={ids}
           onChange={onChange}
           empty={
-            <p
+            <button
+              type="button"
               data-testid="lineup-empty"
-              className="flex h-14 items-center rounded-2xl border border-dashed px-4 text-sm text-muted-foreground"
+              onClick={() => {
+                editor.clearError();
+                builder.setRosterOpen(true);
+              }}
+              className="flex min-h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-base font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              No one is in the lineup yet. Tap the pencil to add people.
-            </p>
+              <Plus className="size-5" /> Add people
+            </button>
           }
         >
           {rows.map((m) => {

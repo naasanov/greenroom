@@ -12,7 +12,10 @@ export function FieldError({ message }: { message?: string }) {
   );
 }
 
-/** Sticky action bar at the bottom of a drawer form, with an optional server error. */
+/**
+ * Sticky action bar at the bottom of a drawer form, with an optional server error.
+ * It reaches through the drawer body's bottom padding so it sits flush with the edge.
+ */
 export function FormActions({
   error,
   children,
@@ -21,7 +24,7 @@ export function FormActions({
   children: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 -mx-5 mt-1 flex flex-col gap-2 border-t bg-popover px-5 pt-3 pb-3">
+    <div className="sticky bottom-[calc(-1*max(1.5rem,env(safe-area-inset-bottom)))] -mx-5 mt-1 mb-[calc(-1*max(1.5rem,env(safe-area-inset-bottom)))] flex flex-col gap-2 border-t bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

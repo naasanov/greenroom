@@ -42,7 +42,7 @@ export function useGigUploads(gigId: string) {
     () => EMPTY,
   );
   const entries = all.filter((e) => e.gigId === gigId);
-  return { store, entries, defaults: store.getDefaults(gigId) };
+  return { store, entries };
 }
 
 export function useUploadStore(): UploadStore {

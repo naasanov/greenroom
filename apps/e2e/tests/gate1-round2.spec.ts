@@ -17,9 +17,7 @@ test("right sheet header has top padding and is not covered", async ({
   const sheet = page.getByTestId("right-sheet");
   await expect(sheet).toHaveAttribute("data-state", "open");
   await expect
-    .poll(async () =>
-      sheet.evaluate((el) => getComputedStyle(el).translate),
-    )
+    .poll(async () => sheet.evaluate((el) => getComputedStyle(el).translate))
     .toBe("0px");
 
   const result = await sheet.evaluate((el) => {

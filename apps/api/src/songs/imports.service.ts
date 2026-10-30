@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -85,10 +86,16 @@ export class ImportsService implements OnModuleInit {
       throw new BadRequestException("Not a Spotify playlist link");
     }
     const res = await this.fetchPlaylist(userId, playlistId);
+    if (res.status === "forbidden") {
+      throw new ForbiddenException({
+        code: SONG_ERROR_CODES.playlistForbidden,
+        message: "Spotify does not share this playlist with your account",
+      });
+    }
     if (res.status !== "ok") {
       throw new NotFoundException({
         code: SONG_ERROR_CODES.playlistNotFound,
-        message: "Can't see this playlist, it might be private",
+        message: "Can't find this playlist, it may not exist",
       });
     }
     const importId = randomUUID();

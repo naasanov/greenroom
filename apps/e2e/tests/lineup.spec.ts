@@ -32,6 +32,15 @@ async function openGig(page: Page, gig: { id: string }) {
 async function openRoster(page: Page) {
   await page.getByRole("button", { name: "Edit lineup" }).click();
   await expect(page.getByTestId("roster-picker")).toBeVisible();
+  // Drag tests measure rows right after opening, so wait out the slide on desktop.
+  const side = page.locator('aside[aria-label="Band members"]');
+  if (await side.count()) {
+    const viewport = page.viewportSize()!;
+    await expect(async () => {
+      const box = (await side.boundingBox())!;
+      expect(Math.abs(box.y + box.height - viewport.height)).toBeLessThan(2);
+    }).toPass();
+  }
 }
 
 const bandPath = () => `/bands/${seed.bands.nightOwls.id}`;
@@ -150,6 +159,16 @@ async function seedPastLineup(testApi: Parameters<typeof apiAs>[0]) {
   expect(res.status()).toBe(200);
   await api.dispose();
 }
+
+test("an empty lineup is one Add people button that opens the roster", async ({
+  page,
+}) => {
+  await openGig(page, seed.gigs.tentative);
+  const empty = page.getByTestId("lineup-empty");
+  await expect(empty).toHaveText("Add people");
+  await empty.click();
+  await expect(page.getByTestId("roster-picker")).toBeVisible();
+});
 
 const openHistory = async (page: Page) => {
   await openRoster(page);

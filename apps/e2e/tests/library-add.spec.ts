@@ -86,6 +86,7 @@ test("add via a YouTube link", async ({ page, testApi, loginAs }) => {
     "Fake Band - Live at the Garage",
   );
   await expect(sheet(page).getByLabel("Artist")).toHaveValue("Fake Band");
+  await expect(sheet(page).getByLabel("Duration")).toHaveValue("3:35");
   await sheet(page).getByRole("button", { name: "Done" }).click();
   await expect(sheet(page).getByTestId("song-view")).toContainText(
     "Fake Band - Live at the Garage",

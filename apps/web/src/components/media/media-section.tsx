@@ -8,6 +8,7 @@ import { useGoogleIntegrations } from "@/lib/queries/google";
 import { useGigMedia } from "@/lib/queries/media";
 import { useRouter } from "next/navigation";
 import { openMediaView } from "./media-gallery-page";
+import { MediaThumb, isVideo } from "./media-tile";
 import { useUploadStore } from "./upload/upload-provider";
 
 const PREVIEW_COUNT = 4;
@@ -43,6 +44,13 @@ function Thumb({ item }: { item: MediaItem }) {
       </div>
     );
   }
+  if (!item.thumbnailUrl && isVideo(item)) {
+    return (
+      <div className={tile} title={item.name}>
+        <MediaThumb item={item} compact />
+      </div>
+    );
+  }
   if (!item.thumbnailUrl) {
     const Icon = item.mimeType?.startsWith("video/") ? FileVideo : ImageIcon;
     return (
@@ -59,7 +67,7 @@ function Thumb({ item }: { item: MediaItem }) {
         src={item.thumbnailUrl}
         alt={item.name}
         loading="lazy"
-        className="size-full object-cover"
+        className="size-full object-cover [image-orientation:from-image]"
       />
     </div>
   );

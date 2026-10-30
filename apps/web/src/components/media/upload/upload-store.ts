@@ -38,13 +38,9 @@ export interface UploadEntry {
   restored: boolean;
   /** Done and animating up into the gallery. */
   flying: boolean;
+  /** The user picked a folder (or Unsorted); the entry leaves the tray once done. */
+  placed: boolean;
   previewUrl: string | null;
-}
-
-export interface GigDefaults {
-  folderId: string | null;
-  songId: string | null;
-  songTitle: string | null;
 }
 
 interface Patch {
@@ -56,11 +52,6 @@ interface Patch {
 const CONCURRENCY = 2;
 const FLY_AFTER_MS = 700;
 const LAND_AFTER_MS = 1300;
-const NO_DEFAULTS: GigDefaults = {
-  folderId: null,
-  songId: null,
-  songTitle: null,
-};
 
 function describeError(e: unknown): { message: string; retryable: boolean } {
   if (e instanceof ApiError) {
@@ -89,7 +80,6 @@ export class UploadStore {
   private listeners = new Set<() => void>();
   private controllers = new Map<string, AbortController>();
   private pending = new Map<string, Patch>();
-  private defaults = new Map<string, GigDefaults>();
   /** Session ids that already showed up and left (or were dismissed). */
   private settled = new Set<string>();
   private seq = 0;
@@ -128,26 +118,7 @@ export class UploadStore {
     this.emit();
   }
 
-  getDefaults(gigId: string): GigDefaults {
-    return this.defaults.get(gigId) ?? NO_DEFAULTS;
-  }
-
-  /** Sets the tray-wide folder/song: applies to unfinished entries and to later picks. */
-  setDefaults(gigId: string, patch: Partial<GigDefaults>) {
-    this.defaults.set(gigId, { ...this.getDefaults(gigId), ...patch });
-    const keys = this.entries
-      .filter((e) => e.gigId === gigId && e.status !== "done")
-      .map((e) => e.key);
-    const apply: Patch = {};
-    if (patch.folderId !== undefined) apply.folderId = patch.folderId;
-    if (patch.songId !== undefined) apply.songId = patch.songId;
-    if (keys.length > 0) this.patch(keys, apply);
-    this.entries = [...this.entries];
-    this.emit();
-  }
-
   add(bandId: string, gigId: string, files: File[]) {
-    const d = this.getDefaults(gigId);
     for (const file of files) {
       const fingerprint = fileFingerprint(file);
       const previewUrl =
@@ -186,11 +157,12 @@ export class UploadStore {
         error: null,
         retryable: false,
         sessionId: null,
-        folderId: d.folderId,
-        songId: d.songId,
+        folderId: null,
+        songId: null,
         item: null,
         restored: false,
         flying: false,
+        placed: false,
         previewUrl,
       };
       this.entries = [...this.entries, entry];
@@ -242,6 +214,7 @@ export class UploadStore {
       item: s.item,
       restored: true,
       flying: false,
+      placed: false,
       previewUrl: null,
     }));
     this.entries = [...this.entries, ...added];
@@ -259,7 +232,7 @@ export class UploadStore {
         ? {
             ...e,
             ...(patch.folderId !== undefined
-              ? { folderId: patch.folderId }
+              ? { folderId: patch.folderId, placed: true }
               : {}),
             ...(patch.songId !== undefined ? { songId: patch.songId } : {}),
             ...(patch.fileName !== undefined
@@ -309,6 +282,22 @@ export class UploadStore {
   }
 
   private cancelled = new Set<string>();
+
+  /** Local-only edit of finished entries (the caller updates the media items). */
+  patchDone(keys: string[], patch: Patch) {
+    this.entries = this.entries.map((e) =>
+      keys.includes(e.key) && e.status === "done"
+        ? {
+            ...e,
+            ...(patch.songId !== undefined ? { songId: patch.songId } : {}),
+            ...(patch.fileName !== undefined
+              ? { fileName: patch.fileName }
+              : {}),
+          }
+        : e,
+    );
+    this.emit();
+  }
 
   /** Removes finished entries from the tray without touching the server. */
   dismiss(keys: string[]) {
@@ -377,11 +366,15 @@ export class UploadStore {
       void this.qc.invalidateQueries({
         queryKey: ["bands", entry.bandId, "song-media"],
       });
-      setTimeout(
-        () => this.update(key, (e) => ({ ...e, flying: true })),
-        FLY_AFTER_MS,
-      );
-      setTimeout(() => this.remove([key]), LAND_AFTER_MS);
+      // Finished files stay in the tray until the user places them; those that
+      // already have a folder choice leave right away.
+      if (this.current(key)?.placed) {
+        setTimeout(
+          () => this.update(key, (e) => ({ ...e, flying: true })),
+          FLY_AFTER_MS,
+        );
+        setTimeout(() => this.remove([key]), LAND_AFTER_MS);
+      }
     } catch (e) {
       if (isAbortError(e) || this.cancelled.has(key)) {
         // Cancelled by the user; the entry is already gone.

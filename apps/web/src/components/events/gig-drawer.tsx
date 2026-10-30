@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
 import {
@@ -184,6 +184,7 @@ export function GigDrawer({
   open = true,
   beside = false,
   onClose,
+  registerClose,
 }: {
   bandId: string;
   gigId: string;
@@ -195,6 +196,8 @@ export function GigDrawer({
   /** Sits left of the agenda sheet on wide screens instead of left of the FAB column. */
   beside?: boolean;
   onClose: () => void;
+  /** Receives a function that closes the drawer, asking first when it has unsaved edits. */
+  registerClose?: (close: (() => void) | null) => void;
 }) {
   const update = useUpdateGig(bandId, gigId);
   const remove = useDeleteGig(bandId, gigId);
@@ -229,6 +232,15 @@ export function GigDrawer({
   }, [setlistAsideOpen, setRosterOpen]);
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
+  useEffect(() => {
+    if (!open || !registerClose) return;
+    registerClose(() => requestCloseRef.current());
+    return () => registerClose(null);
+  }, [open, registerClose]);
   const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
 
   async function save(payload: CreateGig) {
@@ -243,7 +255,7 @@ export function GigDrawer({
       <PickDndProvider>
         <BottomDrawer
           open={open}
-          className={eventDrawerClass(setlist.besideEffective)}
+          className={eventDrawerClass(setlist.besideEffective, true)}
           aside={
             <>
               <SetlistAside builder={setlist} />

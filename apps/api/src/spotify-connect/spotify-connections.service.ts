@@ -9,7 +9,6 @@ import { DRIZZLE } from "../db/db.constants.js";
 import {
   SPOTIFY,
   SPOTIFY_EXPORT_SCOPES,
-  SPOTIFY_IMPORT_SCOPES,
   type SpotifyAdapter,
 } from "../integrations/index.js";
 
@@ -49,12 +48,11 @@ export class SpotifyConnectionsService {
     };
   }
 
-  /** Stores a single-use state bound to the user and returns the authorize URL. */
-  async start(
-    userId: string,
-    redirectTo: string,
-    scopes: "import" | "export" = "import",
-  ): Promise<string> {
+  /**
+   * Stores a single-use state bound to the user and returns the authorize URL.
+   * Every connect asks for the read and modify scopes so import and export both work.
+   */
+  async start(userId: string, redirectTo: string): Promise<string> {
     const state = randomBytes(32).toString("base64url");
     await this.db.insert(oauthStates).values({
       stateHash: sha256(state),
@@ -66,34 +64,33 @@ export class SpotifyConnectionsService {
     return this.spotify.buildAuthUrl({
       redirectUri: spotifyRedirectUri(),
       state,
-      scopes:
-        scopes === "export" ? SPOTIFY_EXPORT_SCOPES : SPOTIFY_IMPORT_SCOPES,
+      scopes: SPOTIFY_EXPORT_SCOPES,
     });
   }
 
   /**
    * A usable token whose grant includes playlist-modify scopes. A missing
-   * connection, a revoked grant, or a read-only grant is a 409 asking for export consent.
+   * connection or revoked grant asks to connect; a read-only grant asks to reconnect.
    */
   async getExportToken(userId: string): Promise<string> {
     const row = await this.find(userId);
     const token = row ? await this.getAccessToken(userId) : null;
-    const granted = row ? await this.find(userId) : undefined;
-    if (
-      !token ||
-      !granted ||
-      !SPOTIFY_EXPORT_SCOPES.every((s) => granted.scopes.includes(s))
-    ) {
-      throw this.exportLoginRequired();
+    if (!row || !token) throw this.exportLoginRequired();
+    if (!SPOTIFY_EXPORT_SCOPES.every((s) => row.scopes.includes(s))) {
+      throw this.exportLoginRequired(true);
     }
     return token;
   }
 
-  exportLoginRequired(): ConflictException {
+  exportLoginRequired(reconnect = false): ConflictException {
     return new ConflictException({
-      code: SONG_ERROR_CODES.spotifyLoginRequired,
+      code: reconnect
+        ? SONG_ERROR_CODES.spotifyReconnectRequired
+        : SONG_ERROR_CODES.spotifyLoginRequired,
       scopes: "export",
-      message: "Connect Spotify to export playlists",
+      message: reconnect
+        ? "Reconnect Spotify to grant playlist access"
+        : "Connect Spotify to export playlists",
     });
   }
 

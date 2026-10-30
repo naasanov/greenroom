@@ -21,10 +21,11 @@ export interface SpotifyPlaylist {
 export type SpotifyTrackResult =
   { status: "ok"; track: SpotifyTrack } | { status: "not-found" };
 
-/** Private and nonexistent playlists are indistinguishable to the API. */
+/** `forbidden` is Spotify's 403 (not shared with this account); `not-found-or-private` is a 404. */
 export type SpotifyPlaylistResult =
   | { status: "ok"; playlist: SpotifyPlaylist }
   | { status: "not-found-or-private" }
+  | { status: "forbidden" }
   | { status: "unauthorized" };
 
 export const SPOTIFY_IMPORT_SCOPES = [

@@ -38,6 +38,9 @@ export const memberPhotoUrl = (
     ? `${apiPublicUrl()}/bands/${bandId}/members/${userId}/photo?v=${encodeURIComponent(fileId)}`
     : null;
 
+export const userPhotoUrl = (userId: string, version: number): string =>
+  `${apiPublicUrl()}/users/${userId}/photo?v=${version}`;
+
 export function mediaCategory(
   mime: string | null,
 ): "photos" | "videos" | "other" {

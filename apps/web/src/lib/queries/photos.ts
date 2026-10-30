@@ -93,20 +93,26 @@ export function useBandPhoto(bandId: string) {
   };
 }
 
-export function useMyBandPhoto(bandId: string) {
+/** The user's single profile photo; every band's member lists refresh with it. */
+export function useMyPhoto() {
   const qc = useQueryClient();
-  const done = () => qc.invalidateQueries({ queryKey: keys.members(bandId) });
+  const done = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: keys.me }),
+      qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "bands" && q.queryKey[2] === "members",
+      }),
+    ]);
+  };
   return {
     upload: useMutation({
       mutationFn: (file: File) =>
-        upload(`/bands/${bandId}/members/me/photo`, file, (d) =>
-          memberPhotoSchema.parse(d),
-        ),
+        upload("/users/me/photo", file, (d) => memberPhotoSchema.parse(d)),
       onSuccess: done,
     }),
     remove: useMutation({
-      mutationFn: () =>
-        api(`/bands/${bandId}/members/me/photo`, { method: "DELETE" }),
+      mutationFn: () => api("/users/me/photo", { method: "DELETE" }),
       onSuccess: done,
     }),
   };

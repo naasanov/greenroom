@@ -16,10 +16,10 @@ test.beforeEach(async ({ testApi }) => {
   seed = await testApi.seed("band");
 });
 
-/** Runs the fake connect flow, optionally asking for the export scopes. */
-async function connect(api: APIRequestContext, scopes?: "export") {
+/** Runs the fake connect flow. */
+async function connect(api: APIRequestContext) {
   const res = await api.get("/integrations/spotify/start", {
-    params: { redirectTo: "/library", ...(scopes ? { scopes } : {}) },
+    params: { redirectTo: "/library" },
     maxRedirects: 0,
   });
   const state = new URL(res.headers()["location"]!).searchParams.get("state");
@@ -35,24 +35,19 @@ async function gigSetlist(api: APIRequestContext, gigId: string) {
   return ((await res.json()) as { id: string }).id;
 }
 
-test("start with scopes=export requests the modify scopes", async ({
+test("a plain connect already requests the modify scopes", async ({
   testApi,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
-  const res = await api.get("/integrations/spotify/start", {
-    params: { scopes: "export" },
-    maxRedirects: 0,
-  });
-  const scope = new URL(res.headers()["location"]!).searchParams.get("scope");
-  expect(scope?.split(" ")).toEqual(
+  const plain = await startSpotify(api);
+  expect(plain.location.searchParams.get("scope")?.split(" ")).toEqual(
     expect.arrayContaining([
       "playlist-read-private",
+      "playlist-read-collaborative",
       "playlist-modify-private",
       "playlist-modify-public",
     ]),
   );
-  const plain = await startSpotify(api);
-  expect(plain.location.searchParams.get("scope")).not.toContain("modify");
   await api.dispose();
 });
 
@@ -70,17 +65,32 @@ test("export without a connection needs an export login", async ({
   await api.dispose();
 });
 
-test("a read-only connection is asked to upgrade, then export works", async ({
+test("a fresh connect exports without asking again", async ({ testApi }) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await connect(api);
+  const ok = await api.post(LIBRARY, { data: { name: "Library" } });
+  expect(ok.status()).toBe(200);
+  await api.dispose();
+});
+
+test("a legacy read-only link is asked to reconnect once, then export works", async ({
   testApi,
   db,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
   await connect(api);
+  await db
+    .update(oauthConnections)
+    .set({ scopes: ["playlist-read-private", "playlist-read-collaborative"] })
+    .where(eq(oauthConnections.userId, USERS.ava.id));
   const res = await api.post(LIBRARY, { data: { name: "Library" } });
   expect(res.status()).toBe(409);
-  expect((await res.json()).scopes).toBe("export");
+  expect(await res.json()).toMatchObject({
+    code: "SPOTIFY_RECONNECT_REQUIRED",
+    message: "Reconnect Spotify to grant playlist access",
+  });
 
-  await connect(api, "export");
+  await connect(api);
   const [row] = await db
     .select()
     .from(oauthConnections)
@@ -95,7 +105,7 @@ test("library export creates a private playlist and reports skipped songs", asyn
   testApi,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
-  await connect(api, "export");
+  await connect(api);
   const res = await api.post(LIBRARY, {
     data: { name: "Night Owls library", sort: "title" },
   });
@@ -132,7 +142,7 @@ test("setlist export follows setlist order and skips songs without a track", asy
   testApi,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
-  await connect(api, "export");
+  await connect(api);
   const slId = await gigSetlist(api, seed.gigs.upcomingClub.id);
   const put = await api.put(`/bands/${BAND}/setlists/${slId}/items`, {
     data: {
@@ -168,7 +178,7 @@ test("nothing to export answers 422 and creates no playlist", async ({
   testApi,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
-  await connect(api, "export");
+  await connect(api);
   const slId = await gigSetlist(api, seed.gigs.upcomingClub.id);
   const exportIt = () =>
     api.post(`/bands/${BAND}/setlists/${slId}/export`, {
@@ -194,7 +204,7 @@ test("export validates the name and requires band membership", async ({
   testApi,
 }) => {
   const api = await apiAs(testApi, USERS.ava.email);
-  await connect(api, "export");
+  await connect(api);
   const blank = await api.post(LIBRARY, { data: { name: "  " } });
   expect(blank.status()).toBe(400);
 

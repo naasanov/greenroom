@@ -64,6 +64,22 @@ function reducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Extra chip lines in priority order; the chip clips whatever does not fit. */
+function chipDetails(ev: CalendarEvent): string[] {
+  const lines: string[] = [];
+  const range = timeRange(ev);
+  if (range) lines.push(range);
+  if (ev.type === "gig") {
+    if (ev.venueName) lines.push(ev.venueName);
+    const n = ev.lineupUserIds.length;
+    if (n > 0) lines.push(`${n} in lineup`);
+  } else {
+    lines.push(ev.location ? ev.location : "Practice");
+    if (ev.location) lines.push("Practice");
+  }
+  return lines;
+}
+
 function renderEvent(
   arg: EventContentArg,
   sel: SelectedEvent | null | undefined,
@@ -77,11 +93,23 @@ function renderEvent(
       ? timeShort(wallClock(ev.startsAt, ev.timeZone).time)
       : null;
   if (month) {
+    const details = chipDetails(ev);
     return (
       <div className="gr-chip" data-selected={selected}>
-        <span aria-hidden="true" className={`gr-dot ${style.solid}`} />
-        {time ? <span className="gr-chip-time">{time}</span> : null}
-        <span className="gr-chip-title">{ev.title}</span>
+        <div className="gr-chip-head">
+          <span aria-hidden="true" className={`gr-dot ${style.solid}`} />
+          {time ? <span className="gr-chip-time">{time}</span> : null}
+          <span className="gr-chip-title">{ev.title}</span>
+        </div>
+        {details.length > 0 ? (
+          <div className="gr-chip-details" data-testid="chip-details">
+            {details.map((d) => (
+              <span key={d} className="gr-chip-detail">
+                {d}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     );
   }

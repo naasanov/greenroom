@@ -95,6 +95,20 @@ test("creating another band lands on Events", async ({
   ).toBeVisible();
 });
 
+test("the band picker links straight to band settings", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/events");
+  await page.getByRole("button", { name: /Switch band/ }).click();
+  await page.getByRole("menuitem", { name: "Band settings" }).click();
+  await expect(page).toHaveURL(/\/settings(#settings-band)?$/);
+  await expect(page.getByTestId("settings-band")).toBeVisible();
+});
+
 test("profile icon opens settings with personal info and sign out", async ({
   page,
   testApi,

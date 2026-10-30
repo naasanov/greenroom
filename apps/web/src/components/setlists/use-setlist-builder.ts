@@ -46,8 +46,16 @@ export interface SetlistBuilder {
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
   /** The add-song sheet; `open` turns false while it slides away. */
-  sheet: { nonce: number; initialText: string; open: boolean } | null;
+  sheet: {
+    nonce: number;
+    initialText: string;
+    open: boolean;
+    /** Set when the sheet shows an existing song instead of the add flow. */
+    songId?: string;
+  } | null;
   openSheet: (initialText?: string) => void;
+  /** Opens the song sheet on an existing song. */
+  viewSong: (songId: string) => void;
   closeSheet: () => void;
   copyEntry: GigHistoryEntry | null;
   requestCopy: (entry: GigHistoryEntry) => void;
@@ -125,6 +133,10 @@ export function useSetlistBuilder({
     nonce.current += 1;
     setSheet({ nonce: nonce.current, initialText, open: true });
   }, []);
+  const viewSong = useCallback((songId: string) => {
+    nonce.current += 1;
+    setSheet({ nonce: nonce.current, initialText: "", open: true, songId });
+  }, []);
   // The sheet stays mounted while it slides away, then is dropped.
   const closeSheet = useCallback(() => {
     setSheet((s) => (s ? { ...s, open: false } : s));
@@ -169,6 +181,7 @@ export function useSetlistBuilder({
     setHistoryOpen,
     sheet,
     openSheet,
+    viewSong,
     closeSheet,
     copyEntry,
     requestCopy,

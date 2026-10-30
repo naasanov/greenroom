@@ -46,7 +46,7 @@ function Content({ item }: { item: MediaItem }) {
         data-testid="viewer-image"
         src={item.thumbnailUrl}
         alt={item.name}
-        className="max-h-full max-w-full object-contain"
+        className="max-h-full max-w-full object-contain [image-orientation:from-image]"
       />
     );
   }
@@ -58,7 +58,7 @@ function Content({ item }: { item: MediaItem }) {
       src={item.contentUrl}
       alt={item.name}
       onError={() => setBroken(true)}
-      className="max-h-full max-w-full object-contain"
+      className="max-h-full max-w-full object-contain [image-orientation:from-image]"
     />
   );
 }
@@ -72,6 +72,7 @@ export function MediaViewer({
   onClose,
   onLinkSong,
   onClearSong,
+  onRename,
 }: {
   items: MediaItem[];
   index: number;
@@ -81,8 +82,11 @@ export function MediaViewer({
   /** Omit both to show the linked song read-only (no change or clear buttons). */
   onLinkSong?: (item: MediaItem) => void;
   onClearSong?: (item: MediaItem) => void;
+  /** Makes the name at the top click-to-rename. */
+  onRename?: (item: MediaItem, name: string) => void;
 }) {
   const item = items[index];
+  const [editing, setEditing] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const canShare = useShareSheet("files");
 
@@ -101,6 +105,7 @@ export function MediaViewer({
         )
       )
         return;
+      if (e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowLeft") go(-1);
       else if (e.key === "ArrowRight") go(1);
       else if (e.key === "Escape") onClose();
@@ -134,9 +139,46 @@ export function MediaViewer({
           <X />
         </Button>
         <div className="min-w-0 flex-1">
-          <p data-testid="viewer-name" className="truncate text-sm font-medium">
-            {item.name}
-          </p>
+          {editing && onRename ? (
+            <input
+              key={item.id}
+              autoFocus
+              aria-label="Item name"
+              data-testid="viewer-name-input"
+              defaultValue={item.name}
+              onFocus={(e) => e.currentTarget.select()}
+              onBlur={(e) => {
+                const next = e.currentTarget.value.trim();
+                setEditing(false);
+                if (next && next !== item.name) onRename(item, next);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  e.currentTarget.value = item.name;
+                  e.currentTarget.blur();
+                }
+              }}
+              className="h-9 w-full min-w-0 rounded-md bg-white/15 px-1 text-base font-medium text-white outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-inset md:text-sm"
+            />
+          ) : onRename ? (
+            <button
+              type="button"
+              data-testid="viewer-name"
+              onClick={() => setEditing(true)}
+              className="block min-h-9 w-full truncate rounded-md px-1 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              {item.name}
+            </button>
+          ) : (
+            <p
+              data-testid="viewer-name"
+              className="truncate text-sm font-medium"
+            >
+              {item.name}
+            </p>
+          )}
           <p
             data-testid="viewer-position"
             className="text-xs text-white/60 tabular-nums"

@@ -14,6 +14,7 @@ import {
   Grid2x2,
   Grid3x3,
   List,
+  ListChecks,
   MoreHorizontal,
   Music2,
   Pencil,
@@ -22,6 +23,16 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaFolderWithItems, MediaItem } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
@@ -84,6 +95,8 @@ import { useGigUploads } from "./upload/upload-provider";
 import { UploadTray } from "./upload/upload-tray";
 
 const isTrayKey = (id: string) => id.startsWith("up-");
+/** Matches the `scroll-mt-28` on sections (7rem at the default font size). */
+const SECTION_OFFSET = 112;
 const ACCEPT = "image/*,video/*,audio/*,application/pdf";
 
 const useDensity = createLocalChoice<Density>(
@@ -185,29 +198,23 @@ function FolderNameDialog({
 
 function SectionHeader({
   section,
-  index,
-  count,
   collapsed,
   placing,
   folderCount,
   folderIndex,
   onToggle,
   onPlace,
-  onJump,
   onRename,
   onMove,
   onDelete,
 }: {
   section: Section;
-  index: number;
-  count: number;
   collapsed: boolean;
   placing: boolean;
   folderCount: number;
   folderIndex: number;
   onToggle: () => void;
   onPlace: () => void;
-  onJump: (delta: number) => void;
   onRename: () => void;
   onMove: (delta: number) => void;
   onDelete: () => void;
@@ -249,26 +256,6 @@ function SectionHeader({
           </span>
         ) : null}
       </button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`Previous section from ${section.name}`}
-        data-testid="section-up"
-        disabled={index === 0}
-        onClick={() => onJump(-1)}
-      >
-        <ArrowUp />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`Next section from ${section.name}`}
-        data-testid="section-down"
-        disabled={index === count - 1}
-        onClick={() => onJump(1)}
-      >
-        <ArrowDown />
-      </Button>
       {section.folder ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -281,33 +268,63 @@ function SectionHeader({
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onRename}>
-              <Pencil /> Rename folder
+          <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuItem onSelect={onRename} className="whitespace-nowrap">
+              <Pencil /> Rename
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={folderIndex === 0}
               onSelect={() => onMove(-1)}
+              className="whitespace-nowrap"
             >
-              <ArrowUp /> Move folder up
+              <ArrowUp /> Move up
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={folderIndex === folderCount - 1}
               onSelect={() => onMove(1)}
+              className="whitespace-nowrap"
             >
-              <ArrowDown /> Move folder down
+              <ArrowDown /> Move down
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               disabled={!empty}
               onSelect={onDelete}
+              className="whitespace-nowrap"
             >
-              <Trash2 /> {empty ? "Delete folder" : "Delete folder (not empty)"}
+              <Trash2 /> {empty ? "Delete" : "Delete (not empty)"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
     </header>
+  );
+}
+
+/** A gallery section that highlights while tiles are dragged over it. */
+function DropSection({
+  section,
+  children,
+}: {
+  section: Section;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `drop:${section.key}` });
+  return (
+    <section
+      ref={setNodeRef}
+      id={`media-section-${section.key}`}
+      data-testid="media-section"
+      data-section={section.name}
+      data-drop-over={isOver ? "true" : undefined}
+      aria-label={section.name}
+      className={cn(
+        "scroll-mt-28 rounded-3xl pt-6 first:pt-2",
+        isOver && "bg-primary/10 ring-2 ring-primary/60",
+      )}
+    >
+      {children}
+    </section>
   );
 }
 
@@ -356,13 +373,18 @@ export function MediaGallery({
   const [error, setError] = useState<string | null>(null);
   const shareSheet = useShareSheet("touch");
   const fileInput = useRef<HTMLInputElement>(null);
-  const { store, entries, defaults } = useGigUploads(gigId);
+  const { store, entries } = useGigUploads(gigId);
   const mine = useMyUploads(bandId, gigId);
   const [trayHeight, setTrayHeight] = useState(0);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [bulkPicker, setBulkPicker] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const [canJump, setCanJump] = useState({ up: false, down: false });
+  const [dragId, setDragId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   useEffect(() => {
     if (mine.data) store.restore(bandId, gigId, mine.data);
@@ -375,7 +397,27 @@ export function MediaGallery({
   };
   const onTrayHeight = useCallback((px: number) => setTrayHeight(px), []);
 
-  const data = media.data;
+  // Finished uploads waiting in the tray are shown there, not in the gallery.
+  const trayItemIds = useMemo(
+    () =>
+      new Set(
+        entries.flatMap((e) =>
+          e.status === "done" && e.item && !e.placed ? [e.item.id] : [],
+        ),
+      ),
+    [entries],
+  );
+  const data = useMemo(() => {
+    const raw = media.data;
+    if (!raw || trayItemIds.size === 0) return raw;
+    const keep = (items: MediaItem[]) =>
+      items.filter((i) => !trayItemIds.has(i.id));
+    return {
+      ...raw,
+      unsorted: keep(raw.unsorted),
+      folders: raw.folders.map((f) => ({ ...f, items: keep(f.items) })),
+    };
+  }, [media.data, trayItemIds]);
   const drive = integrations.data?.drive;
   const ready = !!data?.driveLinked && !!drive?.folderId;
 
@@ -449,23 +491,97 @@ export function MediaGallery({
 
   function moveSelectionTo(folderId: string | null) {
     if (selectedCount === 0) return;
-    if (trayKeys.length > 0) store.patch(trayKeys, { folderId });
-    if (selectedIds.length > 0) {
-      move.mutate(
-        { itemIds: selectedIds, folderId },
-        fail("Could not move those items."),
-      );
+    const doneEntries = trayKeys.flatMap((k) => {
+      const e = trayEntry(k);
+      return e?.status === "done" && e.item ? [e] : [];
+    });
+    const pendingKeys = trayKeys.filter((k) => trayEntry(k)?.status !== "done");
+    if (pendingKeys.length > 0) store.patch(pendingKeys, { folderId });
+    const itemIds = [...selectedIds, ...doneEntries.map((e) => e.item!.id)];
+    if (itemIds.length > 0) {
+      move.mutate({ itemIds, folderId }, fail("Could not move those items."));
     }
+    // Finished uploads leave the tray once they are placed.
+    if (doneEntries.length > 0) store.dismiss(doneEntries.map((e) => e.key));
     setMoveMenu(false);
     clearSelection();
   }
 
-  function jump(index: number, delta: number) {
-    const target = sections[index + delta];
+  /** Scroll offsets (px) that put each section header under the sticky bar. */
+  function sectionTargets(): number[] {
+    const el = root.current;
+    if (!el) return [];
+    const max = el.scrollHeight - el.clientHeight;
+    return Array.from(el.querySelectorAll('[data-testid="media-section"]')).map(
+      (n) => {
+        const top =
+          n.getBoundingClientRect().top - el.getBoundingClientRect().top;
+        return Math.min(max, Math.max(0, top + el.scrollTop - SECTION_OFFSET));
+      },
+    );
+  }
+
+  const measureJump = useCallback(() => {
+    const el = root.current;
+    if (!el) return;
+    const targets = sectionTargets();
+    const next = {
+      up: targets.some((t) => t < el.scrollTop - 4),
+      down: targets.some((t) => t > el.scrollTop + 4),
+    };
+    setCanJump((prev) =>
+      prev.up === next.up && prev.down === next.down ? prev : next,
+    );
+  }, []);
+
+  // Jumps to the nearest section above or below the current scroll position.
+  function jump(dir: 1 | -1) {
+    const el = root.current;
+    if (!el) return;
+    const targets = sectionTargets();
+    const top =
+      dir === 1
+        ? targets.find((t) => t > el.scrollTop + 4)
+        : targets.findLast((t) => t < el.scrollTop - 4);
+    if (top !== undefined) el.scrollTo({ top, behavior: "smooth" });
+  }
+
+  useEffect(() => {
+    const id = requestAnimationFrame(measureJump);
+    return () => cancelAnimationFrame(id);
+  }, [measureJump, sections, collapsed, density, entries.length]);
+
+  function dropOnSection(e: DragEndEvent) {
+    setDragId(null);
+    const key = String(e.over?.id ?? "");
+    if (!key.startsWith("drop:")) return;
+    const target = sections.find((x) => `drop:${x.key}` === key);
     if (!target) return;
-    document
-      .getElementById(`media-section-${target.key}`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const dragged = String(e.active.id);
+    const ids = selected.has(dragged) ? selectedIds : [dragged];
+    const itemIds = ids.filter((id) => !target.items.some((i) => i.id === id));
+    if (itemIds.length === 0) return;
+    move.mutate(
+      { itemIds, folderId: target.folder?.id ?? null },
+      fail("Could not move those items."),
+    );
+    clearSelection();
+  }
+
+  function commitTrayRename(key: string, name: string | null) {
+    setEditingKey(null);
+    const next = name?.trim();
+    const entry = trayEntry(key);
+    if (!next || !entry || next === entry.fileName) return;
+    if (entry.status === "done" && entry.item) {
+      renameItem.mutate(
+        { itemId: entry.item.id, name: next },
+        fail("Could not rename that item."),
+      );
+      store.patchDone([key], { fileName: next });
+    } else {
+      store.patch([key], { fileName: next });
+    }
   }
 
   function moveFolder(folderId: string, delta: number) {
@@ -520,14 +636,17 @@ export function MediaGallery({
       icon: <CheckCheck />,
       onSelect: () => setSelected(allSelected ? new Set() : new Set(scopeIds)),
     },
-    ...(trayKeys.length > 0
+    ...(trayKeys.some((k) => trayEntry(k)?.status !== "done")
       ? [
           {
             key: "cancel-upload",
             label: "Cancel upload",
             icon: <Ban />,
             destructive: true,
-            onSelect: () => setConfirmCancel(trayKeys),
+            onSelect: () =>
+              setConfirmCancel(
+                trayKeys.filter((k) => trayEntry(k)?.status !== "done"),
+              ),
           },
         ]
       : []),
@@ -597,8 +716,22 @@ export function MediaGallery({
 
   function linkPicked(ids: string[], songId: string | null) {
     const keys = ids.filter(isTrayKey);
-    const items = ids.filter((id) => !isTrayKey(id));
-    if (keys.length > 0) store.patch(keys, { songId });
+    const doneEntries = keys.flatMap((k) => {
+      const e = trayEntry(k);
+      return e?.status === "done" && e.item ? [e] : [];
+    });
+    const items = [
+      ...ids.filter((id) => !isTrayKey(id)),
+      ...doneEntries.map((e) => e.item!.id),
+    ];
+    const pending = keys.filter((k) => trayEntry(k)?.status !== "done");
+    if (pending.length > 0) store.patch(pending, { songId });
+    if (doneEntries.length > 0) {
+      store.patchDone(
+        doneEntries.map((e) => e.key),
+        { songId },
+      );
+    }
     if (items.length > 0) {
       link.mutate(
         { itemIds: items, songId },
@@ -617,37 +750,28 @@ export function MediaGallery({
   } else {
     body = (
       <>
-        {all.length === 0 ? (
-          <button
-            type="button"
-            data-testid="media-empty"
-            onClick={() => fileInput.current?.click()}
-            className="flex w-full flex-col items-center gap-1 rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <Upload className="size-5" />
-            <span>No media yet</span>
-            <span className="text-xs">Drop files here or tap to add</span>
-          </button>
+        {all.length === 0 && entries.length === 0 ? (
+          <div className="flex justify-center py-12">
+            <Button
+              size="lg"
+              data-testid="media-empty"
+              onClick={() => fileInput.current?.click()}
+              className="h-20 gap-3 rounded-3xl px-10 text-lg"
+            >
+              <Upload className="size-6" /> Upload photos and videos
+            </Button>
+          </div>
         ) : null}
-        {sections.map((section, index) => {
+        {sections.map((section) => {
           if (section.items.length === 0 && !section.folder) return null;
           const isCollapsed = collapsed.has(section.key);
           const folderIndex = section.folder
             ? folders.findIndex((f) => f.id === section.folder!.id)
             : -1;
           return (
-            <section
-              key={section.key}
-              id={`media-section-${section.key}`}
-              data-testid="media-section"
-              data-section={section.name}
-              aria-label={section.name}
-              className="scroll-mt-28 pt-6 first:pt-2"
-            >
+            <DropSection key={section.key} section={section}>
               <SectionHeader
                 section={section}
-                index={index}
-                count={sections.length}
                 collapsed={isCollapsed}
                 placing={placing}
                 folderCount={folders.length}
@@ -660,7 +784,6 @@ export function MediaGallery({
                   })
                 }
                 onPlace={() => moveSelectionTo(section.folder?.id ?? null)}
-                onJump={(d) => jump(index, d)}
                 onRename={() =>
                   setFolderDialog({
                     kind: "rename",
@@ -702,29 +825,23 @@ export function MediaGallery({
                       onLongPress={() => startWith(item.id)}
                       onStartRename={() => setEditingId(item.id)}
                       onRename={(name) => commitRename(item, name)}
+                      dragCount={selected.has(item.id) ? selectedIds.length : 1}
                     />
                   ))}
                 </ul>
               )}
-            </section>
+            </DropSection>
           );
         })}
-        <div className="pt-8">
-          <Button
-            variant="outline"
-            data-testid="new-folder"
-            onClick={() => setFolderDialog({ kind: "new" })}
-          >
-            <FolderPlus /> New folder
-          </Button>
-        </div>
       </>
     );
   }
 
   return (
     <div
+      ref={root}
       data-testid="media-gallery"
+      onScroll={measureJump}
       style={{ "--tray-h": `${trayHeight}px` } as React.CSSProperties}
       onDragOver={(e) => {
         if (!ready || !e.dataTransfer.types.includes("Files")) return;
@@ -840,7 +957,25 @@ export function MediaGallery({
             </Button>
           </p>
         ) : null}
-        {body}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
+          onDragStart={(e) => setDragId(String(e.active.id))}
+          onDragEnd={dropOnSection}
+          onDragCancel={() => setDragId(null)}
+        >
+          {body}
+          <DragOverlay dropAnimation={null} zIndex={60}>
+            {dragId ? (
+              <div
+                data-testid="drag-overlay"
+                className="w-fit rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lift"
+              >
+                {plural(selected.has(dragId) ? selectedIds.length : 1)}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </main>
 
       {ready ? (
@@ -850,9 +985,68 @@ export function MediaGallery({
               label="Add media"
               layout="desktop"
               className="bottom-[calc(var(--tray-h,0px)+1.5rem)]"
-              onClick={() => fileInput.current?.click()}
+              actions={[
+                {
+                  key: "upload",
+                  label: "Upload",
+                  icon: <Upload />,
+                  onSelect: () => fileInput.current?.click(),
+                },
+                {
+                  key: "new-folder",
+                  label: "New folder",
+                  icon: <FolderPlus />,
+                  onSelect: () => setFolderDialog({ kind: "new" }),
+                },
+              ]}
             />
           ) : null}
+          <div
+            data-testid="fab-stack"
+            className="pr-safe fixed right-4 bottom-[calc(var(--tray-h,0px)+5.75rem)] z-30 flex w-14 flex-col items-center gap-2"
+          >
+            {!selecting && sections.length > 1 ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Jump to previous folder"
+                  data-testid="jump-up"
+                  disabled={!canJump.up}
+                  onClick={() => jump(-1)}
+                  className="size-11 rounded-full shadow-lift ring-1 ring-foreground/10"
+                >
+                  <ArrowUp />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  aria-label="Jump to next folder"
+                  data-testid="jump-down"
+                  disabled={!canJump.down}
+                  onClick={() => jump(1)}
+                  className="size-11 rounded-full shadow-lift ring-1 ring-foreground/10"
+                >
+                  <ArrowDown />
+                </Button>
+              </>
+            ) : null}
+            {all.length > 0 || entries.length > 0 ? (
+              <Button
+                variant={selecting ? "default" : "secondary"}
+                size="icon"
+                aria-label={selecting ? "Exit selection mode" : "Select items"}
+                aria-pressed={selecting}
+                data-testid="select-fab"
+                onClick={() =>
+                  selecting ? clearSelection() : setSelecting(true)
+                }
+                className="size-12 rounded-full shadow-lift ring-1 ring-foreground/10"
+              >
+                {selecting ? <X /> : <ListChecks />}
+              </Button>
+            ) : null}
+          </div>
           <input
             ref={fileInput}
             type="file"
@@ -871,22 +1065,16 @@ export function MediaGallery({
       {ready && entries.length > 0 ? (
         <UploadTray
           entries={entries}
-          folders={folders}
-          defaults={defaults}
           selected={selected}
           editingKey={editingKey}
           songTitle={(id) => (id ? (songTitles.get(id) ?? null) : null)}
-          onFolder={(folderId) => store.setDefaults(gigId, { folderId })}
-          onPickSong={() => setBulkPicker(true)}
+          onSelectAll={() => {
+            setSelecting(true);
+            setSelected(new Set(entries.map((e) => e.key)));
+          }}
           onToggle={toggleTray}
           onStartRename={setEditingKey}
-          onRename={(key, name) => {
-            setEditingKey(null);
-            const next = name?.trim();
-            if (next && next !== trayEntry(key)?.fileName) {
-              store.patch([key], { fileName: next });
-            }
-          }}
+          onRename={commitTrayRename}
           onRetry={(key) => store.retry(key)}
           onCancelAll={() =>
             store.cancel(
@@ -927,6 +1115,12 @@ export function MediaGallery({
           onIndexChange={(i) => setViewerId(all[i]?.id ?? null)}
           onClose={() => setViewerId(null)}
           onLinkSong={(item) => setPicker([item.id])}
+          onRename={(item, name) =>
+            renameItem.mutate(
+              { itemId: item.id, name },
+              fail("Could not rename that item."),
+            )
+          }
           onClearSong={(item) =>
             link.mutate(
               { itemIds: [item.id], songId: null },
@@ -980,23 +1174,6 @@ export function MediaGallery({
             linkPicked(picker, song.id);
             clearSelection();
           }
-        }}
-      />
-
-      <SongPickerDrawer
-        bandId={bandId}
-        open={bulkPicker}
-        onOpenChange={setBulkPicker}
-        title="Link uploads to a song"
-        firstSongIds={setlistSongIds}
-        currentSongId={defaults.songId}
-        onClear={() => {
-          store.setDefaults(gigId, { songId: null, songTitle: null });
-          setBulkPicker(false);
-        }}
-        onPick={(song) => {
-          store.setDefaults(gigId, { songId: song.id, songTitle: song.title });
-          setBulkPicker(false);
         }}
       />
 

@@ -2,11 +2,18 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
-import { bands, memberships, type Database } from "@greenroom/db";
+import {
+  bands,
+  memberships,
+  userPhotos,
+  users,
+  type Database,
+} from "@greenroom/db";
 import { MAX_BAND_PHOTO_BYTES } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import type { DriveDownloadResult } from "../integrations/index.js";
@@ -14,7 +21,7 @@ import {
   DriveStructureService,
   type DriveContext,
 } from "./drive-structure.service.js";
-import { bandPhotoUrl, memberPhotoUrl, UUID_RE } from "./media-util.js";
+import { bandPhotoUrl, userPhotoUrl, UUID_RE } from "./media-util.js";
 
 export interface UploadedImage {
   buffer: Buffer;
@@ -28,6 +35,16 @@ export interface PhotoStream {
   mimeType: string;
 }
 
+export interface UserPhotoBytes {
+  data: Buffer;
+  mimeType: string;
+}
+
+const safeImageMime = (m: string): string =>
+  m.startsWith("image/") && m !== "image/svg+xml"
+    ? m
+    : "application/octet-stream";
+
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -36,9 +53,11 @@ const EXT: Record<string, string> = {
   "image/heic": "heic",
 };
 
-/** Band and per-band member photos, stored in the band's Profile photos folder. */
+/** Band photos, plus the user profile photo mirrored into each band's Profile photos folder. */
 @Injectable()
 export class ProfilePhotosService {
+  private readonly log = new Logger(ProfilePhotosService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly structure: DriveStructureService,
@@ -141,7 +160,95 @@ export class ProfilePhotosService {
     return this.stream(bandId, band.photoDriveFileId, band.photoMimeType);
   }
 
-  // ---- member photo ----
+  // ---- user profile photo ----
+
+  /** Stores the user's single profile photo, then mirrors it to every band Drive. */
+  async setUserPhoto(
+    userId: string,
+    file: UploadedImage | undefined,
+  ): Promise<string> {
+    const img = this.validate(file);
+    await this.db
+      .insert(userPhotos)
+      .values({ userId, data: img.buffer, mimeType: img.mimetype })
+      .onConflictDoUpdate({
+        target: userPhotos.userId,
+        set: {
+          data: img.buffer,
+          mimeType: img.mimetype,
+          updatedAt: new Date(),
+        },
+      });
+    const photoUrl = userPhotoUrl(userId, Date.now());
+    await this.db
+      .update(users)
+      .set({ avatarUrl: photoUrl })
+      .where(eq(users.id, userId));
+    await this.syncToBands(userId);
+    return photoUrl;
+  }
+
+  async clearUserPhoto(userId: string): Promise<void> {
+    await this.db.delete(userPhotos).where(eq(userPhotos.userId, userId));
+    await this.db
+      .update(users)
+      .set({ avatarUrl: null })
+      .where(eq(users.id, userId));
+    await this.syncToBands(userId);
+  }
+
+  async openUserPhoto(userId: string): Promise<UserPhotoBytes> {
+    if (!UUID_RE.test(userId)) throw new NotFoundException();
+    const [row] = await this.db
+      .select()
+      .from(userPhotos)
+      .where(eq(userPhotos.userId, userId));
+    if (!row) throw new NotFoundException();
+    return { data: row.data, mimeType: safeImageMime(row.mimeType) };
+  }
+
+  /** Best effort per band: a failing or unlinked Drive never fails the update. */
+  async syncToBands(userId: string): Promise<void> {
+    let rows: { bandId: string }[] = [];
+    try {
+      rows = await this.db
+        .select({ bandId: memberships.bandId })
+        .from(memberships)
+        .where(and(eq(memberships.userId, userId), isNull(memberships.leftAt)));
+    } catch (err) {
+      this.log.warn(`photo sync lookup failed: ${String(err)}`);
+    }
+    await Promise.all(rows.map((r) => this.syncToBand(r.bandId, userId)));
+  }
+
+  /** Mirrors the current profile photo (or its absence) into one band's Drive. */
+  async syncToBand(bandId: string, userId: string): Promise<void> {
+    try {
+      const ctx = await this.structure.context(bandId);
+      const m = await this.membership(bandId, userId);
+      if (!ctx || !m) return;
+      const [photo] = await this.db
+        .select()
+        .from(userPhotos)
+        .where(eq(userPhotos.userId, userId));
+      let fileId: string | null = null;
+      if (photo) {
+        fileId = await this.upload(ctx, `member-${userId}`, {
+          buffer: photo.data,
+          mimetype: photo.mimeType,
+          size: photo.data.length,
+          originalname: "profile",
+        });
+      }
+      await this.db
+        .update(memberships)
+        .set({ photoDriveFileId: fileId })
+        .where(eq(memberships.id, m.id));
+      await this.trashQuietly(ctx, m.photoDriveFileId);
+    } catch (err) {
+      this.log.warn(`photo sync to band ${bandId} failed: ${String(err)}`);
+    }
+  }
 
   private async membership(bandId: string, userId: string) {
     const [m] = await this.db
@@ -157,35 +264,7 @@ export class ProfilePhotosService {
     return m;
   }
 
-  async setMemberPhoto(
-    bandId: string,
-    userId: string,
-    file: UploadedImage | undefined,
-  ): Promise<string> {
-    const img = this.validate(file);
-    const ctx = await this.structure.requireContext(bandId);
-    const m = await this.membership(bandId, userId);
-    if (!m) throw new NotFoundException("Band not found");
-    const fileId = await this.upload(ctx, `member-${userId}`, img);
-    await this.db
-      .update(memberships)
-      .set({ photoDriveFileId: fileId })
-      .where(eq(memberships.id, m.id));
-    await this.trashQuietly(ctx, m.photoDriveFileId);
-    return memberPhotoUrl(bandId, userId, fileId)!;
-  }
-
-  async clearMemberPhoto(bandId: string, userId: string): Promise<void> {
-    const m = await this.membership(bandId, userId);
-    if (!m?.photoDriveFileId) return;
-    const ctx = await this.structure.context(bandId);
-    await this.db
-      .update(memberships)
-      .set({ photoDriveFileId: null })
-      .where(eq(memberships.id, m.id));
-    if (ctx) await this.trashQuietly(ctx, m.photoDriveFileId);
-  }
-
+  /** Serves a band Drive copy; kept for photos uploaded before the single profile photo. */
   async openMemberPhoto(bandId: string, userId: string): Promise<PhotoStream> {
     if (!UUID_RE.test(userId)) throw new NotFoundException();
     const m = await this.membership(bandId, userId);

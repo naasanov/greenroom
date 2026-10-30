@@ -77,6 +77,7 @@ export function RoutedShell({ children }: { children: ReactNode }) {
         activeBandId={currentBand.id}
         onBandChange={setCurrentBandId}
         onCreateBand={() => setCreateOpen(true)}
+        onBandSettings={() => router.push("/settings#settings-band")}
         activeTab={activeTab}
         tabHref={tabPath}
         profile={{ name: me.displayName, imageUrl: me.avatarUrl }}

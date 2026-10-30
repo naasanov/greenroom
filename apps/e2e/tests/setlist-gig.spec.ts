@@ -71,47 +71,75 @@ async function fillSetlist(
   return sl.id as string;
 }
 
-test("empty setlist points at the edit pencil", async ({ page }) => {
+test("empty setlist is one Add songs button that opens the library", async ({
+  page,
+}) => {
   await openGig(page, seed.gigs.tentative);
-  await expect(page.getByTestId("setlist-empty")).toContainText("pencil");
+  const empty = page.getByTestId("setlist-empty");
+  await expect(empty).toHaveText("Add songs");
   await expect(
     page.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add songs" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Copy from a past gig" }),
   ).toHaveCount(0);
   await expect(total(page)).toHaveCount(0);
+  await empty.click();
+  await expect(page.getByTestId("library-picker")).toBeVisible();
 });
 
-test("the library drawer rises from the bottom and offers copying from a past gig", async ({
+test("the library drawer rises from the bottom and swaps to past gigs in place", async ({
   page,
   isMobile,
 }) => {
   test.skip(isMobile, "The bottom-anchored aside is the desktop layout");
   await openGig(page, seed.gigs.tentative);
+  // Rising is a transition on `translate`, which must start when the drawer opens.
+  await librarySide(page).evaluate((el) => {
+    el.addEventListener("transitionstart", (e) => {
+      if (
+        e.target === el &&
+        (e as TransitionEvent).propertyName === "translate"
+      ) {
+        el.setAttribute("data-rose", "");
+      }
+    });
+  });
   await openLibrary(page);
 
   const side = librarySide(page);
   await expect(side).toHaveAttribute("data-state", "open");
+  await expect(side).toHaveAttribute("data-rose", "");
   await expectRisen(page, side);
 
   const copy = page
     .getByTestId("library-picker")
     .getByRole("button", { name: "Copy from a past gig" });
   await expect(copy).toBeVisible();
+  const field = page.getByRole("searchbox", { name: "Search the library" });
+  expect((await copy.boundingBox())!.height).toBeLessThanOrEqual(
+    (await field.boundingBox())!.height,
+  );
+  await expect(copy).toHaveText("");
+
+  // The panel stays put while its content swaps: no second slide-in.
+  await side.evaluate((el) => {
+    el.removeAttribute("data-rose");
+    el.setAttribute("data-same-panel", "");
+  });
   await copy.click();
   await expect(page.getByTestId("history-picker")).toBeVisible();
   await expect(page.getByTestId("library-picker")).toBeHidden();
-  await expect(side).toHaveAttribute("data-state", "closed");
-
   const history = page.locator('aside[aria-label="Copy from a past gig"]');
-  await expectRisen(page, history);
+  await expect(history).toHaveAttribute("data-state", "open");
+  await expect(history).toHaveAttribute("data-same-panel", "");
+  await expect(history).not.toHaveAttribute("data-rose", "");
   await history
     .getByRole("button", { name: "Back to the music library" })
     .click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
   await expect(page.getByTestId("history-picker")).toBeHidden();
+  await expect(librarySide(page)).toHaveAttribute("data-state", "open");
 });
 
 test("tapping library rows adds and removes songs with check marks", async ({
@@ -226,6 +254,54 @@ test("a row can be reordered by dragging its handle", async ({
   await expect
     .poll(async () => (await rowTitles(page)).slice(0, 3))
     .toEqual(["Midnight Train", "Paper Planes", "Skyline Drive"]);
+});
+
+test("rows settle without bouncing after a drop", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Pointer drag is covered on desktop");
+  await page.setViewportSize({ width: 1400, height: 800 });
+  await openGig(page, seed.gigs.upcomingClub);
+  await expect(rows(page)).toHaveCount(5);
+  const handle = page.getByRole("button", { name: "Reorder Skyline Drive" });
+  const from = (await handle.boundingBox())!;
+  const target = (await rows(page).nth(2).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, target.y + target.height - 8, {
+    steps: 12,
+  });
+  await page.waitForTimeout(300);
+  // After release every frame must already show the final order, at rest.
+  const frames = page.evaluate(
+    () =>
+      new Promise<{ order: string[]; moving: boolean }[]>((resolve) => {
+        const out: { order: string[]; moving: boolean }[] = [];
+        const tick = () => {
+          const els = [
+            ...document.querySelectorAll<HTMLElement>(
+              '[data-testid="target-row"]',
+            ),
+          ];
+          out.push({
+            order: els.map((e) => e.dataset.itemId ?? ""),
+            moving: els.some(
+              (e) => e.style.transform !== "" && e.style.transform !== "none",
+            ),
+          });
+          if (out.length < 20) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  await page.mouse.up();
+  const seen = await frames;
+  const final = seen[seen.length - 1]!.order;
+  const settled = seen.slice(2);
+  expect(settled.every((f) => f.order.join() === final.join())).toBe(true);
+  expect(settled.some((f) => f.moving)).toBe(false);
 });
 
 test("a library song dragged over the setlist highlights it and appends on drop", async ({

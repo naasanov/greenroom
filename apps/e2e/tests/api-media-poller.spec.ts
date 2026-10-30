@@ -26,7 +26,7 @@ test("poller reconciles add, rename, move, trash, delete, and new subfolders", a
     await ava.post(`${media}/folders`, { data: { name: "Stage" } })
   ).json();
   const gigFolder = (await fake.files()).find((f) =>
-    /^\d{4}-\d\d-\d\d /.test(f.name),
+    /^\d\d-\d\d-\d\d /.test(f.name),
   )!;
   const stageDrive = (await fake.byName("Stage"))!;
   const names = async () => {

@@ -176,6 +176,10 @@ export type PracticeSubmit =
  * Create a practice series, or edit an occurrence. An edit hands back a draft so the
  * caller can ask the scope and build the request body for it.
  */
+/** WebKit gives native time inputs an intrinsic width; this lets the grid size them. */
+const TIME_INPUT =
+  "min-w-0 w-full max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left";
+
 export function PracticeForm({
   initial,
   editing = false,
@@ -396,7 +400,7 @@ export function PracticeForm({
         <FieldError message={errors.title?.message} />
       </FormField>
 
-      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 [&>*]:min-w-0">
         <FormField label="Date" htmlFor={id("date")} className="col-span-2">
           <Input
             id={id("date")}
@@ -410,6 +414,7 @@ export function PracticeForm({
           <Input
             id={id("time")}
             type="time"
+            className={TIME_INPUT}
             aria-invalid={!!errors.startTime}
             {...startField}
             onChange={onStartChange}
@@ -420,6 +425,7 @@ export function PracticeForm({
           <Input
             id={id("end")}
             type="time"
+            className={TIME_INPUT}
             aria-invalid={!!errors.endTime}
             {...form.register("endTime")}
           />

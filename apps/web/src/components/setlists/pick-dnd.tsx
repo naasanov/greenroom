@@ -45,7 +45,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Children,
   createContext,
+  isValidElement,
   useCallback,
   useContext,
   useEffect,
@@ -266,6 +268,7 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
 }
 
 const ROW_GAP = 8;
+const SETTLE_MS = 3000;
 
 interface TargetCtx {
   targetId: string;
@@ -298,9 +301,42 @@ export function PickTarget({
   children: ReactNode;
 }) {
   const { register, active } = usePickDnd();
+  // A reorder shows at once, in the same render that clears the drag transforms,
+  // so rows never flash back to the old order while the owner's update lands.
+  const [local, setLocal] = useState<{ base: string[]; next: string[] } | null>(
+    null,
+  );
   useEffect(() => {
-    register(targetId, { ids, onChange });
-  }, [register, targetId, ids, onChange]);
+    if (!local) return;
+    const t = window.setTimeout(() => setLocal(null), SETTLE_MS);
+    return () => window.clearTimeout(t);
+  }, [local]);
+  const shown = local && local.base === ids ? local.next : ids;
+  const handleChange = useCallback(
+    (next: string[], change: TargetChange) => {
+      if (!change.added) setLocal({ base: ids, next });
+      onChange(next, change);
+    },
+    [ids, onChange],
+  );
+  useEffect(() => {
+    register(targetId, { ids, onChange: handleChange });
+  }, [register, targetId, ids, handleChange]);
+  const rows = useMemo(() => {
+    if (shown === ids) return children;
+    const list = Children.toArray(children);
+    const rank = new Map(shown.map((id, i) => [id, i]));
+    const keyed = list.map((c) =>
+      isValidElement<{ itemId?: string }>(c) && c.props.itemId !== undefined
+        ? rank.get(c.props.itemId)
+        : undefined,
+    );
+    if (keyed.some((r) => r === undefined)) return children;
+    return list
+      .map((c, i) => ({ c, r: keyed[i]! }))
+      .sort((a, b) => a.r - b.r)
+      .map((x) => x.c);
+  }, [children, shown, ids]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `container:${targetId}`,
@@ -323,11 +359,11 @@ export function PickTarget({
           empty
         ) : (
           <SortableContext
-            items={ids.map((id) => sortId(targetId, id))}
+            items={shown.map((id) => sortId(targetId, id))}
             strategy={verticalListSortingStrategy}
           >
             <ul className="flex flex-col" style={{ gap: ROW_GAP }}>
-              {children}
+              {rows}
             </ul>
           </SortableContext>
         )}
@@ -384,6 +420,7 @@ export function TargetRow({
   } = useSortable({
     id: sortId(target.targetId, itemId),
     disabled: !reorder,
+    animateLayoutChanges: () => false,
     data: {
       type: "item",
       targetId: target.targetId,

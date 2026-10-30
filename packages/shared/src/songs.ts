@@ -3,7 +3,9 @@ import { z } from "zod";
 export const SONG_ERROR_CODES = {
   duplicateSong: "DUPLICATE_SONG",
   playlistNotFound: "PLAYLIST_NOT_FOUND_OR_PRIVATE",
+  playlistForbidden: "PLAYLIST_FORBIDDEN",
   spotifyLoginRequired: "SPOTIFY_LOGIN_REQUIRED",
+  spotifyReconnectRequired: "SPOTIFY_RECONNECT_REQUIRED",
   nothingToExport: "NOTHING_TO_EXPORT",
 } as const;
 
@@ -118,6 +120,12 @@ export interface SongDetail extends SongSummary {
   updatedAt: string;
   references: Reference[];
   usedIn: UsedIn[];
+}
+
+/** A reference tag used in the band's songs, with how many songs use it. */
+export interface ReferenceTag {
+  label: string;
+  count: number;
 }
 
 export interface SuggestedReference {

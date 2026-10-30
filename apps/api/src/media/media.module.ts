@@ -11,7 +11,10 @@ import { MediaController } from "./media.controller.js";
 import { MediaService } from "./media.service.js";
 import { MediaTestController } from "./media-test.controller.js";
 import { MediaZipService } from "./media-zip.service.js";
-import { ProfilePhotosController } from "./profile-photos.controller.js";
+import {
+  ProfilePhotosController,
+  UserPhotosController,
+} from "./profile-photos.controller.js";
 import { ProfilePhotosService } from "./profile-photos.service.js";
 import {
   PublicUploadLinksController,
@@ -65,6 +68,7 @@ const linkThrottlers = [
     DriveController,
     MediaController,
     ProfilePhotosController,
+    UserPhotosController,
     UploadsController,
     UploadLinksController,
     PublicUploadLinksController,

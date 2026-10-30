@@ -1,6 +1,7 @@
 import { apiPublicUrl } from "../../auth/auth.constants.js";
 import { stagingLoginEnabled } from "../../staging-login/staging-login.enabled.js";
 import {
+  SPOTIFY_IMPORT_SCOPES,
   parseSpotifyId,
   type SpotifyAdapter,
   type SpotifyCreatePlaylistResult,
@@ -15,6 +16,8 @@ import {
 
 /** Token that owns the built-in private playlist. */
 export const FAKE_SPOTIFY_OWNER_TOKEN = "fake-spotify-owner-token";
+/** Connecting as `fake-code:owner` links the account that owns the private playlist. */
+export const FAKE_PRIVATE_OWNER_USER = "owner";
 export const FAKE_PUBLIC_PLAYLIST_ID = "fakePlaylistPublic";
 export const FAKE_PRIVATE_PLAYLIST_ID = "fakePlaylistPrivate";
 
@@ -126,6 +129,8 @@ interface StoredPlaylist {
   name: string;
   isPublic: boolean;
   ownerToken: string;
+  /** Fake Spotify account name that owns the playlist, when seeded for one. */
+  ownerUser?: string;
   trackIds: string[];
 }
 
@@ -135,6 +140,8 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   private created: string[] = [];
   private counter = 0;
   private refreshTokens = new Set<string>();
+  private tokenUsers = new Map<string, string>();
+  private refreshUsers = new Map<string, string>();
   // Scopes of the latest authorize URL; the next code exchange grants them.
   private requestedScopes: string[] = [];
 
@@ -191,16 +198,19 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     const n = ++this.counter;
     const refreshToken = `fake-spotify-refresh-${n}`;
     this.refreshTokens.add(refreshToken);
+    const accessToken = `fake-spotify-access-${n}`;
+    this.tokenUsers.set(accessToken, name);
+    this.refreshUsers.set(refreshToken, name);
     return {
       status: "ok",
       profile: { id: `fake-spotify-user-${name}`, displayName: name },
       tokens: {
-        accessToken: `fake-spotify-access-${n}`,
+        accessToken,
         refreshToken,
         expiresAt: this.expiry(),
         scopes: this.requestedScopes.length
           ? [...this.requestedScopes]
-          : ["playlist-read-private", "playlist-read-collaborative"],
+          : [...SPOTIFY_IMPORT_SCOPES],
       },
     };
   }
@@ -210,9 +220,12 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   ): Promise<SpotifyRefreshResult> {
     if (!this.refreshTokens.has(refreshToken))
       return { status: "invalid-grant" };
+    const accessToken = `fake-spotify-access-${++this.counter}`;
+    const user = this.refreshUsers.get(refreshToken);
+    if (user) this.tokenUsers.set(accessToken, user);
     return {
       status: "ok",
-      accessToken: `fake-spotify-access-${++this.counter}`,
+      accessToken,
       refreshToken: null,
       expiresAt: this.expiry(),
     };
@@ -225,9 +238,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     if (!this.validToken(userToken)) return { status: "unauthorized" };
     const p = this.find(idOrUrl);
     if (p) {
-      return p.isPublic || p.ownerToken === userToken
-        ? this.ok(p)
-        : { status: "not-found-or-private" };
+      return this.canRead(p, userToken) ? this.ok(p) : { status: "forbidden" };
     }
     // Staging has no real playlists, so any id resolves to the demo set.
     const id = parseSpotifyId(idOrUrl);
@@ -257,6 +268,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
       name: input.name,
       isPublic: input.isPublic ?? false,
       ownerToken: userToken,
+      ownerUser: this.tokenUsers.get(userToken),
       trackIds: [],
     });
     return {
@@ -276,7 +288,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   ): Promise<SpotifyWriteResult> {
     if (!this.validToken(userToken)) return { status: "unauthorized" };
     const p = this.playlists.get(playlistId);
-    if (!p || p.ownerToken !== userToken) return { status: "not-found" };
+    if (!p || !this.isOwner(p, userToken)) return { status: "not-found" };
     for (const uri of trackUris) {
       const id = parseSpotifyId(uri);
       if (id) p.trackIds.push(id);
@@ -295,6 +307,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     name: string;
     isPublic: boolean;
     ownerToken?: string;
+    ownerUser?: string;
     trackIds: string[];
   }): void {
     this.playlists.set(p.id, { ownerToken: FAKE_SPOTIFY_OWNER_TOKEN, ...p });
@@ -338,6 +351,8 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     this.created = [];
     this.requestedScopes = [];
     this.refreshTokens.clear();
+    this.tokenUsers.clear();
+    this.refreshUsers.clear();
     this.tracks = new Map(CATALOG.map((t) => [t.id, t]));
     this.playlists = new Map();
     this.seedPlaylist({
@@ -350,12 +365,24 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
       id: FAKE_PRIVATE_PLAYLIST_ID,
       name: "Fake Private Setlist",
       isPublic: false,
+      ownerUser: FAKE_PRIVATE_OWNER_USER,
       trackIds: ["fakeTrack4", "fakeTrack5"],
     });
   }
 
   private expiry(): string {
     return new Date(Date.UTC(2030, 0, 1)).toISOString();
+  }
+
+  private isOwner(p: StoredPlaylist, token: string): boolean {
+    return (
+      p.ownerToken === token ||
+      (!!p.ownerUser && this.tokenUsers.get(token) === p.ownerUser)
+    );
+  }
+
+  private canRead(p: StoredPlaylist, token: string): boolean {
+    return p.isPublic || this.isOwner(p, token);
   }
 
   private validToken(token: string): boolean {

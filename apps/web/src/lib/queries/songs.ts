@@ -4,6 +4,7 @@ import {
   keepPreviousData,
   queryOptions,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -14,6 +15,8 @@ import {
   type CreateSong,
   type DeletedSong,
   type ImportProgress,
+  type Reference,
+  type ReferenceTag,
   type ResolveResult,
   type SongCreated,
   type SongDetail,
@@ -34,6 +37,8 @@ export const songKeys = {
     [...songsRoot(bandId), "list", { q, sort }] as const,
   resolve: (bandId: string, input: string) =>
     ["bands", bandId, "song-resolve", input] as const,
+  referenceTags: (bandId: string) =>
+    [...songsRoot(bandId), "reference-tags"] as const,
   importStatus: (bandId: string, importId: string) =>
     ["bands", bandId, "song-imports", importId] as const,
 };
@@ -242,4 +247,29 @@ export function useImportProgress(bandId: string, importId: string | null) {
       return status === "completed" || status === "failed" ? false : 700;
     },
   });
+}
+
+/** Distinct reference tags used in the band, most used first. */
+export function useReferenceTags(bandId: string | undefined) {
+  return useQuery({
+    queryKey: songKeys.referenceTags(bandId ?? ""),
+    queryFn: () =>
+      api(`/bands/${bandId}/songs/reference-tags`, {
+        schema: typed<ReferenceTag[]>(),
+      }),
+    enabled: !!bandId,
+    staleTime: 30_000,
+  });
+}
+
+/** References for each song id, fetched through the shared detail cache. */
+export function useSongReferences(bandId: string, songIds: string[]) {
+  const results = useQueries({
+    queries: songIds.map((id) => songDetailOptions(bandId, id)),
+  });
+  const byId = new Map<string, Reference[]>();
+  results.forEach((r, i) => {
+    if (r.data) byId.set(songIds[i]!, r.data.references);
+  });
+  return { byId, loading: results.some((r) => r.isPending) };
 }

@@ -1,7 +1,13 @@
 "use client";
 
 import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
-import { useCallback, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type {
   EditScope as ApiScope,
   PracticeEditResult,
@@ -226,6 +232,7 @@ export function PracticeDrawer({
   beside = false,
   onClose,
   onEdited,
+  registerClose,
 }: {
   bandId: string;
   seriesId: string;
@@ -237,6 +244,8 @@ export function PracticeDrawer({
   /** Sits left of the agenda sheet on wide screens instead of centering on the page. */
   beside?: boolean;
   onClose: () => void;
+  /** Receives a function that closes the drawer, asking first when it has unsaved edits. */
+  registerClose?: (close: (() => void) | null) => void;
   /** Called with the edit result so the caller can follow the occurrence. */
   onEdited: (result: PracticeEditResult) => void;
 }) {
@@ -268,6 +277,15 @@ export function PracticeDrawer({
   });
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
+  useEffect(() => {
+    if (!open || !registerClose) return;
+    registerClose(() => requestCloseRef.current());
+    return () => registerClose(null);
+  }, [open, registerClose]);
   const cancelEdit = () => (dirty ? setDiscard("cancel") : setEditing(false));
 
   async function applyScope(draft: PracticeEditDraft, scope: ApiScope) {
@@ -314,7 +332,7 @@ export function PracticeDrawer({
       <PickDndProvider>
         <BottomDrawer
           open={open}
-          className={eventDrawerClass(setlist.besideEffective)}
+          className={eventDrawerClass(setlist.besideEffective, true)}
           aside={<SetlistAside builder={setlist} />}
           onOpenChange={(open) => !open && onClose()}
           dismissible={!dirty}

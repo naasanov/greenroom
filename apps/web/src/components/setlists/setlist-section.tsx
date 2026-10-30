@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, Pencil, Upload, X } from "lucide-react";
+import { GripVertical, Link2, Pencil, Plus, Upload, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useCurrentBand } from "@/lib/current-band";
 import { cn } from "@/lib/utils";
 import { exportDateLabel, useGigForExport } from "@/lib/queries/spotify-export";
+import { OpenReferencesDialog } from "./open-references-dialog";
 import { PickTarget, TargetRow } from "./pick-dnd";
 import { SongLine, setlistSummary, toSetlistSong } from "./song-row";
 import type { SetlistBuilder } from "./use-setlist-builder";
@@ -59,6 +60,11 @@ export function SetlistSection({
   const pathname = usePathname();
   const search = useSearchParams();
   const [exporting, setExporting] = useState(false);
+  const [referencesOpen, setReferencesOpen] = useState(false);
+  const referenceSongs = useMemo(
+    () => items?.map((i) => ({ id: i.songId, title: i.title })) ?? [],
+    [items],
+  );
   const exportBack = useExportReturn("setlist");
   const [exportSeen, setExportSeen] = useState(false);
   if (exportBack.resume && !exportSeen) {
@@ -113,6 +119,18 @@ export function SetlistSection({
           ) : null}
         </div>
         <div className="-mr-1.5 flex shrink-0 items-center">
+          {setlist && setlist.songCount > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Open references"
+              className="text-muted-foreground"
+              onClick={() => setReferencesOpen(true)}
+            >
+              <Link2 />
+            </Button>
+          ) : null}
           {setlist && setlist.songCount > 0 && builder.setlistId ? (
             <Button
               type="button"
@@ -163,14 +181,18 @@ export function SetlistSection({
           ids={ids}
           onChange={onChange}
           empty={
-            <p
+            <button
+              type="button"
               data-testid="setlist-empty"
-              className="flex h-14 items-center rounded-2xl border border-dashed px-4 text-sm text-muted-foreground"
+              disabled={!builder.ready}
+              onClick={() => {
+                editor.clearError();
+                builder.setLibraryOpen(true);
+              }}
+              className="flex min-h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-base font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
             >
-              {builder.setlistId
-                ? "No songs yet. Tap the pencil to add songs from your library or copy a past gig."
-                : "No setlist"}
-            </p>
+              <Plus className="size-5" /> Add songs
+            </button>
           }
         >
           {(setlist?.items ?? []).map((item) => {
@@ -208,8 +230,22 @@ export function SetlistSection({
                       <GripVertical className="size-5" />
                     </button>
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`View ${item.title}`}
+                      data-testid="setlist-row-open"
+                      onClick={() => {
+                        // A drag-to-select over the name must not open the song.
+                        if (window.getSelection()?.toString()) return;
+                        builder.viewSong(item.songId);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        e.preventDefault();
+                        builder.viewSong(item.songId);
+                      }}
                       className={cn(
-                        "flex min-w-0 flex-1 items-center gap-2.5",
+                        "flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                         dragging && "opacity-30",
                       )}
                     >
@@ -247,6 +283,14 @@ export function SetlistSection({
       ) : null}
 
       {extra ? <div className="flex flex-wrap gap-2">{extra}</div> : null}
+      {referenceSongs.length > 0 ? (
+        <OpenReferencesDialog
+          bandId={builder.bandId}
+          songs={referenceSongs}
+          open={referencesOpen}
+          onOpenChange={setReferencesOpen}
+        />
+      ) : null}
       {builder.setlistId ? (
         <ExportDialog
           bandId={builder.bandId}

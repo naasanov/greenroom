@@ -1,4 +1,5 @@
 import {
+  customType,
   index,
   pgEnum,
   pgTable,
@@ -9,6 +10,10 @@ import {
 } from "drizzle-orm/pg-core";
 import { bands } from "./bands.js";
 import { createdAt, id, tstz, updatedAt } from "./helpers.js";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 export const users = pgTable("users", {
   id: id(),
@@ -21,6 +26,16 @@ export const users = pgTable("users", {
     onDelete: "set null",
   }),
   createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+// The user's one profile photo. Per-band Drive copies are synced from it.
+export const userPhotos = pgTable("user_photos", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  data: bytea("data").notNull(),
+  mimeType: text("mime_type").notNull(),
   updatedAt: updatedAt(),
 });
 

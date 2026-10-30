@@ -11,12 +11,14 @@ const DEFAULT_VIDEOS: YoutubeVideo[] = [
     title: "Fake Band - Live at the Garage",
     channelName: "Fake Band",
     thumbnailUrl: "https://fake-youtube.test/thumb/fakeVid0001.jpg",
+    durationSeconds: 215,
   },
   {
     videoId: "fakeVid0002",
     title: "Backing Track in E",
     channelName: "Jam Tracks",
     thumbnailUrl: "https://fake-youtube.test/thumb/fakeVid0002.jpg",
+    durationSeconds: 3725,
   },
 ];
 

@@ -37,6 +37,11 @@ test("edit in place: plain-text reference renders without a link", async ({
   const s = sheet(page);
   const editButton = s.getByRole("button", { name: "Edit" });
   const box = await editButton.boundingBox();
+  const share = (await s
+    .getByRole("button", { name: "Share link" })
+    .boundingBox())!;
+  // Share and Edit sit together as one cluster.
+  expect(box!.x - (share.x + share.width)).toBeLessThan(8);
   await editButton.click();
   // The header button keeps its size and place when toggling to Cancel.
   const cancel = s.getByRole("button", { name: "Cancel" });

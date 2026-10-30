@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
 import { BottomDrawer, SideDrawer } from "@/components/app/bottom-drawer";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
@@ -46,15 +46,18 @@ function SearchBox({
   onChange,
   label,
   placeholder,
+  action,
 }: {
   value: string;
   onChange: (v: string) => void;
   label: string;
   placeholder: string;
+  /** Icon button beside the field, as tall as the field. */
+  action?: ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 -mx-1 bg-popover px-1 pt-1 pb-3">
-      <div className="relative">
+    <div className="sticky top-0 z-10 -mx-1 flex gap-2 bg-popover px-1 pt-1 pb-3">
+      <div className="relative min-w-0 flex-1">
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
@@ -78,6 +81,7 @@ function SearchBox({
           </Button>
         ) : null}
       </div>
+      {action}
     </div>
   );
 }
@@ -91,9 +95,16 @@ const SIDE_CLASS = "inset-y-auto bottom-0 h-[min(34rem,85dvh)]";
 const asideClass = (mode: SetlistBuilder["mode"]) =>
   mode === "overlay" ? OVERLAY_CLASS : mode === "side" ? SIDE_CLASS : undefined;
 
-function LibraryDrawer({ builder }: { builder: SetlistBuilder }) {
+function LibraryView({
+  builder,
+  search,
+  setSearch,
+}: {
+  builder: SetlistBuilder;
+  search: string;
+  setSearch: (v: string) => void;
+}) {
   const { songs, editor, guarded } = builder;
-  const [search, setSearch] = useState("");
   const q = search.trim().toLowerCase();
   const inSetlist = useMemo(
     () => new Set(builder.setlist?.items.map((i) => i.songId)),
@@ -112,38 +123,26 @@ function LibraryDrawer({ builder }: { builder: SetlistBuilder }) {
   const draggable = builder.mode === "side";
 
   return (
-    <SideDrawer
-      open={builder.libraryOpen}
-      onOpenChange={builder.setLibraryOpen}
-      title="Music Library"
-      rise
-      className={asideClass(builder.mode)}
-      headerAction={
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Add a new song"
-          onClick={() => builder.openSheet(search.trim())}
-        >
-          <Plus />
-        </Button>
-      }
-    >
+    <>
       <div data-testid="library-picker">
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-1 mb-3 w-full"
-          onClick={() => builder.setHistoryOpen(true)}
-        >
-          <History /> Copy from a past gig
-        </Button>
         <SearchBox
           value={search}
           onChange={setSearch}
           label="Search the library"
           placeholder="Search songs"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Copy from a past gig"
+              title="Copy from a past gig"
+              className="shrink-0"
+              onClick={() => builder.setHistoryOpen(true)}
+            >
+              <History />
+            </Button>
+          }
         />
         {!filtered ? (
           <p role="status" className="text-sm text-muted-foreground">
@@ -220,7 +219,7 @@ function LibraryDrawer({ builder }: { builder: SetlistBuilder }) {
           </div>
         )}
       </div>
-    </SideDrawer>
+    </>
   );
 }
 
@@ -308,7 +307,7 @@ function HistoryRow({
   );
 }
 
-function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
+function HistoryView({ builder }: { builder: SetlistBuilder }) {
   const [search, setSearch] = useState("");
   const q = useDebounced(search.trim(), 250);
   const history = useSetlistHistory(builder.bandId, q, builder.historyOpen);
@@ -318,24 +317,7 @@ function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
   );
 
   return (
-    <SideDrawer
-      open={builder.historyOpen}
-      onOpenChange={builder.setHistoryOpen}
-      title="Copy from a past gig"
-      rise
-      className={asideClass(builder.mode)}
-      headerAction={
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Back to the music library"
-          onClick={() => builder.setLibraryOpen(true)}
-        >
-          <ArrowLeft />
-        </Button>
-      }
-    >
+    <>
       <div data-testid="history-picker">
         <SearchBox
           value={search}
@@ -366,7 +348,7 @@ function HistoryDrawer({ builder }: { builder: SetlistBuilder }) {
           />
         )}
       </div>
-    </SideDrawer>
+    </>
   );
 }
 
@@ -415,15 +397,20 @@ function AddSongSheet({
             className="pointer-events-none fixed inset-0 z-[60] outline-none [&>aside]:pointer-events-auto"
           >
             <DialogPrimitive.Title className="sr-only">
-              {title}
+              {sheet.songId ? "Song" : title}
             </DialogPrimitive.Title>
             <SongSheet
               bandId={bandId}
-              target={{ kind: "add", nonce: sheet.nonce }}
+              target={
+                sheet.songId
+                  ? { kind: "song", id: sheet.songId }
+                  : { kind: "add", nonce: sheet.nonce }
+              }
               open={open}
               initialText={sheet.initialText}
               siblings={[]}
               onSelect={(id) => {
+                if (sheet.songId) return;
                 const existing = songs?.find((s) => s.id === id);
                 if (existing) onPick(toSetlistSong(existing));
                 dirty.current = false;
@@ -498,6 +485,59 @@ function CopyChoiceDialog({ builder }: { builder: SetlistBuilder }) {
 }
 
 /**
+ * One drawer that shows either the music library or the copy-from-a-past-gig
+ * list, so switching between them swaps content without the panel leaving.
+ * Both views stay mounted, so each keeps its search text.
+ */
+function LibraryHistoryDrawer({ builder }: { builder: SetlistBuilder }) {
+  const [search, setSearch] = useState("");
+  const history = builder.historyOpen;
+  return (
+    <SideDrawer
+      open={builder.libraryOpen || history}
+      onOpenChange={(open) => {
+        if (open) return builder.setLibraryOpen(true);
+        builder.setLibraryOpen(false);
+        builder.setHistoryOpen(false);
+      }}
+      title={history ? "Copy from a past gig" : "Music Library"}
+      rise
+      className={asideClass(builder.mode)}
+      headerAction={
+        history ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Back to the music library"
+            onClick={() => builder.setLibraryOpen(true)}
+          >
+            <ArrowLeft />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Add a new song"
+            onClick={() => builder.openSheet(search.trim())}
+          >
+            <Plus />
+          </Button>
+        )
+      }
+    >
+      <div hidden={history}>
+        <LibraryView builder={builder} search={search} setSearch={setSearch} />
+      </div>
+      <div hidden={!history}>
+        <HistoryView builder={builder} />
+      </div>
+    </SideDrawer>
+  );
+}
+
+/**
  * Everything that sits beside or over the event drawer: pass as the
  * `BottomDrawer` `aside`. Includes the library and copy drawers, the add-song
  * sheet, and the replace-or-append question.
@@ -506,8 +546,7 @@ export function SetlistAside({ builder }: { builder: SetlistBuilder }) {
   if (!builder.ready) return null;
   return (
     <>
-      <LibraryDrawer builder={builder} />
-      <HistoryDrawer builder={builder} />
+      <LibraryHistoryDrawer builder={builder} />
       <AddSongSheet
         bandId={builder.bandId}
         sheet={builder.sheet}

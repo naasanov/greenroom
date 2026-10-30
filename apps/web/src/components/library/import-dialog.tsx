@@ -15,7 +15,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { connectSpotify, useSpotifyStatus } from "@/lib/queries/spotify";
-import { useImportProgress, useStartImport } from "@/lib/queries/songs";
+import {
+  useImportProgress,
+  useSongs,
+  useStartImport,
+} from "@/lib/queries/songs";
+import { useDebounced } from "./use-debounced";
 
 function summary(p: ImportProgress): string {
   const parts = [`${p.added} added`, `${p.skipped} already in library`];
@@ -50,6 +55,44 @@ function Progress({ progress }: { progress: ImportProgress | undefined }) {
   );
 }
 
+/** Read-only search over songs already in the band's library. */
+function LibrarySearch({ bandId }: { bandId: string }) {
+  const [q, setQ] = useState("");
+  const debounced = useDebounced(q.trim(), 200);
+  const songs = useSongs(bandId, { q: debounced, sort: "title" });
+  const rows = songs.data ?? [];
+  return (
+    <div className="flex flex-col gap-3" data-testid="import-library">
+      <Input
+        autoFocus
+        aria-label="Search your library"
+        placeholder="Search by title or artist"
+        autoComplete="off"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      <ul
+        className="flex max-h-64 flex-col overflow-y-auto"
+        data-testid="import-library-results"
+      >
+        {rows.map((s) => (
+          <li key={s.id} className="flex flex-col py-1.5 text-sm">
+            <span className="font-medium">{s.title}</span>
+            {s.artist ? (
+              <span className="text-muted-foreground">{s.artist}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {songs.isSuccess && rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No songs in your library match.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ConnectPrompt({
   url,
   notice,
@@ -67,7 +110,8 @@ function ConnectPrompt({
       </p>
       <p className="text-sm text-muted-foreground">
         Spotify only shares playlist contents with a signed-in account, so you
-        need to connect yours once.
+        need to connect yours once. You can also connect Spotify in settings.
+        Private playlists can only be imported from the account that owns them.
       </p>
       {notice ? (
         <p
@@ -132,10 +176,10 @@ function ImportBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [mode, setMode] = useState<"playlist" | "library">("playlist");
   const error = start.error;
-  const privateOrMissing =
-    isApiError(error, 404) &&
-    (error.code === SONG_ERROR_CODES.playlistNotFound || !error.code);
+  const missing = isApiError(error, 404);
+  const forbidden = isApiError(error, 403);
 
   if (importId && data && finished) {
     const failed = data.status === "failed";
@@ -168,6 +212,38 @@ function ImportBody({
     );
   }
 
+  const toggle = (
+    <div className="flex gap-2" role="group" aria-label="Import source">
+      <Button
+        type="button"
+        size="sm"
+        variant={mode === "playlist" ? "default" : "outline"}
+        aria-pressed={mode === "playlist"}
+        onClick={() => setMode("playlist")}
+      >
+        Spotify playlist
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={mode === "library" ? "default" : "outline"}
+        aria-pressed={mode === "library"}
+        onClick={() => setMode("library")}
+      >
+        Your library
+      </Button>
+    </div>
+  );
+
+  if (mode === "library") {
+    return (
+      <div className="flex flex-col gap-3">
+        {toggle}
+        <LibrarySearch bandId={bandId} />
+      </div>
+    );
+  }
+
   return (
     <form
       className="flex flex-col gap-3"
@@ -181,6 +257,7 @@ function ImportBody({
         begin(url.trim());
       }}
     >
+      {toggle}
       <Input
         autoFocus
         aria-label="Playlist link"
@@ -199,11 +276,13 @@ function ImportBody({
           data-testid="import-error"
           className="text-sm text-destructive"
         >
-          {privateOrMissing
-            ? "Can't see this playlist — it might be private"
-            : isApiError(error, 400)
-              ? "That doesn't look like a Spotify playlist link."
-              : "Could not start the import. Please try again."}
+          {forbidden
+            ? "Spotify won't share this playlist with your account. Private playlists can only be imported from the account that owns them. You can manage your connection in settings."
+            : missing
+              ? "Can't find this playlist. Check the link, or connect Spotify in settings if it is private."
+              : isApiError(error, 400)
+                ? "That doesn't look like a Spotify playlist link."
+                : "Could not start the import. Please try again."}
         </p>
       ) : null}
       <Button type="submit" size="lg" disabled={!url.trim() || start.isPending}>
@@ -239,8 +318,8 @@ export function ImportDialog({
             Import playlist
           </DialogTitle>
           <DialogDescription>
-            Paste a Spotify playlist link. Songs already in your library are
-            skipped.
+            Paste a Spotify playlist link to add its songs (ones already in your
+            library are skipped), or search the songs you already have.
           </DialogDescription>
         </DialogHeader>
         {open ? (

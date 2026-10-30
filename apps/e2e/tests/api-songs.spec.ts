@@ -398,7 +398,7 @@ test("smart add resolves links, searches Spotify, and handles empty results", as
     source: "youtube",
     title: "Fake Band - Live at the Garage",
     artist: "Fake Band",
-    durationSeconds: null,
+    durationSeconds: 215,
     imageUrl: "https://fake-youtube.test/thumb/fakeVid0001.jpg",
     spotifyTrackId: null,
     youtubeUrl: "https://www.youtube.com/watch?v=fakeVid0001",
@@ -443,6 +443,60 @@ test("smart add resolves links, searches Spotify, and handles empty results", as
   const again = await resolve("https://open.spotify.com/track/fakeTrack2");
   expect(again.candidates[0].existingSongId).toBe(saved.id);
   await api.dispose();
+});
+
+test("YouTube links fill the duration on create and on link edit when empty", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const yt = (id: string) => `https://www.youtube.com/watch?v=${id}`;
+
+  const created = await (
+    await api.post(base, {
+      data: { title: "Live", youtubeUrl: yt("fakeVid0001") },
+    })
+  ).json();
+  expect(created.durationSeconds).toBe(215);
+
+  // Hours are counted; an explicit duration is never overwritten.
+  const long = await (
+    await api.post(base, {
+      data: { title: "Long", youtubeUrl: yt("fakeVid0002") },
+    })
+  ).json();
+  expect(long.durationSeconds).toBe(3725);
+  const explicit = await (
+    await api.post(base, {
+      data: {
+        title: "Set",
+        youtubeUrl: yt("fakeVid0001"),
+        durationSeconds: 99,
+      },
+    })
+  ).json();
+  expect(explicit.durationSeconds).toBe(99);
+
+  // Unknown videos leave the duration blank.
+  const unknown = await (
+    await api.post(base, {
+      data: { title: "Gone", youtubeUrl: yt("noSuchVid99") },
+    })
+  ).json();
+  expect(unknown.durationSeconds).toBeNull();
+
+  // Editing the link backfills only an empty duration.
+  const patched = await (
+    await api.patch(`${base}/${unknown.id}`, {
+      data: { youtubeUrl: yt("fakeVid0002") },
+    })
+  ).json();
+  expect(patched.durationSeconds).toBe(3725);
+  const kept = await (
+    await api.patch(`${base}/${patched.id}`, {
+      data: { youtubeUrl: yt("fakeVid0001") },
+    })
+  ).json();
+  expect(kept.durationSeconds).toBe(3725);
 });
 
 test("create suggests a Songsterr tab without saving it", async ({
@@ -565,9 +619,9 @@ test("playlist import runs as a job and reports progress and a summary", async (
   const priv = await api.post(`${base}/import`, {
     data: { url: "https://open.spotify.com/playlist/fakePlaylistPrivate" },
   });
-  expect(priv.status()).toBe(404);
+  expect(priv.status()).toBe(403);
   expect(await priv.json()).toMatchObject({
-    code: "PLAYLIST_NOT_FOUND_OR_PRIVATE",
+    code: "PLAYLIST_FORBIDDEN",
   });
   expect(
     (

@@ -95,67 +95,72 @@ test("band photo: upload, public serve, replace, delete, admin only", async ({
   expect((await pub.get(`/bands/${BAND}/photo`)).status()).toBe(404);
 });
 
-test("member photos are per band, member-only, and self-managed", async ({
+test("profile photo: one per user, served to signed-in users, mirrored to band Drives", async ({
   testApi,
   db,
 }) => {
   await testApi.seed("band");
   const ava = await clientFor(testApi, USERS.ava.email);
   const ben = await clientFor(testApi, USERS.ben.email);
-  const outsider = await clientFor(testApi, "outsider@example.com");
   const pub = await anon();
   const fake = await FakeDrive.create();
-  const mine = `/bands/${BAND}/members/me/photo`;
+  const mine = "/users/me/photo";
 
-  expect((await ben.put(mine, file())).status()).toBe(409);
-  await setupDrive(ava);
-  expect(
-    (await ben.get(`/bands/${BAND}/members/${USERS.ben.id}/photo`)).status(),
-  ).toBe(404);
-  expect((await outsider.put(mine, file())).status()).toBe(404);
   expect(
     (
       await ben.put(mine, file("a.txt", "text/plain", Buffer.from("x")))
     ).status(),
   ).toBe(422);
+  expect((await pub.put(mine, file())).status()).toBe(401);
 
+  // Works with no Drive linked; nothing to mirror yet.
   const up = await ben.put(mine, file());
   expect(up.status()).toBe(200);
   const { photoUrl } = await up.json();
+  expect(photoUrl).toContain(`/users/${USERS.ben.id}/photo?v=`);
+  expect((await (await ben.get("/auth/me")).json()).avatarUrl).toBe(photoUrl);
+
+  // Signed-in users read it; anonymous cannot.
+  const read = await ava.get(`/users/${USERS.ben.id}/photo`);
+  expect(read.status()).toBe(200);
+  expect(Buffer.from(await read.body()).equals(PNG)).toBe(true);
+  expect((await pub.get(`/users/${USERS.ben.id}/photo`)).status()).toBe(401);
+  expect((await ava.get(`/users/${USERS.ava.id}/photo`)).status()).toBe(404);
+
+  // Members lists carry it as avatarUrl; there is no separate band photoUrl.
+  const members = await (await ava.get(`/bands/${BAND}/members`)).json();
+  const row = members.find(
+    (m: { userId: string }) => m.userId === USERS.ben.id,
+  );
+  expect(row.avatarUrl).toBe(photoUrl);
+  expect(row).not.toHaveProperty("photoUrl");
+
+  // Linking Drive later, then changing the photo, mirrors it into the folder.
+  await setupDrive(ava);
+  expect((await ben.put(mine, file())).status()).toBe(200);
   const [m] = await db
     .select()
     .from(memberships)
-    .where(and(eq(memberships.userId, USERS.ben.id), eq(memberships.bandId, BAND)));
+    .where(
+      and(eq(memberships.userId, USERS.ben.id), eq(memberships.bandId, BAND)),
+    );
   const first = m!.photoDriveFileId!;
-  expect(photoUrl).toContain(
-    `/bands/${BAND}/members/${USERS.ben.id}/photo?v=${first}`,
-  );
-
-  // Another member can read it; non-members and anonymous cannot.
-  const other = await ava.get(`/bands/${BAND}/members/${USERS.ben.id}/photo`);
-  expect(other.status()).toBe(200);
-  expect(Buffer.from(await other.body()).equals(PNG)).toBe(true);
-  expect(
-    (
-      await outsider.get(`/bands/${BAND}/members/${USERS.ben.id}/photo`)
-    ).status(),
-  ).toBe(404);
-  expect(
-    (await pub.get(`/bands/${BAND}/members/${USERS.ben.id}/photo`)).status(),
-  ).toBe(401);
-  // Ava has none, and Ben's upload did not touch her.
-  expect(
-    (await ava.get(`/bands/${BAND}/members/${USERS.ava.id}/photo`)).status(),
-  ).toBe(404);
+  expect(first).toBeTruthy();
+  expect((await fake.files()).some((f) => f.id === first)).toBe(true);
 
   await ben.put(mine, file());
   expect((await fake.files()).find((f) => f.id === first)!.trashed).toBe(true);
 
   expect((await ben.delete(mine)).status()).toBe(204);
-  expect((await ben.get(`/bands/${BAND}/members/me/photo`)).status()).toBe(404);
+  expect(
+    (await ben.get(mine.replace("/me/", `/${USERS.ben.id}/`))).status(),
+  ).toBe(404);
+  expect((await (await ben.get("/auth/me")).json()).avatarUrl).toBeNull();
   const [cleared] = await db
     .select()
     .from(memberships)
-    .where(and(eq(memberships.userId, USERS.ben.id), eq(memberships.bandId, BAND)));
+    .where(
+      and(eq(memberships.userId, USERS.ben.id), eq(memberships.bandId, BAND)),
+    );
   expect(cleared!.photoDriveFileId).toBeNull();
 });

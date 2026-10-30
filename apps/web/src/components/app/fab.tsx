@@ -26,6 +26,7 @@ const OFFSET: Record<ShellLayout, string> = {
  */
 export function Fab({
   onClick,
+  onPressStart,
   label = "Add",
   actions,
   layout = "responsive",
@@ -33,6 +34,8 @@ export function Fab({
   className,
 }: {
   onClick?: () => void;
+  /** Runs on pointer down, before any drawer's outside-press handling. */
+  onPressStart?: () => void;
   label?: string;
   actions?: FabAction[];
   layout?: ShellLayout;
@@ -119,6 +122,7 @@ export function Fab({
           type="button"
           aria-label={label}
           aria-expanded={dial ? open : undefined}
+          onPointerDown={onPressStart}
           onClick={() => (dial ? setOpen((o) => !o) : onClick?.())}
           className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
         >

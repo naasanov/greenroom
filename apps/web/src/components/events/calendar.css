@@ -258,6 +258,45 @@
   }
 }
 
+/* Month chip: title row on top, detail lines below. Lines that do not fit wrap
+   into a clipped second column, so a short chip shows only its title row. */
+.gr-cal .gr-chip-head {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+.gr-cal .gr-chip-details {
+  display: none;
+}
+@media (min-width: 640px) {
+  .gr-cal .fc .fc-dayGridMonth-view .gr-chip {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+  }
+  .gr-cal .fc .fc-dayGridMonth-view .gr-chip-details {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-flow: column wrap;
+    overflow: hidden;
+    padding-left: 0.625rem;
+    font-size: 0.625rem;
+    line-height: 0.875rem;
+    opacity: 0.8;
+  }
+  .gr-cal .gr-chip-detail {
+    width: 100%;
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* Month chips fill the day cell and split its height evenly. */
 .gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
   display: flex;

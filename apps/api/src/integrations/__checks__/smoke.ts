@@ -305,7 +305,7 @@ async function main(): Promise<void> {
   assert.equal(
     (await spotify.getPlaylist("fake-spotify-other", FAKE_PRIVATE_PLAYLIST_ID))
       .status,
-    "not-found-or-private",
+    "forbidden",
   );
   assert.equal(
     (

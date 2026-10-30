@@ -123,16 +123,42 @@ function DrawerContent({
   useOutsideClickGuard(el, onOutsideClickGuard);
   // Vaul mounts a modal Radix dialog even with modal={false}. Undo its body
   // pointer lock and aria-hidden on the page so the page stays interactive.
+  // A real alert dialog may hide the page while open; once it closes, the
+  // aria-hidden it leaves behind is cleared too.
   React.useEffect(() => {
     if (!el) return;
-    const id = requestAnimationFrame(() => {
+    const unhide = () => {
+      if (document.querySelector('[role="alertdialog"]')) return;
       document.body.style.pointerEvents = "auto";
       document.querySelectorAll("[data-aria-hidden]").forEach((node) => {
         node.removeAttribute("aria-hidden");
         node.removeAttribute("data-aria-hidden");
       });
+      // The alert dialog's cleanup can leave aria-hidden without its marker on
+      // live page content; hidden containers that hold controls are never intended.
+      document
+        .querySelectorAll(
+          '[aria-hidden="true"]:not([inert]):has(a[href], button, input, select, textarea)',
+        )
+        .forEach((node) => {
+          if (!node.closest("[inert]")) node.removeAttribute("aria-hidden");
+        });
+    };
+    let frame = requestAnimationFrame(unhide);
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(unhide);
     });
-    return () => cancelAnimationFrame(id);
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-hidden", "data-aria-hidden"],
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [el]);
   return (
     <DrawerPortal data-slot="drawer-portal">

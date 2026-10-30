@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -60,12 +60,15 @@ export function BandSwitcher({
   activeId,
   onSelect,
   onCreate,
+  onSettings,
   className,
 }: {
   bands: BandSummary[];
   activeId: string;
   onSelect?: (id: string) => void;
   onCreate?: () => void;
+  /** Adds a "Band settings" entry for the active band. */
+  onSettings?: () => void;
   className?: string;
 }) {
   const active = bands.find((b) => b.id === activeId) ?? bands[0];
@@ -108,6 +111,17 @@ export function BandSwitcher({
             ) : null}
           </DropdownMenuItem>
         ))}
+        {onSettings ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onSettings} className="gap-3">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-muted">
+                <Settings className="size-4" />
+              </span>
+              Band settings
+            </DropdownMenuItem>
+          </>
+        ) : null}
         {onCreate ? (
           <>
             <DropdownMenuSeparator />

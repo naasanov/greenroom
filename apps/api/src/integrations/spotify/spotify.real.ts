@@ -69,7 +69,8 @@ const expiryFrom = (expiresIn: unknown): string =>
 
 function playlistMiss(status: number): SpotifyPlaylistResult | null {
   if (status === 401) return { status: "unauthorized" };
-  if ([400, 403, 404].includes(status)) {
+  if (status === 403) return { status: "forbidden" };
+  if ([400, 404].includes(status)) {
     return { status: "not-found-or-private" };
   }
   return null;

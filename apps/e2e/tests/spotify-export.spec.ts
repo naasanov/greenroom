@@ -1,8 +1,13 @@
-import { USERS } from "@greenroom/db";
+import { USERS, oauthConnections } from "@greenroom/db";
+import { eq } from "drizzle-orm";
 import type { Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
 import { apiAs, openLibrary } from "./library-helpers.js";
-import { fakeSpotifyConsent } from "./spotify-helpers.js";
+import {
+  apiWithCookie,
+  connectSpotify,
+  fakeSpotifyConsent,
+} from "./spotify-helpers.js";
 
 const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
 const label = (iso: string) => {
@@ -140,4 +145,106 @@ test("the export button is hidden for an empty setlist", async ({
   await expect(
     page.getByRole("button", { name: "Export to Spotify" }),
   ).toHaveCount(0);
+});
+
+test("a connected user exports without being asked to connect again", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  const { cookie } = await loginAs(USERS.ava.email);
+  const api = await apiWithCookie(cookie);
+  await connectSpotify(api);
+  await api.dispose();
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  await exportButton(page).click();
+  await expect(dialog(page).getByTestId("export-summary")).toContainText(
+    "Exported 3 songs",
+  );
+  await expect(dialog(page).getByTestId("export-connect")).toHaveCount(0);
+});
+
+test("a read-only link asks to reconnect once with a clear message", async ({
+  page,
+  testApi,
+  loginAs,
+  db,
+}) => {
+  await testApi.seed("band");
+  const { cookie } = await loginAs(USERS.ava.email);
+  const api = await apiWithCookie(cookie);
+  await connectSpotify(api);
+  await api.dispose();
+  await db
+    .update(oauthConnections)
+    .set({ scopes: ["playlist-read-private", "playlist-read-collaborative"] })
+    .where(eq(oauthConnections.userId, USERS.ava.id));
+
+  await fakeSpotifyConsent(page);
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  await exportButton(page).click();
+  await expect(dialog(page).getByTestId("export-connect")).toContainText(
+    "Reconnect Spotify to grant playlist access",
+  );
+  await dialog(page).getByRole("button", { name: "Reconnect Spotify" }).click();
+  await expect(dialog(page).getByTestId("export-summary")).toContainText(
+    "Exported 3 songs",
+  );
+});
+
+test("copy to clipboard puts Title - Artist lines on the clipboard", async ({
+  page,
+  testApi,
+  loginAs,
+  context,
+}) => {
+  const seed = await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const gig = seed.gigs.upcomingClub;
+  const bandId = seed.bands.nightOwls.id;
+  const api = await apiAs(testApi, USERS.ava.email);
+  const sl = await (
+    await api.get(`/bands/${bandId}/gigs/${gig.id}/setlist`)
+  ).json();
+  await api.put(`/bands/${bandId}/setlists/${sl.id}/items`, {
+    data: {
+      songIds: [seed.songs.skyline.id, seed.songs.lowTide.id],
+    },
+  });
+  await api.dispose();
+
+  await page.goto(`/gigs/${gig.id}`);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const copy = dialog(page).getByTestId("export-copy");
+  await expect(copy).toBeEnabled();
+  await copy.click();
+  await expect(copy).toHaveText("Copied");
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  const lines = text.split("\n");
+  expect(lines).toHaveLength(2);
+  expect(lines[0]).toBe("Skyline Drive - The Meridians");
+  expect(text).not.toContain("\u2014");
+});
+
+test("copy shows a failure state when no clipboard path works", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined });
+    document.execCommand = () => false;
+  });
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const copy = dialog(page).getByTestId("export-copy");
+  await expect(copy).toBeEnabled();
+  await copy.click();
+  await expect(copy).toHaveText("Copy failed");
 });

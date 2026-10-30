@@ -39,7 +39,8 @@ export class ExportService {
       name,
       isPublic: false,
     });
-    if (created.status !== "ok") throw this.connections.exportLoginRequired();
+    if (created.status !== "ok")
+      throw this.connections.exportLoginRequired(true);
     const added = await this.spotify.addTracksToPlaylist(
       token,
       created.playlist.id,
@@ -47,7 +48,7 @@ export class ExportService {
     );
     if (added.status !== "ok") {
       if (added.status === "unauthorized") {
-        throw this.connections.exportLoginRequired();
+        throw this.connections.exportLoginRequired(true);
       }
       throw new ConflictException(
         "Spotify could not add songs to the playlist",

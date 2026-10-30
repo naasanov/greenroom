@@ -59,7 +59,7 @@ export class SmartAddService {
             source: "youtube",
             title: video.title,
             artist: video.channelName || null,
-            durationSeconds: null,
+            durationSeconds: video.durationSeconds,
             imageUrl: video.thumbnailUrl || null,
             spotifyTrackId: null,
             youtubeUrl: url,

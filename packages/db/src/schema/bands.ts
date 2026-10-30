@@ -63,7 +63,7 @@ export const memberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: membershipRole("role").notNull().default("member"),
-    // Member photo in the band's Profile photos folder; per band, not per user.
+    // Drive copy of the user profile photo in this band's Profile photos folder.
     photoDriveFileId: text("photo_drive_file_id"),
     joinedAt: tstz("joined_at").notNull().defaultNow(),
     leftAt: tstz("left_at"),

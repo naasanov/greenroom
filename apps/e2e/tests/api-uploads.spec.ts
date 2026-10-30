@@ -62,7 +62,7 @@ test("multi-chunk upload lands in Unsorted and the fake Drive with the right byt
   ]);
   const file = (await fake.files()).find((f) => f.name === "clip.mp4")!;
   const gigFolder = (await fake.files()).find((f) => f.id === file.parentId)!;
-  expect(gigFolder.name).toContain("2026");
+  expect(gigFolder.name).toMatch(/^\d\d-\d\d-\d\d /);
   expect(await fake.content(file.id)).toEqual(data);
 
   // Chunks sent after completion are idempotent.

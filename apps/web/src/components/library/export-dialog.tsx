@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, ClipboardCopy } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SONG_ERROR_CODES, type ExportResult } from "@greenroom/shared";
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
+import { useSetlist } from "@/lib/queries/setlists";
+import { useSongs } from "@/lib/queries/songs";
 import { pathWithout } from "@/lib/queries/spotify";
 import {
   connectSpotifyForExport,
@@ -113,6 +115,83 @@ function Result({
   );
 }
 
+/** Writes plain text to the clipboard, falling back to a hidden textarea. */
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall through to the legacy copy path.
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Copies one "Title - Artist" line per song as plain text. */
+function CopyListButton({ lines }: { lines: string[] }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  const copy = async () => {
+    const ok = await writeClipboard(lines.join("\n"));
+    setState(ok ? "copied" : "failed");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState("idle"), 2000);
+  };
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      data-testid="export-copy"
+      disabled={lines.length === 0}
+      onClick={() => void copy()}
+    >
+      {state === "copied" ? <Check /> : <ClipboardCopy />}
+      {state === "copied"
+        ? "Copied"
+        : state === "failed"
+          ? "Copy failed"
+          : "Copy to clipboard"}
+    </Button>
+  );
+}
+
+function useCopyLines(bandId: string, target: ExportTarget): string[] {
+  const library = useSongs(
+    bandId,
+    { q: "", sort: target.kind === "library" ? target.sort : "recent" },
+    target.kind === "library",
+  );
+  const setlist = useSetlist(
+    bandId,
+    target.kind === "setlist" ? target.setlistId : undefined,
+  );
+  const rows =
+    target.kind === "library"
+      ? (library.data ?? [])
+      : (setlist.data?.items ?? []);
+  return rows.map((s) => (s.artist ? `${s.title} - ${s.artist}` : s.title));
+}
+
 function ExportBody({
   bandId,
   target,
@@ -131,7 +210,10 @@ function ExportBody({
   onDone: () => void;
 }) {
   const [name, setName] = useState(defaultName);
-  const [needsLogin, setNeedsLogin] = useState(connectError);
+  const [needsLogin, setNeedsLogin] = useState<"connect" | "reconnect" | null>(
+    connectError ? "connect" : null,
+  );
+  const copyLines = useCopyLines(bandId, target);
   const exportMutation = useExportToSpotify(bandId);
   const startedRef = useRef(false);
 
@@ -140,11 +222,11 @@ function ExportBody({
       { target, name: value },
       {
         onError: (e) => {
-          if (
-            isApiError(e, 409) &&
-            e.code === SONG_ERROR_CODES.spotifyLoginRequired
-          ) {
-            setNeedsLogin(true);
+          if (!isApiError(e, 409)) return;
+          if (e.code === SONG_ERROR_CODES.spotifyReconnectRequired) {
+            setNeedsLogin("reconnect");
+          } else if (e.code === SONG_ERROR_CODES.spotifyLoginRequired) {
+            setNeedsLogin("connect");
           }
         },
       },
@@ -165,11 +247,14 @@ function ExportBody({
     return (
       <div className="flex flex-col gap-4" data-testid="export-connect">
         <p className="text-base font-medium">
-          Connect Spotify to export playlists
+          {needsLogin === "reconnect"
+            ? "Reconnect Spotify to grant playlist access"
+            : "Connect Spotify to export playlists"}
         </p>
         <p className="text-sm text-muted-foreground">
-          Greenroom needs your permission to create playlists in your Spotify
-          account. You only need to do this once.
+          {needsLogin === "reconnect"
+            ? "Your Spotify connection was made before playlist exports existed. Reconnect once to let Greenroom create playlists in your account."
+            : "Greenroom needs your permission to create playlists in your Spotify account. You only need to do this once."}
         </p>
         {connectError ? (
           <p
@@ -181,6 +266,7 @@ function ExportBody({
           </p>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <CopyListButton lines={copyLines} />
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
@@ -191,7 +277,9 @@ function ExportBody({
               )
             }
           >
-            Connect Spotify
+            {needsLogin === "reconnect"
+              ? "Reconnect Spotify"
+              : "Connect Spotify"}
           </Button>
         </div>
       </div>
@@ -245,6 +333,7 @@ function ExportBody({
       >
         {exportMutation.isPending ? "Exporting..." : "Export"}
       </Button>
+      <CopyListButton lines={copyLines} />
     </form>
   );
 }
@@ -281,7 +370,8 @@ export function ExportDialog({
           </DialogTitle>
           <DialogDescription>
             Creates a new private playlist in your Spotify account. Songs
-            without a Spotify link are skipped.
+            without a Spotify link are skipped. You can also copy the song list
+            as text.
           </DialogDescription>
         </DialogHeader>
         {open ? (

@@ -49,7 +49,9 @@ test("lazy gig folder, folder CRUD, and item operations hit the fake Drive", asy
   });
   // No gig folder until media is touched.
   expect(
-    (await fake.files()).filter((f) => f.parentId && f.name.startsWith("20")),
+    (await fake.files()).filter(
+      (f) => f.parentId && /^\d\d-\d\d-\d\d /.test(f.name),
+    ),
   ).toHaveLength(0);
 
   const gig = seed.gigs.upcomingClub;
@@ -57,7 +59,7 @@ test("lazy gig folder, folder CRUD, and item operations hit the fake Drive", asy
     await ben.post(`${media()}/folders`, { data: { name: "Stage" } })
   ).json();
   expect(stage).toMatchObject({ name: "Stage", position: 0 });
-  const gigFolder = await fake.byName(`${gig.date} ${gig.title}`);
+  const gigFolder = await fake.byName(`${gig.date.slice(2)} ${gig.title}`);
   expect(gigFolder).toBeTruthy();
   const gigsRoot = await fake.byName("Gigs");
   expect(gigFolder!.parentId).toBe(gigsRoot!.id);
@@ -69,7 +71,9 @@ test("lazy gig folder, folder CRUD, and item operations hit the fake Drive", asy
   ).json();
   expect(crowd.position).toBe(1);
   expect(
-    (await fake.files()).filter((f) => f.name === `${gig.date} ${gig.title}`),
+    (await fake.files()).filter(
+      (f) => f.name === `${gig.date.slice(2)} ${gig.title}`,
+    ),
   ).toHaveLength(1);
   expect(
     (await ava.post(`${media()}/folders`, { data: { name: "  " } })).status(),
@@ -227,7 +231,7 @@ test("thumbnail and content streaming, and missing-file marking", async ({
   await setupDrive(ava);
   await ava.post(`${media()}/folders`, { data: { name: "F" } });
   const gigFolder = (await fake.files()).find((f) =>
-    /^\d{4}-\d\d-\d\d /.test(f.name),
+    /^\d\d-\d\d-\d\d /.test(f.name),
   )!;
   await fake.external({
     action: "add",
@@ -300,7 +304,7 @@ test("song links rename uncustomized items and list by gig", async ({
   await setupDrive(ava);
   await ava.post(`${media()}/folders`, { data: { name: "F" } });
   const gigFolder = (await fake.files()).find((f) =>
-    /^\d{4}-\d\d-\d\d /.test(f.name),
+    /^\d\d-\d\d-\d\d /.test(f.name),
   )!;
   for (const n of ["IMG_1.mov", "IMG_2.mov", "IMG_3.mov"])
     await fake.external({

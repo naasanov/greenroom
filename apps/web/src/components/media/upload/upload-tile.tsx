@@ -34,7 +34,7 @@ function ProgressBorder({
         y="2"
         width="96"
         height="96"
-        rx="16"
+        rx="28"
         fill="none"
         pathLength={100}
         strokeWidth="4"
@@ -81,7 +81,7 @@ function Preview({ entry }: { entry: UploadEntry }) {
         alt=""
         draggable={false}
         onError={() => setBroken(true)}
-        className="size-full object-cover"
+        className="size-full object-cover [image-orientation:from-image]"
       />
     );
   }
@@ -138,13 +138,13 @@ export function UploadTile({
         data-testid="upload-open"
         onClick={onToggle}
         className={cn(
-          "relative size-[4.5rem] touch-manipulation overflow-hidden rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "relative size-[4.5rem] touch-manipulation rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           selected && "ring-3 ring-primary",
         )}
       >
         <div
           className={cn(
-            "flex size-full items-center justify-center bg-muted text-muted-foreground transition-[filter,opacity] duration-500",
+            "flex size-full items-center justify-center overflow-hidden rounded-2xl bg-muted text-muted-foreground transition-[filter,opacity] duration-500",
             !done && "opacity-50 grayscale",
           )}
         >
@@ -166,7 +166,7 @@ export function UploadTile({
         {entry.status === "readd" ? (
           <span
             data-testid="upload-readd"
-            className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-0.5 text-center text-[9px] leading-tight font-medium text-white"
+            className="absolute inset-x-1 bottom-1 rounded-b-xl bg-black/65 px-2 py-0.5 text-center text-[9px] leading-tight font-medium text-white"
           >
             Re-add to finish
           </span>
@@ -186,7 +186,10 @@ export function UploadTile({
           </span>
         ) : null}
         {selected ? (
-          <span className="absolute inset-0 bg-primary/20" aria-hidden />
+          <span
+            className="absolute inset-0 rounded-2xl bg-primary/20"
+            aria-hidden
+          />
         ) : null}
       </button>
       {editing ? (
@@ -201,14 +204,14 @@ export function UploadTile({
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") onRename(null);
           }}
-          className="h-11 w-44 min-w-0 rounded-lg border bg-background px-2 text-base outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:text-xs"
+          className="relative z-10 h-11 w-44 min-w-0 rounded-md bg-muted px-1 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:text-xs"
         />
       ) : (
         <button
           type="button"
           data-testid="upload-name"
           onClick={onStartRename}
-          className="flex min-h-11 w-full min-w-0 items-center text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="flex min-h-11 w-full min-w-0 items-center px-1 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <span className="truncate">{entry.fileName}</span>
         </button>

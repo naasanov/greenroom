@@ -10,19 +10,13 @@ import { FormField } from "@/components/app/form-field";
 import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
 import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PhotoUpload } from "@/components/app/photo-upload";
 import { MemberAvatar } from "@/components/roster/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { useCurrentBand } from "@/lib/current-band";
-import { keys, useMembers, useMyInstruments, useSignOut } from "@/lib/queries";
-import {
-  NOT_LINKED_NOTE,
-  useDriveStatus,
-  useMyBandPhoto,
-} from "@/lib/queries/photos";
+import { keys, useMyInstruments, useSignOut } from "@/lib/queries";
+import { useMyPhoto } from "@/lib/queries/photos";
 
 /** Saves name and calendar email only; instruments autosave separately. */
 function useSaveProfileFields() {
@@ -136,32 +130,20 @@ function PersonalForm({ user }: { user: User }) {
   );
 }
 
-/** The member's photo for the current band, disabled until the band's Drive is set up. */
-function MemberPhotoRow({
-  user,
-  band,
-}: {
-  user: User;
-  band: { id: string; name: string };
-}) {
-  const members = useMembers(band.id);
-  const status = useDriveStatus(band.id);
-  const photo = useMyBandPhoto(band.id);
-  const mine = members.data?.find((m) => m.userId === user.id);
-  const member = {
-    userId: user.id,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    photoUrl: mine?.photoUrl ?? null,
-  };
+/** The user's single profile photo, used across the app and mirrored to band Drives. */
+function ProfilePhotoRow({ user }: { user: User }) {
+  const photo = useMyPhoto();
   return (
     <PhotoUpload
-      testId="member-photo-row"
-      title={`Your photo in ${band.name}`}
-      hasPhoto={!!member.photoUrl}
-      loading={status.isPending || members.isPending}
-      disabledNote={status.data?.folderSet === false ? NOT_LINKED_NOTE : null}
-      preview={<MemberAvatar member={member} className="size-16" />}
+      testId="profile-photo-row"
+      title="Your photo"
+      hasPhoto={!!user.avatarUrl}
+      preview={
+        <MemberAvatar
+          member={{ ...user, userId: user.id }}
+          className="size-16"
+        />
+      }
       onUpload={(file) => photo.upload.mutateAsync(file)}
       onRemove={() => photo.remove.mutateAsync()}
     />
@@ -172,7 +154,6 @@ function MemberPhotoRow({
 export function PersonalSection({ user }: { user: User }) {
   const mine = useMyInstruments();
   const signOut = useSignOut();
-  const { currentBand } = useCurrentBand();
 
   return (
     <SectionCard
@@ -181,12 +162,6 @@ export function PersonalSection({ user }: { user: User }) {
       testId="settings-personal"
     >
       <div className="flex items-center gap-4">
-        <Avatar className="size-16">
-          {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
-          <AvatarFallback className="bg-secondary text-xl font-semibold text-secondary-foreground">
-            {user.displayName.slice(0, 1).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
         <div className="flex min-w-0 flex-col">
           <span
             data-testid="settings-name"
@@ -203,9 +178,7 @@ export function PersonalSection({ user }: { user: User }) {
         </div>
       </div>
 
-      {currentBand ? (
-        <MemberPhotoRow key={currentBand.id} user={user} band={currentBand} />
-      ) : null}
+      <ProfilePhotoRow user={user} />
 
       {mine.data ? (
         <>
@@ -227,7 +200,7 @@ export function PersonalSection({ user }: { user: User }) {
       <SpotifyRow />
 
       <Button
-        variant="outline"
+        variant="destructive"
         size="lg"
         disabled={signOut.isPending}
         onClick={() => signOut.mutate()}

@@ -28,7 +28,7 @@ test("media section shows the empty state, thumbnails with counts, and missing i
     data: { name: "Stage" },
   });
   const gigFolder = (await fake.files()).find((f) =>
-    /^\d{4}-\d\d-\d\d /.test(f.name),
+    /^\d\d-\d\d-\d\d /.test(f.name),
   )!;
   for (const [name, mimeType] of [
     ["a.png", "image/png"],

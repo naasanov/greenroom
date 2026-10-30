@@ -31,6 +31,7 @@ import {
   type DeletedSong,
   type ListSongsQuery,
   type Reference,
+  type ReferenceTag,
   type ReferenceInput,
   type SongCreated,
   type SongDetail,
@@ -40,7 +41,12 @@ import {
   type UsedIn,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
-import { SONGSTERR, type SongsterrAdapter } from "../integrations/index.js";
+import {
+  SONGSTERR,
+  YOUTUBE,
+  type SongsterrAdapter,
+  type YoutubeAdapter,
+} from "../integrations/index.js";
 import { SongIndex } from "./song-match.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -58,6 +64,7 @@ export class SongsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(SONGSTERR) private readonly songsterr: SongsterrAdapter,
+    @Inject(YOUTUBE) private readonly youtube: YoutubeAdapter,
   ) {}
 
   // ---- list ----
@@ -118,6 +125,22 @@ export class SongsService {
 
   // ---- read ----
 
+  /** Distinct reference labels (case-insensitive) across live songs, most used first. */
+  async referenceTags(bandId: string): Promise<ReferenceTag[]> {
+    const lower = sql<string>`lower(${songLinks.label})`;
+    const rows = await this.db
+      .select({
+        label: sql<string>`min(${songLinks.label})`,
+        count: sql<number>`count(distinct ${songLinks.songId})::int`,
+      })
+      .from(songLinks)
+      .innerJoin(songs, eq(songs.id, songLinks.songId))
+      .where(and(eq(songs.bandId, bandId), isNull(songs.deletedAt)))
+      .groupBy(lower)
+      .orderBy(desc(sql`count(distinct ${songLinks.songId})`), asc(lower));
+    return rows;
+  }
+
   async get(bandId: string, songId: string): Promise<SongDetail> {
     const song = await this.findRow(this.db, bandId, songId);
     return this.detail(song);
@@ -136,6 +159,8 @@ export class SongsService {
         });
       }
     }
+    const durationSeconds =
+      input.durationSeconds ?? (await this.youtubeDuration(input.youtubeUrl));
     const row = await this.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(songs)
@@ -143,7 +168,7 @@ export class SongsService {
           bandId,
           title: input.title,
           artist: input.artist ?? null,
-          durationSeconds: input.durationSeconds ?? null,
+          durationSeconds,
           notes: input.notes ?? null,
           imageUrl: input.imageUrl ?? null,
           spotifyTrackId: input.spotifyTrackId ?? null,
@@ -169,8 +194,17 @@ export class SongsService {
     songId: string,
     input: UpdateSong,
   ): Promise<SongDetail> {
-    await this.findRow(this.db, bandId, songId);
+    const existing = await this.findRow(this.db, bandId, songId);
     const { references, ...fields } = input;
+    // A changed YouTube link fills an empty duration; a set duration is never overwritten.
+    if (
+      fields.durationSeconds == null &&
+      existing.durationSeconds == null &&
+      fields.youtubeUrl &&
+      fields.youtubeUrl !== existing.youtubeUrl
+    ) {
+      fields.durationSeconds = await this.youtubeDuration(fields.youtubeUrl);
+    }
     const patch = Object.fromEntries(
       Object.entries(fields).filter(([, v]) => v !== undefined),
     );
@@ -185,6 +219,20 @@ export class SongsService {
       }
     });
     return this.get(bandId, songId);
+  }
+
+  /** Best-effort video length; null for non-YouTube input or any lookup failure. */
+  async youtubeDuration(
+    url: string | null | undefined,
+  ): Promise<number | null> {
+    if (!url) return null;
+    try {
+      const res = await this.youtube.getVideoMetadata(url);
+      const sec = res.status === "ok" ? res.video.durationSeconds : null;
+      return sec === null ? null : Math.min(sec, 86_400);
+    } catch {
+      return null;
+    }
   }
 
   // ---- delete ----

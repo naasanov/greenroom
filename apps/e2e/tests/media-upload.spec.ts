@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BandSeedResult } from "@greenroom/db";
@@ -97,7 +97,7 @@ const mediaState = async () =>
     folders: { name: string; items: { name: string; sizeBytes: number }[] }[];
   };
 
-test("picked files appear in the tray, finish, and land in Unsorted", async ({
+test("finished files stay in the tray until moved, here to Unsorted", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
@@ -107,27 +107,40 @@ test("picked files appear in the tray, finish, and land in Unsorted", async ({
   await expect(
     utile(page, "big.mp4").getByTestId("upload-progress"),
   ).toHaveAttribute("data-progress", "100");
+  // Done files wait in the tray; the gallery does not list them twice.
+  await expect(
+    section(page, "Unsorted").locator('[data-name="big.mp4"]'),
+  ).toHaveCount(0);
+  await expect(tray(page)).toBeVisible();
+  await utile(page, "big.mp4").getByTestId("upload-open").click();
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Unsorted" }).click();
+  await expect(tray(page)).toBeHidden();
   await expect(
     section(page, "Unsorted").locator('[data-name="big.mp4"]'),
   ).toBeVisible();
-  await expect(tray(page)).toBeHidden();
   const state = await mediaState();
   expect(state.unsorted.find((i) => i.name === "big.mp4")?.sizeBytes).toBe(
     CHUNK + MIB,
   );
 });
 
-test("the bulk folder choice lands items in that folder, before and while uploading", async ({
+test("Select all then Move to folder works while items are still uploading", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
+  await expect(page.getByTestId("upload-folder")).toHaveCount(0);
+  await expect(page.getByTestId("upload-song-pick")).toHaveCount(0);
   const release = await holdChunks(page);
   await pick(page, [makeFile("a.png", 4000), makeFile("b.png", 4000, 2)]);
   await expect(utile(page, "a.png")).toHaveAttribute(
     "data-status",
     "uploading",
   );
-  await page.getByTestId("upload-folder").selectOption({ label: "Stage" });
+  await page.getByTestId("upload-select-all").click();
+  await expect(page.getByTestId("selection-count")).toHaveText("2");
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Stage" }).click();
   await expect
     .poll(async () => (await mySessions()).filter((s) => s.folderId).length)
     .toBe(2);
@@ -135,11 +148,8 @@ test("the bulk folder choice lands items in that folder, before and while upload
   const stageSection = section(page, "Stage");
   await expect(stageSection.locator('[data-name="a.png"]')).toBeVisible();
   await expect(stageSection.locator('[data-name="b.png"]')).toBeVisible();
-
-  // The choice is the default for the next pick.
-  await pick(page, makeFile("c.png", 4000, 3));
-  await expect(page.getByTestId("upload-folder")).toHaveValue(/.+/);
-  await expect(stageSection.locator('[data-name="c.png"]')).toBeVisible();
+  // Placed uploads leave the tray on their own.
+  await expect(tray(page)).toBeHidden();
 });
 
 test("rename and link-to-song while uploading apply on completion", async ({
@@ -171,6 +181,13 @@ test("rename and link-to-song while uploading apply on completion", async ({
   ).toBeVisible();
 
   release();
+  await expect(utile(page, "renamed.mp4")).toHaveAttribute(
+    "data-status",
+    "done",
+  );
+  await utile(page, "renamed.mp4").getByTestId("upload-open").click();
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Unsorted" }).click();
   const landed = tile(page, "renamed.mp4");
   await expect(landed).toBeVisible();
   await expect(landed.getByTestId("media-song")).toHaveText(
@@ -249,7 +266,6 @@ test("an interrupted chunk is retried from the server offset", async ({
   expect(res.status()).toBe(200);
   release();
   await expect(utile(page, "flaky.mp4")).toHaveAttribute("data-status", "done");
-  await expect(tile(page, "flaky.mp4")).toBeVisible();
 });
 
 test("after a reload unfinished items say Re-add to finish; re-picking resumes", async ({
@@ -277,7 +293,6 @@ test("after a reload unfinished items say Re-add to finish; re-picking resumes",
   });
   await pick(page, big);
   await expect(t).toHaveAttribute("data-status", "done");
-  await expect(tile(page, "big.mp4")).toBeVisible();
   // Only the missing tail was sent, on the same session.
   expect(puts).toEqual([`bytes ${CHUNK}-${CHUNK + MIB - 1}/${CHUNK + MIB}`]);
   expect(await mySessions()).toHaveLength(1);
@@ -336,6 +351,103 @@ test("the screen wake lock is held while uploading and released after", async ({
   await expect(page.getByTestId("upload-keep-open")).toHaveCount(0);
 });
 
+/** A real JPEG (drawn in the page) with an EXIF Orientation=6 APP1 segment spliced in. */
+async function exifJpeg(page: Page, orientation: number): Promise<string> {
+  const b64 = await page.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 40;
+    c.height = 20;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#e33";
+    g.fillRect(0, 0, 40, 20);
+    const blob: Blob = await new Promise((r) =>
+      c.toBlob((b) => r(b!), "image/jpeg"),
+    );
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    let bin = "";
+    for (const x of buf) bin += String.fromCharCode(x);
+    return btoa(bin);
+  });
+  const jpeg = Buffer.from(b64, "base64");
+  const exif = Buffer.from([
+    0xff,
+    0xe1,
+    0x00,
+    0x22,
+    0x45,
+    0x78,
+    0x69,
+    0x66,
+    0x00,
+    0x00,
+    0x4d,
+    0x4d,
+    0x00,
+    0x2a,
+    0x00,
+    0x00,
+    0x00,
+    0x08,
+    0x00,
+    0x01,
+    0x01,
+    0x12,
+    0x00,
+    0x03,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x00,
+    orientation,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+  ]);
+  const out = Buffer.concat([jpeg.subarray(0, 2), exif, jpeg.subarray(2)]);
+  const path = join(dir, `exif-${orientation}.jpg`);
+  writeFileSync(path, out);
+  return path;
+}
+
+test("EXIF-rotated photos preview upright and the uploaded file is untouched", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const path = await exifJpeg(page, 6);
+  const release = await holdChunks(page);
+  await pick(page, path);
+  const img = utile(page, "exif-6.jpg").locator("img");
+  await expect(img).toBeVisible();
+  await expect
+    .poll(() =>
+      img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  expect(await img.evaluate((e) => getComputedStyle(e).imageOrientation)).toBe(
+    "from-image",
+  );
+  // Orientation 6 swaps the displayed size: the 40x20 file shows as 20x40.
+  expect(
+    await img.evaluate((e: HTMLImageElement) => [
+      e.naturalWidth,
+      e.naturalHeight,
+    ]),
+  ).toEqual([20, 40]);
+  release();
+  await expect(utile(page, "exif-6.jpg")).toHaveAttribute(
+    "data-status",
+    "done",
+  );
+  const stored = (await m.fake.files()).find((f) => f.name === "exif-6.jpg")!;
+  expect(
+    Buffer.from(await m.fake.content(stored.id)).equals(readFileSync(path)),
+  ).toBe(true);
+});
+
 test("dropping files on the gallery uploads them", async ({ page }) => {
   await openGallery(page, m.gigId);
   await page.getByTestId("media-gallery").evaluate((el) => {
@@ -351,7 +463,7 @@ test("dropping files on the gallery uploads them", async ({ page }) => {
       }),
     );
   });
-  await expect(tile(page, "dropped.png")).toBeVisible();
+  await expect(utile(page, "dropped.png")).toBeVisible();
 });
 
 test("Add media in the gig drawer picks files and opens the full view", async ({
@@ -363,7 +475,7 @@ test("Add media in the gig drawer picks files and opens the full view", async ({
     .getByTestId("media-add-input")
     .setInputFiles(makeFile("d.png", 3000));
   await expect(page).toHaveURL(new RegExp(`/gigs/${m.gigId}/media$`));
-  await expect(tile(page, "d.png")).toBeVisible();
+  await expect(utile(page, "d.png")).toBeVisible();
 });
 
 for (const vp of [

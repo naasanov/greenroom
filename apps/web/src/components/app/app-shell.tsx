@@ -207,6 +207,7 @@ export function AppShell({
   activeBandId,
   onBandChange,
   onCreateBand,
+  onBandSettings,
   activeTab,
   onTabChange,
   tabHref,
@@ -221,6 +222,7 @@ export function AppShell({
   activeBandId: string;
   onBandChange?: (id: string) => void;
   onCreateBand?: () => void;
+  onBandSettings?: () => void;
   /** Null on pages outside the tabs (e.g. settings). */
   activeTab: TabKey | null;
   onTabChange?: (tab: TabKey) => void;
@@ -254,6 +256,7 @@ export function AppShell({
             activeId={activeBandId}
             onSelect={onBandChange}
             onCreate={onCreateBand}
+            onSettings={onBandSettings}
             className="max-w-[60%] md:max-w-64"
           />
           <TopTabs

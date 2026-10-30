@@ -661,12 +661,23 @@ export function SongSheet({
         }
         canPrevious={index > 0}
         canNext={index >= 0 && index < siblings.length - 1}
-        editable={!adding && !!song}
-        editing={editing}
-        onEditingChange={changeEditing}
-        headerActions={
+        headerSlot={
           !adding && songId ? (
-            <ShareButton path={`/songs/${songId}`} title={title} />
+            <div
+              data-testid="song-header-actions"
+              className="flex shrink-0 items-center gap-0.5"
+            >
+              <ShareButton path={`/songs/${songId}`} title={title} />
+              {song ? (
+                <Button
+                  variant={editing ? "secondary" : "ghost"}
+                  onClick={() => changeEditing(!editing)}
+                  className="w-[4.5rem]"
+                >
+                  {editing ? "Cancel" : "Edit"}
+                </Button>
+              ) : null}
+            </div>
           ) : null
         }
         footer={

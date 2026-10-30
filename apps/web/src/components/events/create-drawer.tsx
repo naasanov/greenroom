@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CreateGig, Gig, PracticeSeries } from "@greenroom/shared";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EVENT_TYPES } from "@/components/app/event-types";
@@ -26,6 +26,7 @@ export function CreateEventDrawer({
   onOpenChange,
   onCreated,
   beside = false,
+  registerClose,
 }: {
   bandId: string;
   open: boolean;
@@ -36,6 +37,8 @@ export function CreateEventDrawer({
   onCreated: (created: CreatedEvent) => void;
   /** Sits left of the agenda sheet on wide screens. */
   beside?: boolean;
+  /** Receives a function that closes the drawer, asking first when it has unsaved input. */
+  registerClose?: (close: (() => void) | null) => void;
 }) {
   const createGig = useCreateGig(bandId);
   const createPractice = useCreatePractice(bandId);
@@ -53,6 +56,17 @@ export function CreateEventDrawer({
       setDirty((d) => (d.practice === practice ? d : { ...d, practice })),
     [],
   );
+
+  const requestClose = () => (isDirty ? setDiscardOpen(true) : close());
+  const requestCloseRef = useRef(requestClose);
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
+  useEffect(() => {
+    if (!open || !registerClose) return;
+    registerClose(() => requestCloseRef.current());
+    return () => registerClose(null);
+  }, [open, registerClose]);
 
   function close() {
     setDirty({ gig: false, practice: false });

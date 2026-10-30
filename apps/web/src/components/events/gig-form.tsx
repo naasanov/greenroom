@@ -113,6 +113,10 @@ function defaultsFor(gig: Gig | undefined, date: string): GigFormValues {
 }
 
 /** Create or edit a gig. Only title and date are required. */
+/** WebKit gives native time inputs an intrinsic width; this lets the grid size them. */
+const TIME_INPUT =
+  "min-w-0 w-full max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left";
+
 export function GigForm({
   bandId,
   gig,
@@ -188,11 +192,12 @@ export function GigForm({
         {errors.date ? <FieldError message="Pick a date." /> : null}
       </FormField>
 
-      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 [&>*]:min-w-0">
         <FormField label="Start time" htmlFor={id("start")}>
           <Input
             id={id("start")}
             type="time"
+            className={TIME_INPUT}
             aria-invalid={!!errors.startTime}
             {...form.register("startTime")}
           />
@@ -201,6 +206,7 @@ export function GigForm({
           <Input
             id={id("end")}
             type="time"
+            className={TIME_INPUT}
             aria-invalid={!!errors.endTime}
             {...form.register("endTime")}
           />
@@ -214,6 +220,7 @@ export function GigForm({
           <Input
             id={id("loadin")}
             type="time"
+            className={TIME_INPUT}
             {...form.register("loadInTime")}
           />
         </FormField>

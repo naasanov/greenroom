@@ -1,24 +1,20 @@
 "use client";
 
-import { Music2, Plus, X } from "lucide-react";
+import { CheckCheck, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { MediaFolder } from "@greenroom/shared";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { GigDefaults, UploadEntry } from "./upload-store";
+import type { UploadEntry } from "./upload-store";
 import { UploadTile } from "./upload-tile";
 
-/** Thin bottom tray: batch bar, bulk folder/song strip, and one tile per upload. */
+/** Thin bottom tray: batch bar, a Select all button, and one tile per upload. */
 export function UploadTray({
   entries,
-  folders,
-  defaults,
   selected,
   editingKey,
   songTitle,
-  onFolder,
-  onPickSong,
+  onSelectAll,
   onToggle,
   onStartRename,
   onRename,
@@ -29,13 +25,10 @@ export function UploadTray({
   onHeight,
 }: {
   entries: UploadEntry[];
-  folders: MediaFolder[];
-  defaults: GigDefaults;
   selected: Set<string>;
   editingKey: string | null;
   songTitle: (id: string | null) => string | null;
-  onFolder: (folderId: string | null) => void;
-  onPickSong: () => void;
+  onSelectAll: () => void;
   onToggle: (key: string) => void;
   onStartRename: (key: string) => void;
   onRename: (key: string, name: string | null) => void;
@@ -57,7 +50,7 @@ export function UploadTray({
   const sent = counted.reduce((n, e) => n + e.sent, 0);
   const batch = total > 0 ? Math.min(1, sent / total) : 0;
   const hasReadd = entries.some((e) => e.status === "readd");
-  const hasDone = entries.some((e) => e.status === "done" && e.restored);
+  const hasDone = entries.some((e) => e.status === "done");
   const cancellable = entries.some((e) => e.status !== "done");
 
   useEffect(() => {
@@ -72,7 +65,6 @@ export function UploadTray({
     };
   }, [onHeight]);
 
-  const song = songTitle(defaults.songId);
   return (
     <div
       ref={root}
@@ -99,29 +91,14 @@ export function UploadTray({
         />
       </div>
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 pt-2.5 pb-1">
-        <select
-          aria-label="Upload folder"
-          data-testid="upload-folder"
-          value={defaults.folderId ?? ""}
-          onChange={(e) => onFolder(e.target.value || null)}
-          className="h-9 min-w-0 max-w-[38%] rounded-full border bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <option value="">Unsorted</option>
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
         <Button
           variant="outline"
           size="sm"
-          data-testid="upload-song-pick"
-          onClick={onPickSong}
-          className="min-w-0 max-w-[38%] rounded-full"
+          data-testid="upload-select-all"
+          onClick={onSelectAll}
+          className="rounded-full"
         >
-          <Music2 />
-          <span className="truncate">{song ?? "Link song"}</span>
+          <CheckCheck /> Select all
         </Button>
         <div className="ml-auto flex items-center gap-1">
           {hasReadd ? (

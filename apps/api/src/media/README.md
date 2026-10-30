@@ -3,10 +3,10 @@
 Google Drive structure, gig media metadata, the Drive changes poller, and profile photos. Credentials come from `google-connect` (`GoogleLinksService.getAccessToken(bandId, "drive")`); Drive calls go through the `GOOGLE_DRIVE` adapter (fake in `INTEGRATIONS_MODE=fake`). Everything is referenced by Drive file id, never by path or name.
 
 ## Structure
-- `drive-structure.service.ts`: root folder setup, `Gigs` / `Profile photos` pointers (`bands.drive_*`), lazy gig folders (`YYYY-MM-DD <title>`, created on first media touch, never renamed with the gig). New gigs get no default subfolders.
+- `drive-structure.service.ts`: root folder setup, `Gigs` / `Profile photos` pointers (`bands.drive_*`), lazy gig folders (`YY-MM-DD <title>`, e.g. `26-10-30 Club night`; created on first media touch, never renamed with the gig). New gigs get no default subfolders.
 - `media.service.ts`: gig media read, folder CRUD, item rename/move/trash, song links, thumbnail/content lookup.
 - `drive-poller.service.ts`: changes poller (pg-boss queue `drive-changes-poll`, cron every minute, singleton policy).
-- `profile-photos.service.ts`: band photo and per-band member photos.
+- `profile-photos.service.ts`: band photo, plus the user's single profile photo (stored in `user_photos`, mirrored best effort into every linked band's `Profile photos` folder).
 - `uploads.service.ts` / `uploads.controller.ts`: server-brokered resumable uploads (below). `media-zip.service.ts`: streamed zip downloads. Public upload links (6.3) reuse `UploadsService.create(actor, input, limits)`.
 
 ## Endpoints
@@ -34,8 +34,10 @@ All need a session and band membership (non-members 404) unless noted. Drive not
 | `PUT /bands/:id/photo` | Band admins. Multipart `photo`, image/* (not svg), max 10 MB (413 above, 422 wrong type, 400 missing). Uploads to `Profile photos`, trashes the previous file, sets `photo_drive_file_id` and `bands.photo_url` = `${API_PUBLIC_URL}/bands/<id>/photo?v=<fileId>`. Returns `{ photoUrl }`. |
 | `DELETE /bands/:id/photo` | Admins. 204; trashes the file and clears the fields. |
 | `GET /bands/:id/photo` | PUBLIC, long immutable cache, 404 when none or Drive unavailable. |
-| `PUT/DELETE /bands/:id/members/me/photo` | The member themself, same upload rules. Stored per membership in the band's `Profile photos` folder. `{ photoUrl }` = `${API_PUBLIC_URL}/bands/<id>/members/<userId>/photo?v=<fileId>`. |
-| `GET /bands/:id/members/:userId/photo` | Band members only (`me` allowed), 404 when none. |
+| `PUT /users/me/photo` | Any signed-in user. Same upload rules. Stores the one profile photo in `user_photos` (works with no Drive), sets `users.avatar_url` = `${API_PUBLIC_URL}/users/<id>/photo?v=<ts>`, then for each band the user belongs to with Drive set up uploads a copy to `Profile photos`, trashes the previous copy, and records it in `memberships.photo_drive_file_id`. Per band failures are logged and never fail the request. Returns `{ photoUrl }`. |
+| `DELETE /users/me/photo` | 204; clears `avatar_url`, deletes the stored photo, and trashes the Drive copies. |
+| `GET /users/:userId/photo` | Signed-in users (`me` allowed), 404 when none. |
+| `GET /bands/:id/members/:userId/photo` | Band members only. Serves the Drive copy of a member photo, 404 when none. Members lists no longer carry a separate `photoUrl`; use `avatarUrl`. |
 
 ## Poller rules
 Per band with Drive linked and a cursor (skipped on a revoked link), inside one transaction guarded by a per-band advisory lock: `getChanges`, apply, advance the cursor. Scheduled passes skip a locked band; manual passes wait.
