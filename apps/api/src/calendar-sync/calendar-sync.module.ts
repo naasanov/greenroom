@@ -1,4 +1,5 @@
 import { Global, Module } from "@nestjs/common";
+import { CalendarAclService } from "./calendar-sync.acl.js";
 import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
 import { SyncContextService } from "./calendar-sync.context.js";
 import { CalendarSyncController } from "./calendar-sync.controller.js";
@@ -16,6 +17,7 @@ import { CalendarSyncWorker } from "./calendar-sync.worker.js";
     CalendarBotTokenService,
     CalendarSyncQueue,
     SyncContextService,
+    CalendarAclService,
     CalendarPullService,
     CalendarPushService,
     CalendarSyncService,

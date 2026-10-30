@@ -37,7 +37,7 @@ unset DB_PW
 
 Read it back later with `security find-generic-password -s GREENROOM_STAGING_DB_PASSWORD -w`.
 
-Optional API secret `CALENDAR_BOT_REFRESH_TOKEN` is the refresh token of the bot Google account that owns band calendars (scope `calendar`; uses the existing `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`). Mint it on a laptop with `node apps/api/scripts/calendar-bot-token.ts`, which prints only the token, then run `fly secrets set -a greenroom-staging-api CALENDAR_BOT_REFRESH_TOKEN=<token>`. Without it, calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED` in real mode.
+Optional API secret `CALENDAR_SA_KEY` is the base64 of the JSON key of the service account `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com`, which owns band calendars (scope `calendar`). Stage it from a laptop with `fly secrets set -a greenroom-staging-api CALENDAR_SA_KEY="$(base64 -w0 key.json)"` (on macOS `base64 -i key.json | tr -d '\n'`), then delete the key file. Without it, calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED` in real mode.
 
 ## 3. Deploy: db, then api, then web
 

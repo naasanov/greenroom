@@ -15,15 +15,14 @@ import {
   createGig,
   createPractice,
   dateIn,
-  emailsOf,
   instanceOf,
   keyOf,
   masterOf,
   newBand,
   nextTuesday,
   occurrence,
+  readersOf,
   setupCalendar,
-  statusOf,
 } from "./calendar-sync-helpers.js";
 
 test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
@@ -31,7 +30,7 @@ test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
 const sync = (bandId: string, path = "") =>
   `/bands/${bandId}/integrations/google/calendar${path}`;
 
-test("setup creates one calendar and pushes gigs and practices with attendees", async ({
+test("setup creates one calendar and shares it with members, and pushes gigs and practices without attendees", async ({
   testApi,
   db,
 }) => {
@@ -86,8 +85,12 @@ test("setup creates one calendar and pushes gigs and practices with attendees", 
   const [band] = await db.select().from(bands).where(eq(bands.id, bandId));
   expect(band!.calendarId).toBe(calendarId);
 
+  // Members are readers on the ACL (at their calendar email); the owner is untouched.
+  const acl = await testApi.calendarAcl(calendarId);
+  expect(acl.filter((r) => r.role === "owner")).toHaveLength(1);
+  expect(await readersOf(testApi, calendarId)).toEqual([AVA, BEN_CAL].sort());
+
   const events = await testApi.calendarEvents(calendarId);
-  const attendees = [AVA, BEN_CAL].sort();
 
   const g = masterOf(events, gig.id);
   expect(g).toMatchObject({
@@ -102,7 +105,7 @@ test("setup creates one calendar and pushes gigs and practices with attendees", 
   expect(g.description).toContain("Bring cables");
   expect(g.description).toContain("Load-in: 18:30");
   expect(g.description).toContain(`/gigs/${gig.id}`);
-  expect(emailsOf(g)).toEqual(attendees);
+  expect(g).not.toHaveProperty("attendees");
 
   const a = masterOf(events, allDay.id);
   expect(a).toMatchObject({ allDay: true, start: allDay.date });
@@ -116,7 +119,7 @@ test("setup creates one calendar and pushes gigs and practices with attendees", 
   expect(new Date(m.start).toISOString()).toBe(
     occurrence(start, 0).toISOString(),
   );
-  expect(emailsOf(m)).toEqual(attendees);
+  expect(m).not.toHaveProperty("attendees");
   const movedEvent = instanceOf(events, m.id, moved)!;
   expect(new Date(movedEvent.start).toISOString()).toBe(
     occurrence(start, 2, 20).toISOString(),
@@ -146,6 +149,7 @@ test("setup creates one calendar and pushes gigs and practices with attendees", 
   expect(again.calendarId).toBe(calendarId);
   const after = await testApi.calendarEvents(calendarId);
   expect(after.map((e) => e.id).sort()).toEqual(events.map((e) => e.id).sort());
+  expect(await testApi.calendarAcl(calendarId)).toEqual(acl);
 
   // Any member can read the sync status; strangers cannot.
   const status = await (await ben.api.get(sync(bandId, "/sync"))).json();
@@ -267,47 +271,37 @@ test("app edits, cancels and deletes reach Google", async ({ testApi, db }) => {
   expect(masterOf(events, sid).cancelled).toBe(false);
 });
 
-test("RSVPs in the app set the attendee status of that occurrence", async ({
-  testApi,
-}) => {
+test("RSVPs stay in the app and never write to Google", async ({ testApi }) => {
   const { ava, bandId, join } = await newBand(testApi);
   const ben = await join(BEN);
   const start = nextTuesday(7);
   const series = await createPractice(ava.api, bandId, start);
   const sid = series.id as string;
   const calendarId = await connect(ava.api, bandId);
+  const before = await testApi.calendarEvents(calendarId);
   const key = keyOf(occurrence(start, 1));
   const url = `/bands/${bandId}/practices/${sid}/occurrences/${key}/rsvp`;
 
-  const expected = {
-    going: "accepted",
-    maybe: "tentative",
-    not_going: "declined",
-    no_response: "needsAction",
-  } as const;
-  for (const [status, google] of Object.entries(expected)) {
+  for (const status of ["going", "maybe", "not_going", "no_response"]) {
     const res = await ben.api.put(url, { data: { status } });
     expect(res.status()).toBe(200);
-    await testApi.calendarFlush(bandId);
-    const events = await testApi.calendarEvents(calendarId);
-    const master = masterOf(events, sid);
-    const inst = instanceOf(events, master.id, occurrence(start, 1))!;
-    expect(statusOf(inst, BEN)).toBe(google);
-    // Other occurrences and other members are untouched.
-    expect(statusOf(inst, AVA)).toBe("needsAction");
-    expect(instanceOf(events, master.id, occurrence(start, 2))).toBeUndefined();
+    expect(
+      (await (await ava.api.get(sync(bandId, "/sync"))).json()).pending,
+    ).toBe(0);
   }
-
-  // A sync pass afterwards keeps the answer.
   await ben.api.put(url, { data: { status: "going" } });
+  await testApi.calendarFlush(bandId);
   await testApi.calendarSync(bandId);
+
+  // Google is untouched and the app keeps the answer.
+  expect(await testApi.calendarEvents(calendarId)).toEqual(before);
   const occ = await (
     await ben.api.get(`/bands/${bandId}/practices/${sid}/occurrences/${key}`)
   ).json();
   expect(occ.myRsvp).toBe("going");
 });
 
-test("membership and calendar email changes update attendees", async ({
+test("membership and calendar email changes update the calendar sharing", async ({
   testApi,
 }) => {
   const { ava, bandId, join } = await newBand(testApi);
@@ -315,42 +309,63 @@ test("membership and calendar email changes update attendees", async ({
   const series = await createPractice(ava.api, bandId, nextTuesday(7));
   const sid = series.id as string;
   const calendarId = await connect(ava.api, bandId);
-  const emails = async () => {
-    const events = await testApi.calendarEvents(calendarId);
-    return {
-      gig: emailsOf(masterOf(events, gig.id)),
-      series: emailsOf(masterOf(events, sid)),
-    };
-  };
-  expect(await emails()).toEqual({ gig: [AVA], series: [AVA] });
+  expect(
+    masterOf(await testApi.calendarEvents(calendarId), sid),
+  ).not.toHaveProperty("attendees");
+  const readers = () => readersOf(testApi, calendarId);
+  expect(await readers()).toEqual([AVA]);
+  expect(
+    masterOf(await testApi.calendarEvents(calendarId), gig.id),
+  ).not.toHaveProperty("attendees");
 
   const ben = await join(BEN);
   await testApi.calendarFlush(bandId);
-  expect(await emails()).toEqual({
-    gig: [AVA, BEN].sort(),
-    series: [AVA, BEN].sort(),
-  });
+  expect(await readers()).toEqual([AVA, BEN].sort());
 
   await ben.api.patch("/auth/me", { data: { calendarEmail: BEN_CAL } });
   await testApi.calendarFlush();
-  expect(await emails()).toEqual({
-    gig: [AVA, BEN_CAL].sort(),
-    series: [AVA, BEN_CAL].sort(),
-  });
+  expect(await readers()).toEqual([AVA, BEN_CAL].sort());
 
   const res = await ben.api.post(`/bands/${bandId}/leave`, { data: {} });
   expect(res.status()).toBe(204);
   await testApi.calendarFlush(bandId);
-  expect(await emails()).toEqual({ gig: [AVA], series: [AVA] });
+  expect(await readers()).toEqual([AVA]);
 
-  // A removed member's answers are not resurrected on rejoin.
+  // Rejoining shares the calendar again at the calendar email.
   const again = await join(BEN);
   await testApi.calendarFlush(bandId);
-  expect((await emails()).gig).toContain(BEN_CAL);
+  expect(await readers()).toEqual([AVA, BEN_CAL].sort());
   const members = await (
     await again.api.get(`/bands/${bandId}/members`)
   ).json();
   expect(members).toHaveLength(2);
+});
+
+test("sharing tolerates non-Google addresses and keeps manually added owners", async ({
+  testApi,
+}) => {
+  const { ava, bandId, join } = await newBand(testApi);
+  const ben = await join(BEN);
+  await ben.api.patch("/auth/me", {
+    data: { calendarEmail: "ben@no-google.test" },
+  });
+  const calendarId = await connect(ava.api, bandId);
+
+  // The refused address does not fail setup or the flush; the rest is shared.
+  expect(await readersOf(testApi, calendarId)).toEqual([AVA]);
+  await testApi.calendarFlush(bandId);
+  expect((await ava.api.get(sync(bandId, "/sync"))).status()).toBe(200);
+
+  // A stale reader rule is removed on the next reconcile; the owner stays.
+  await testApi.calendarSimulateAcl(calendarId, "old.member@example.com");
+  expect(await readersOf(testApi, calendarId)).toContain(
+    "old.member@example.com",
+  );
+  await setupCalendar(ava.api, bandId);
+  expect(await readersOf(testApi, calendarId)).toEqual([AVA]);
+  expect(
+    (await testApi.calendarAcl(calendarId)).filter((r) => r.role === "owner"),
+  ).toHaveLength(1);
 });
 
 test("bands without a calendar push nothing; disconnect clears ids; setup again starts fresh", async ({

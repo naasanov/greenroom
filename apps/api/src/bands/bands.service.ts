@@ -251,7 +251,7 @@ export class BandsService {
         .set({ leftAt: new Date() })
         .where(eq(memberships.id, m.id));
     });
-    await this.calendarSync.bandAttendees(bandId);
+    await this.calendarSync.bandAcl(bandId);
   }
 
   async leave(
@@ -286,7 +286,7 @@ export class BandsService {
         .set({ leftAt: new Date() })
         .where(eq(memberships.id, m.id));
     });
-    if (!bandDeleted) await this.calendarSync.bandAttendees(bandId);
+    if (!bandDeleted) await this.calendarSync.bandAcl(bandId);
   }
 
   // Instruments
@@ -424,7 +424,7 @@ export class BandsService {
       if (existing) return toSummary(band, existing.role);
       return toSummary(band, "member");
     });
-    if (joined) await this.calendarSync.bandAttendees(band.id);
+    if (joined) await this.calendarSync.bandAcl(band.id);
     return summary;
   }
 

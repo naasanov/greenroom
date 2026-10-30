@@ -663,7 +663,6 @@ export class PracticesService {
         ],
         set: { status },
       });
-    await this.calendarSync.rsvp(bandId, seriesId, original);
     return this.detail(series, original, override, userId);
   }
 

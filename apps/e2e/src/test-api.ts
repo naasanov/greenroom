@@ -1,8 +1,12 @@
 import type { APIRequestContext } from "@playwright/test";
 import type { Scenario, SeedResult } from "@greenroom/db";
 
-export type AttendeeResponse =
-  "accepted" | "tentative" | "declined" | "needsAction";
+/** A user rule on a fake calendar's ACL. */
+export interface FakeAclRule {
+  id: string;
+  email: string;
+  role: "owner" | "writer" | "reader" | "freeBusyReader";
+}
 
 /** An event in the Google Calendar fake (the fields specs assert on). */
 export interface FakeCalendarEvent {
@@ -13,7 +17,6 @@ export interface FakeCalendarEvent {
   start: string;
   end: string;
   recurrence: string[];
-  attendees: { email: string; responseStatus: AttendeeResponse }[];
   cancelled: boolean;
   etag: string;
   allDay: boolean;
@@ -32,7 +35,6 @@ export interface FakeEventPatch {
   recurrence?: string[];
   timeZone?: string;
   allDay?: boolean;
-  attendeeEmails?: string[];
 }
 
 type SeedFor<S extends Scenario> = Extract<SeedResult, { scenario: S }>;
@@ -162,34 +164,15 @@ export class TestApi {
     });
   }
 
-  /** A guest answers on the event (for a recurring event: the whole series). */
-  async calendarAttendeeResponse(
-    calendarId: string,
-    eventId: string,
-    email: string,
-    responseStatus: AttendeeResponse,
-  ): Promise<void> {
-    await this.call("post", "calendar/simulate/attendee-response", {
-      data: { calendarId, eventId, email, responseStatus },
-    });
+  /** ACL rules of a fake calendar, owner included. */
+  calendarAcl(calendarId: string): Promise<FakeAclRule[]> {
+    return this.call("post", "calendar/acl", { data: { calendarId } });
   }
 
-  /** A guest answers for one occurrence only. */
-  async calendarInstanceAttendeeResponse(
-    calendarId: string,
-    recurringEventId: string,
-    originalStart: string,
-    email: string,
-    responseStatus: AttendeeResponse,
-  ): Promise<void> {
-    await this.call("post", "calendar/simulate/instance-attendee-response", {
-      data: {
-        calendarId,
-        recurringEventId,
-        originalStart,
-        email,
-        responseStatus,
-      },
+  /** Simulates the owner sharing the calendar by hand in Google. */
+  async calendarSimulateAcl(calendarId: string, email: string): Promise<void> {
+    await this.call("post", "calendar/simulate/acl-rule", {
+      data: { calendarId, email },
     });
   }
 

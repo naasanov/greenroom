@@ -1,13 +1,5 @@
 export const GOOGLE_CALENDAR = Symbol("GOOGLE_CALENDAR");
 
-export type AttendeeResponse =
-  "accepted" | "tentative" | "declined" | "needsAction";
-
-export interface CalendarAttendee {
-  email: string;
-  responseStatus: AttendeeResponse;
-}
-
 export interface CalendarEvent {
   id: string;
   summary: string;
@@ -18,7 +10,6 @@ export interface CalendarEvent {
   end: string;
   /** RRULE lines such as "RRULE:FREQ=WEEKLY;BYDAY=TU". Empty for non-recurring. */
   recurrence: string[];
-  attendees: CalendarAttendee[];
   /** True when the event was deleted/cancelled. */
   cancelled: boolean;
   /** Changes on every write. */
@@ -52,13 +43,6 @@ export interface CalendarEventInput {
   /** Stored as extendedProperties.private; patches merge keys. */
   privateProperties?: Record<string, string>;
   recurrence?: string[];
-  /** Attendee emails; new attendees start as needsAction. */
-  attendeeEmails?: string[];
-  /**
-   * Response status to record per attendee email (lowercase keys are matched
-   * case-insensitively). Emails not listed keep their current status.
-   */
-  attendeeResponses?: Record<string, AttendeeResponse>;
 }
 
 export type CalendarEventPatch = Partial<CalendarEventInput>;
@@ -70,13 +54,23 @@ export type CalendarEventResult =
 
 export type CalendarDeleteResult = { status: "ok" } | { status: "not-found" };
 
+export interface CalendarAclRule {
+  /** Google rule id, `user:<email>` for user scopes. */
+  id: string;
+  email: string;
+  role: "owner" | "writer" | "reader" | "freeBusyReader";
+}
+
+export type CalendarShareResult =
+  { status: "shared" } | { status: "already-shared" } | { status: "rejected" };
+
 export type CalendarChangesResult =
   | { status: "ok"; events: CalendarEvent[]; nextSyncToken: string }
   | { status: "sync-token-expired" };
 
 /**
- * Every method takes the band's linked Google account access token first.
- * All writes send attendee notifications (sendUpdates: all).
+ * Every method takes the calendar owner's (service account) access token first.
+ * Events carry no attendees; members get the calendar itself through ACL rules.
  * Instance ids are `${recurringEventId}_${YYYYMMDDTHHMMSSZ}` (UTC), or
  * `_${YYYYMMDD}` for all-day events.
  */
@@ -120,4 +114,20 @@ export interface GoogleCalendarAdapter {
     calendarId: string,
     syncToken?: string,
   ): Promise<CalendarChangesResult>;
+  /** Grants a user read access and emails them the share (sendNotifications). */
+  shareCalendar(
+    accessToken: string,
+    calendarId: string,
+    email: string,
+  ): Promise<CalendarShareResult>;
+  listAclRules(
+    accessToken: string,
+    calendarId: string,
+  ): Promise<CalendarAclRule[]>;
+  /** Removes one rule by id; reports whether it existed. */
+  deleteAclRule(
+    accessToken: string,
+    calendarId: string,
+    ruleId: string,
+  ): Promise<CalendarDeleteResult>;
 }

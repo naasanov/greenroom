@@ -15,7 +15,6 @@ import {
   assertGcalRepresentable,
   firstOccurrence,
   isOccurrence,
-  occurrencesBetween,
 } from "../events/recurrence.js";
 import { isValidTimeZone, localDate, localTime } from "../events/time.js";
 import {
@@ -28,12 +27,9 @@ import {
   DEFAULT_GIG_MINUTES,
   KIND_GIG,
   KIND_PRACTICE,
-  fromGoogleResponse,
   gigLocation,
   gigTimes,
-  sameEmail,
   singleRrule,
-  syncWindow,
 } from "./calendar-sync.mapping.js";
 import { CalendarSyncQueue } from "./calendar-sync.queue.js";
 
@@ -41,9 +37,6 @@ const { RRule } = rrulePkg;
 const MINUTE_MS = 60_000;
 
 type GigRow = typeof gigs.$inferSelect;
-
-/** Resolves the full list of instance events on demand, at most once per batch. */
-export type InstanceSource = () => Promise<CalendarEvent[]>;
 
 function normalizedRule(rule: string): string {
   try {
@@ -88,9 +81,8 @@ export class CalendarPullService {
     if (res.status !== "ok") throw new Error("Calendar full sync failed");
 
     const events = res.events;
-    const instances = this.instanceSource(ctx, full ? events : undefined);
     for (const e of events.filter((x) => !x.recurringEventId)) {
-      await this.applyEvent(ctx, e, instances);
+      await this.applyEvent(ctx, e);
     }
     for (const e of events.filter((x) => x.recurringEventId)) {
       await this.applyInstance(ctx, e);
@@ -110,21 +102,6 @@ export class CalendarPullService {
         target: calendarSyncStates.bandId,
         set: { syncToken, lastSyncedAt: now },
       });
-  }
-
-  instanceSource(
-    ctx: BandSyncContext,
-    known?: CalendarEvent[],
-  ): InstanceSource {
-    let cached: Promise<CalendarEvent[]> | undefined = known
-      ? Promise.resolve(known)
-      : undefined;
-    return () => {
-      cached ??= this.calendar
-        .listChanges(ctx.accessToken, ctx.calendarId)
-        .then((r) => (r.status === "ok" ? r.events : []));
-      return cached;
-    };
   }
 
   /** After a full listing, app events whose Google event vanished were deleted there. */
@@ -168,16 +145,12 @@ export class CalendarPullService {
   // ---- gigs and series ----
 
   /** Applies one non-instance event (a gig or a recurring practice master). */
-  async applyEvent(
-    ctx: BandSyncContext,
-    e: CalendarEvent,
-    instances: InstanceSource = this.instanceSource(ctx),
-  ): Promise<void> {
+  async applyEvent(ctx: BandSyncContext, e: CalendarEvent): Promise<void> {
     const kind = e.privateProperties["greenroomKind"];
     const id = e.privateProperties["greenroomId"];
     if (!id || (kind !== KIND_GIG && kind !== KIND_PRACTICE)) return;
     if (kind === KIND_GIG) await this.applyGig(ctx, e, id);
-    else await this.applySeries(ctx, e, id, instances);
+    else await this.applySeries(ctx, e, id);
   }
 
   private async removeGig(id: string): Promise<void> {
@@ -288,7 +261,6 @@ export class CalendarPullService {
     ctx: BandSyncContext,
     e: CalendarEvent,
     seriesId: string,
-    instances: InstanceSource,
   ): Promise<void> {
     const [s] = await this.db
       .select()
@@ -309,15 +281,14 @@ export class CalendarPullService {
     // An unpushed app edit is newer; the push overwrites Google.
     if (this.queue.seriesDirty(s.id)) return;
 
-    const next = await this.applySeriesChanges(s, e);
-    await this.applyMasterResponses(ctx, next, e, instances);
+    await this.applySeriesChanges(s, e);
   }
 
-  /** Writes remote title, location, time and recurrence changes; returns the new row. */
+  /** Writes remote title, location, time and recurrence changes. */
   private async applySeriesChanges(
     s: SeriesRow,
     e: CalendarEvent,
-  ): Promise<SeriesRow> {
+  ): Promise<void> {
     const tz =
       e.timeZone && isValidTimeZone(e.timeZone) ? e.timeZone : s.timeZone;
     const start = new Date(e.start);
@@ -360,7 +331,7 @@ export class CalendarPullService {
       values.dtstart.getTime() !== s.dtstart.getTime() ||
       values.timeZone !== s.timeZone ||
       values.durationMinutes !== s.durationMinutes;
-    const [row] = await this.db
+    const [next] = await this.db
       .update(practiceSeries)
       .set({
         ...values,
@@ -369,16 +340,14 @@ export class CalendarPullService {
       })
       .where(eq(practiceSeries.id, s.id))
       .returning();
-    const next = row!;
 
     const scheduleChanged =
       values.rrule !== s.rrule ||
       values.dtstart.getTime() !== s.dtstart.getTime() ||
       values.timeZone !== s.timeZone;
-    if (scheduleChanged) await this.pruneStale(next);
+    if (scheduleChanged) await this.pruneStale(next!);
     // A rule the app cannot represent stays as the app has it and is pushed back.
     if (!representable) await this.queue.series(s.bandId, s.id);
-    return next;
   }
 
   /** Drops overrides and RSVPs whose key no longer lines up with an occurrence. */
@@ -415,96 +384,9 @@ export class CalendarPullService {
     }
   }
 
-  // ---- RSVPs ----
-
-  private async upsertRsvp(
-    s: Pick<SeriesRow, "id" | "bandId">,
-    at: Date,
-    userId: string,
-    status: ReturnType<typeof fromGoogleResponse>,
-  ): Promise<void> {
-    await this.db
-      .insert(practiceRsvps)
-      .values({
-        bandId: s.bandId,
-        seriesId: s.id,
-        originalStart: at,
-        userId,
-        status,
-      })
-      .onConflictDoUpdate({
-        target: [
-          practiceRsvps.seriesId,
-          practiceRsvps.originalStart,
-          practiceRsvps.userId,
-        ],
-        set: { status },
-      });
-  }
-
-  /**
-   * A member's answer on the recurring master applies to every occurrence in the
-   * sync window that has no instance-level answer from them in Google.
-   */
-  async applyMasterResponses(
-    ctx: BandSyncContext,
-    s: SeriesRow,
-    master: CalendarEvent,
-    instances: InstanceSource,
-  ): Promise<void> {
-    const answers = ctx.members.flatMap((m) => {
-      const a = master.attendees.find((x) => sameEmail(x.email, m.email));
-      return a && a.responseStatus !== "needsAction"
-        ? [{ userId: m.userId, email: m.email, status: a.responseStatus }]
-        : [];
-    });
-    if (answers.length === 0) return;
-
-    const { from, to } = syncWindow();
-    const byStart = new Map<number, CalendarEvent>();
-    for (const i of await instances()) {
-      if (i.recurringEventId !== master.id || i.cancelled || !i.originalStart) {
-        continue;
-      }
-      byStart.set(new Date(i.originalStart).getTime(), i);
-    }
-    const overrides = await this.db
-      .select()
-      .from(overridesTable)
-      .where(eq(overridesTable.seriesId, s.id));
-    const cancelled = new Set(
-      overrides
-        .filter((o) => o.cancelled)
-        .map((o) => o.originalStart.getTime()),
-    );
-    const existing = await this.db
-      .select()
-      .from(practiceRsvps)
-      .where(eq(practiceRsvps.seriesId, s.id));
-    const current = new Map(
-      existing.map((r) => [
-        `${r.originalStart.getTime()}:${r.userId}`,
-        r.status,
-      ]),
-    );
-
-    for (const at of occurrencesBetween(s, from, to)) {
-      const ms = at.getTime();
-      if (cancelled.has(ms) || this.queue.occurrenceDirty(s.id, ms)) continue;
-      const inst = byStart.get(ms);
-      for (const a of answers) {
-        const own = inst?.attendees.find((x) => sameEmail(x.email, a.email));
-        if (own && own.responseStatus !== "needsAction") continue;
-        const status = fromGoogleResponse(a.status);
-        if (current.get(`${ms}:${a.userId}`) === status) continue;
-        await this.upsertRsvp(s, at, a.userId, status);
-      }
-    }
-  }
-
   // ---- instances ----
 
-  /** Applies an edit, cancellation or attendee answer on one occurrence. */
+  /** Applies an edit or cancellation of one occurrence. */
   async applyInstance(ctx: BandSyncContext, e: CalendarEvent): Promise<void> {
     if (!e.recurringEventId || !e.originalStart) return;
     const [s] = await this.db
@@ -543,16 +425,6 @@ export class CalendarPullService {
     if (this.queue.occurrenceDirty(s.id, at.getTime())) return;
     if (override?.gcalInstanceEtag !== e.etag) {
       await this.applyInstanceContent(s, at, override, e);
-    }
-    for (const m of ctx.members) {
-      const a = e.attendees.find((x) => sameEmail(x.email, m.email));
-      if (!a || a.responseStatus === "needsAction") continue;
-      await this.upsertRsvp(
-        s,
-        at,
-        m.userId,
-        fromGoogleResponse(a.responseStatus),
-      );
     }
   }
 

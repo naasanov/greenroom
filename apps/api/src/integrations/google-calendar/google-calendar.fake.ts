@@ -1,11 +1,12 @@
 import type {
-  AttendeeResponse,
+  CalendarAclRule,
   CalendarChangesResult,
   CalendarDeleteResult,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
   CalendarEventResult,
+  CalendarShareResult,
   GoogleCalendarAdapter,
 } from "./google-calendar.adapter.js";
 import { instanceId, isDateOnly } from "./google-calendar.mapping.js";
@@ -16,7 +17,14 @@ interface CalendarState {
   log: string[];
   /** Tokens with an offset below this value report as expired. */
   minValidOffset: number;
+  /** ACL rules keyed by lowercase email. */
+  acl: Map<string, CalendarAclRule>;
 }
+
+/** Owner rule every fake calendar starts with, standing in for the service account. */
+export const FAKE_OWNER_EMAIL = "calendar-owner@fake.test";
+/** Addresses on this domain have no Google account; sharing with them is rejected. */
+export const FAKE_NON_GOOGLE_DOMAIN = "no-google.test";
 
 export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
   private calendars = new Map<string, CalendarState>();
@@ -38,6 +46,16 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
       events: new Map(),
       log: [],
       minValidOffset: 0,
+      acl: new Map([
+        [
+          FAKE_OWNER_EMAIL,
+          {
+            id: `user:${FAKE_OWNER_EMAIL}`,
+            email: FAKE_OWNER_EMAIL,
+            role: "owner",
+          },
+        ],
+      ]),
     });
     return { calendarId };
   }
@@ -57,12 +75,6 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
       start: input.start,
       end: input.end,
       recurrence: input.recurrence ?? [],
-      attendees: (input.attendeeEmails ?? []).map((email) => ({
-        email,
-        responseStatus:
-          lowerKeys(input.attendeeResponses)[email.toLowerCase()] ??
-          ("needsAction" as const),
-      })),
       cancelled: false,
       etag: "",
       updated: "",
@@ -149,46 +161,72 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     return { status: "ok", events, nextSyncToken };
   }
 
+  async shareCalendar(
+    accessToken: string,
+    calendarId: string,
+    email: string,
+  ): Promise<CalendarShareResult> {
+    this.lastAccessToken = accessToken;
+    const cal = this.cal(calendarId);
+    const key = email.toLowerCase();
+    if (key.endsWith(`@${FAKE_NON_GOOGLE_DOMAIN}`)) {
+      return { status: "rejected" };
+    }
+    if (cal.acl.has(key)) return { status: "already-shared" };
+    cal.acl.set(key, { id: `user:${key}`, email, role: "reader" });
+    this.shareLog.push({ calendarId, email });
+    return { status: "shared" };
+  }
+
+  async listAclRules(
+    accessToken: string,
+    calendarId: string,
+  ): Promise<CalendarAclRule[]> {
+    this.lastAccessToken = accessToken;
+    return this.aclRules(calendarId);
+  }
+
+  async deleteAclRule(
+    accessToken: string,
+    calendarId: string,
+    ruleId: string,
+  ): Promise<CalendarDeleteResult> {
+    this.lastAccessToken = accessToken;
+    const cal = this.cal(calendarId);
+    for (const [key, rule] of cal.acl) {
+      if (rule.id === ruleId) {
+        cal.acl.delete(key);
+        return { status: "ok" };
+      }
+    }
+    return { status: "not-found" };
+  }
+
   // ---- test controls ----
+
+  /** Every successful share (notification sent), in order. */
+  shareLog: { calendarId: string; email: string }[] = [];
+
+  /** Current ACL rules of a calendar, owner included. */
+  aclRules(calendarId: string): CalendarAclRule[] {
+    return [...this.cal(calendarId).acl.values()].map((r) => ({ ...r }));
+  }
+
+  /** Simulates the owner sharing the calendar by hand in the Google UI. */
+  simulateAclRule(
+    calendarId: string,
+    email: string,
+    role: CalendarAclRule["role"] = "reader",
+  ): void {
+    this.cal(calendarId).acl.set(email.toLowerCase(), {
+      id: `user:${email.toLowerCase()}`,
+      email,
+      role,
+    });
+  }
 
   /** Access token passed to the most recent adapter call. */
   lastAccessToken: string | null = null;
-
-  /** Simulates a guest responding in Google Calendar. */
-  simulateAttendeeResponse(
-    calendarId: string,
-    eventId: string,
-    email: string,
-    responseStatus: AttendeeResponse,
-  ): void {
-    const cal = this.cal(calendarId);
-    const e = this.must(cal, eventId);
-    const attendees = e.attendees.some((a) => a.email === email)
-      ? e.attendees.map((a) =>
-          a.email === email ? { ...a, responseStatus } : a,
-        )
-      : [...e.attendees, { email, responseStatus }];
-    this.write(cal, { ...e, attendees });
-  }
-
-  /** Simulates a guest responding to one instance of a recurring event. */
-  simulateInstanceAttendeeResponse(
-    calendarId: string,
-    recurringEventId: string,
-    originalStart: string,
-    email: string,
-    responseStatus: AttendeeResponse,
-  ): void {
-    const cal = this.cal(calendarId);
-    const e = this.instance(cal, recurringEventId, originalStart);
-    if (!e) throw new Error(`Fake Calendar: unknown event ${recurringEventId}`);
-    const attendees = e.attendees.some((a) => a.email === email)
-      ? e.attendees.map((a) =>
-          a.email === email ? { ...a, responseStatus } : a,
-        )
-      : [...e.attendees, { email, responseStatus }];
-    this.write(cal, { ...e, attendees });
-  }
 
   /** Simulates an edit (or cancellation) of one instance in the Google Calendar UI. */
   simulateInstanceEdit(
@@ -253,6 +291,7 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
     this.eventCounter = 0;
     this.writeCounter = 0;
     this.lastAccessToken = null;
+    this.shareLog = [];
   }
 
   // ---- internals ----
@@ -326,16 +365,6 @@ export class FakeGoogleCalendarAdapter implements GoogleCalendarAdapter {
         ...patch.privateProperties,
       };
     }
-    if (patch.attendeeEmails !== undefined) {
-      const responses = lowerKeys(patch.attendeeResponses);
-      next.attendees = patch.attendeeEmails.map((email) => ({
-        email,
-        responseStatus:
-          responses[email.toLowerCase()] ??
-          existing.attendees.find((a) => a.email === email)?.responseStatus ??
-          ("needsAction" as const),
-      }));
-    }
     if (cancelled !== undefined) next.cancelled = cancelled;
     return this.write(cal, next);
   }
@@ -345,17 +374,8 @@ function clone(e: CalendarEvent): CalendarEvent {
   return {
     ...e,
     recurrence: [...e.recurrence],
-    attendees: e.attendees.map((a) => ({ ...a })),
     privateProperties: { ...e.privateProperties },
   };
-}
-
-function lowerKeys(
-  responses: Record<string, AttendeeResponse> | undefined,
-): Record<string, AttendeeResponse> {
-  return Object.fromEntries(
-    Object.entries(responses ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
-  );
 }
 
 function isDefined<T>(v: T | undefined): v is T {

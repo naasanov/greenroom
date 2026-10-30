@@ -142,7 +142,7 @@ async function main(): Promise<void> {
   reg.googleDrive.externalDelete(fileId);
   assert.equal((await drive.getFile(TOKEN, fileId)).status, "not-found");
 
-  // calendar: etags, instance, external decline, sync token expiry
+  // calendar: etags, instance, ACL sharing, sync token expiry
   const { calendarId } = await cal.createCalendar(TOKEN, {
     summary: "Band",
     timeZone: "UTC",
@@ -155,7 +155,6 @@ async function main(): Promise<void> {
     start: "2026-11-03T19:00:00Z",
     end: "2026-11-03T21:00:00Z",
     recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=TU"],
-    attendeeEmails: ["a@x.test"],
   });
   const upd = await cal.updateEvent(TOKEN, calendarId, ev.id, {
     location: "Garage",
@@ -181,11 +180,29 @@ async function main(): Promise<void> {
     { cancelled: true },
   );
   assert.ok(inst.status === "ok" && inst.event.cancelled);
-  reg.googleCalendar.simulateAttendeeResponse(
-    calendarId,
-    ev.id,
-    "a@x.test",
-    "declined",
+  assert.equal(
+    (await cal.shareCalendar(TOKEN, calendarId, "A@x.test")).status,
+    "shared",
+  );
+  assert.equal(
+    (await cal.shareCalendar(TOKEN, calendarId, "a@x.test")).status,
+    "already-shared",
+  );
+  assert.equal(
+    (await cal.shareCalendar(TOKEN, calendarId, "z@no-google.test")).status,
+    "rejected",
+  );
+  const rules = await cal.listAclRules(TOKEN, calendarId);
+  assert.ok(rules.some((r) => r.role === "owner"));
+  const rule = rules.find((r) => r.email === "A@x.test");
+  assert.equal(rule?.role, "reader");
+  assert.equal(
+    (await cal.deleteAclRule(TOKEN, calendarId, rule!.id)).status,
+    "ok",
+  );
+  assert.equal(
+    (await cal.deleteAclRule(TOKEN, calendarId, rule!.id)).status,
+    "not-found",
   );
   const delta = await cal.listChanges(
     TOKEN,
@@ -194,8 +211,7 @@ async function main(): Promise<void> {
   );
   assert.ok(delta.status === "ok");
   if (delta.status === "ok") {
-    const e = delta.events.find((x) => x.id === ev.id);
-    assert.equal(e?.attendees[0]?.responseStatus, "declined");
+    assert.ok(delta.events.some((x) => x.id === ev.id));
   }
   reg.googleCalendar.expireSyncTokens(calendarId);
   assert.equal(
@@ -221,25 +237,8 @@ async function main(): Promise<void> {
     end: "2026-11-03T20:00:00Z",
     timeZone: "UTC",
     recurrence: ["RRULE:FREQ=WEEKLY"],
-    attendeeEmails: ["b@x.test"],
   });
-  reg.googleCalendar.simulateInstanceAttendeeResponse(
-    calendarId,
-    weekly.id,
-    "2026-11-10T19:00:00Z",
-    "b@x.test",
-    "declined",
-  );
-  const instEvt = reg.googleCalendar.getEvent(
-    calendarId,
-    instanceId(weekly.id, "2026-11-10T19:00:00Z"),
-  );
-  assert.equal(instEvt?.attendees[0]?.responseStatus, "declined");
-  assert.equal(
-    reg.googleCalendar.getEvent(calendarId, weekly.id)?.attendees[0]
-      ?.responseStatus,
-    "needsAction",
-  );
+  assert.equal(weekly.recurrence.length, 1);
   assert.equal(
     instanceId("abc", "2026-11-10T19:00:00Z"),
     "abc_20261110T190000Z",

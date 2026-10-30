@@ -182,7 +182,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
         open={confirming}
         onOpenChange={setConfirming}
         title="Disconnect Google Calendar?"
-        description="Gigs and practices stop syncing. Events already on members' calendars stay there."
+        description="Gigs and practices stop syncing. The Google calendar stays shared with members as it is."
         confirmLabel="Disconnect"
         destructive
         onConfirm={() => disconnect.mutate()}

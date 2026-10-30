@@ -49,7 +49,8 @@ export function CalendarSetupDialog({
             Google Calendar
           </DialogTitle>
           <DialogDescription>
-            Gigs and practices stay in sync with your band calendar.
+            Gigs and practices stay in sync with your band calendar. Members get
+            the calendar shared by email and accept it once.
           </DialogDescription>
         </DialogHeader>
         {setup.isError ? (
@@ -74,6 +75,9 @@ export function CalendarSetupDialog({
             >
               <CheckCircle2 className="size-4 text-primary" />
               Your band calendar is ready.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Members will receive an email to add it to their Google Calendar.
             </p>
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           </div>

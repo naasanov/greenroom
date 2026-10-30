@@ -359,6 +359,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Files added directly in the Drive folder outside the app DO show up in the app (via the changes poller), landing in the matching folder section, or Unsorted if they're not in a known folder.
 
 # Linking Google Calendar
+- **Update 2026-10-30:** the calendar is owned by a Google service account, which cannot invite attendees. Events carry no attendees; the calendar is shared with each member (at their calendar email) as a reader and they accept it once. RSVPs stay in the app and Google RSVP sync is not supported. The bullets below describe the earlier invite design where they mention attendees or two-way RSVPs.
 - Same lazy pattern as Drive: the Events tab works fully without Google Calendar. An unlinked band shows a small banner on the Events tab offering to connect (also available in Band settings).
 - On connect, the app creates a **new dedicated calendar named after the band** in the connecting account, rather than writing into anyone's personal calendar.
 - Every practice and gig on that calendar invites band members as attendees by email. Members RSVP from their own Google Calendar, which is what drives the two-way decline/RSVP sync.

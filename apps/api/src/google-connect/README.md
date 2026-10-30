@@ -1,6 +1,6 @@
 # Google connect
 
-Per-band linking of Google Drive. (Google Calendar is not linked per user: band calendars are owned by a server-held bot account, see `calendar-sync`. Old `calendar` link rows are ignored.) A link is a Google sign-in for whichever account the band chooses (a band account or a member's personal one); it can differ from the account used to sign into Greenroom. One link per band and service (`band_google_links`, unique on `band_id + service`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
+Per-band linking of Google Drive. (Google Calendar is not linked per user: band calendars are owned by a server-held service account, see `calendar-sync`. Old `calendar` link rows are ignored.) A link is a Google sign-in for whichever account the band chooses (a band account or a member's personal one); it can differ from the account used to sign into Greenroom. One link per band and service (`band_google_links`, unique on `band_id + service`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
 
 Scopes requested: `openid email` plus `https://www.googleapis.com/auth/drive` (service `drive`), with `access_type=offline`, `prompt=consent select_account`, `include_granted_scopes=false`. Shared types and Zod schemas: `packages/shared/src/google.ts`.
 

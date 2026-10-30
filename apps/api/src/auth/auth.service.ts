@@ -141,12 +141,12 @@ export class AuthService {
       .where(eq(users.id, userId))
       .returning();
     if (patch.calendarEmail !== undefined) {
-      await this.calendarSync.userAttendees(userId);
+      await this.calendarSync.userAcl(userId);
     }
     return await toUser(this.db, updated!);
   }
 
-  /** Address Google Calendar invites go to: the calendar email, else sign-in email. */
+  /** Address the band calendar is shared with: the calendar email, else sign-in email. */
   inviteEmailFor(user: Pick<User, "email" | "calendarEmail">): string {
     return user.calendarEmail ?? user.email;
   }

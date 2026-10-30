@@ -1,7 +1,5 @@
 import type { gigs } from "@greenroom/db";
-import type { RsvpStatus } from "@greenroom/shared";
 import type {
-  AttendeeResponse,
   CalendarEventInput,
   CalendarEventPatch,
 } from "../integrations/index.js";
@@ -28,25 +26,6 @@ export function syncWindow(now = new Date()): { from: Date; to: Date } {
   };
 }
 
-// ---- RSVP <-> attendee response ----
-
-const TO_GOOGLE: Record<RsvpStatus, AttendeeResponse> = {
-  going: "accepted",
-  maybe: "tentative",
-  not_going: "declined",
-  no_response: "needsAction",
-};
-
-export const toGoogleResponse = (s: RsvpStatus): AttendeeResponse =>
-  TO_GOOGLE[s];
-
-export function fromGoogleResponse(r: AttendeeResponse): RsvpStatus {
-  if (r === "accepted") return "going";
-  if (r === "tentative") return "maybe";
-  if (r === "declined") return "not_going";
-  return "no_response";
-}
-
 // ---- members ----
 
 export interface SyncMember {
@@ -58,7 +37,8 @@ export interface SyncMember {
 export const sameEmail = (a: string, b: string): boolean =>
   a.toLowerCase() === b.toLowerCase();
 
-export function attendeeEmails(members: readonly SyncMember[]): string[] {
+/** Distinct member addresses (case-insensitive), first spelling kept. */
+export function shareEmails(members: readonly SyncMember[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of members) {
@@ -100,11 +80,7 @@ export function gigTimes(g: GigRow): {
   };
 }
 
-export function gigInput(
-  g: GigRow,
-  emails: string[],
-  webUrl: string,
-): CalendarEventInput {
+export function gigInput(g: GigRow, webUrl: string): CalendarEventInput {
   const t = gigTimes(g);
   const lines = [g.notes?.trim() || null];
   if (g.loadInAt) lines.push(`Load-in: ${localTime(g.loadInAt, g.timeZone)}`);
@@ -118,17 +94,12 @@ export function gigInput(
     allDay: t.allDay,
     timeZone: g.timeZone,
     privateProperties: { greenroomKind: KIND_GIG, greenroomId: g.id },
-    attendeeEmails: emails,
   };
 }
 
 // ---- practices ----
 
-export function seriesInput(
-  s: SeriesRow,
-  emails: string[],
-  webUrl: string,
-): CalendarEventInput {
+export function seriesInput(s: SeriesRow, webUrl: string): CalendarEventInput {
   return {
     summary: s.title,
     description: `${webUrl}/practices/${s.id}`,
@@ -141,17 +112,14 @@ export function seriesInput(
     timeZone: s.timeZone,
     recurrence: [s.rrule],
     privateProperties: { greenroomKind: KIND_PRACTICE, greenroomId: s.id },
-    attendeeEmails: emails,
   };
 }
 
-/** Full content of one instance (overrides applied), plus attendee statuses. */
+/** Full content of one instance with overrides applied. */
 export function instanceInput(
   s: SeriesRow,
   original: Date,
   override: OverrideRow | undefined,
-  emails: string[],
-  responses: Record<string, AttendeeResponse>,
 ): CalendarEventPatch {
   const occ = buildOccurrence(s, original, override);
   return {
@@ -161,8 +129,6 @@ export function instanceInput(
     end: occ.endsAt,
     allDay: false,
     timeZone: s.timeZone,
-    attendeeEmails: emails,
-    attendeeResponses: responses,
   };
 }
 

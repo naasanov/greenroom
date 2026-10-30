@@ -29,14 +29,13 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - **Audience > Publishing status**: click **Publish app** to move it to **In production**. Do not submit it for verification. Testing mode would make Drive and Calendar logins expire every 7 days. Sign-in shows no warning; the admin who links Drive sees Google's "unverified app" screen once (click **Advanced > Go to Greenroom**). Unverified apps are capped at 100 users.
 5. Create the OAuth client: **Clients** (or **Credentials > Create credentials > OAuth client ID**) > type **Web application**, name `Greenroom web`.
    - Authorized JavaScript origins: `https://staging.greenroom.fyi`, `https://greenroom.fyi`, `http://localhost:3000`
-   - Authorized redirect URIs (all seven):
+   - Authorized redirect URIs (all six):
      - `https://api.staging.greenroom.fyi/auth/google/callback`
      - `https://api.staging.greenroom.fyi/integrations/google/callback`
      - `https://api.greenroom.fyi/auth/google/callback`
      - `https://api.greenroom.fyi/integrations/google/callback`
      - `http://localhost:4000/auth/google/callback`
      - `http://localhost:4000/integrations/google/callback`
-     - `http://localhost:53682` (only for the calendar bot token script)
    - **Create**, then store the two values shown: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 6. Create the server key for Places: **APIs & Services > Credentials > Create credentials > API key**. Open it (**Edit API key**):
    - Name `Greenroom server (Places)`. Application restrictions: **None** (the server has no fixed IP). API restrictions: **Restrict key** > only **Places API (New)**. Save.
@@ -46,7 +45,7 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - Store it as `GOOGLE_PICKER_API_KEY`.
 8. Copy the project number: **IAM & Admin > Settings** > **Project number** (digits only, not the project ID). Store it as `GOOGLE_PROJECT_NUMBER`.
 
-Band calendars are owned by one bot Google account instead of a member. Create a plain Google account for it, then on a laptop run `GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... node apps/api/scripts/calendar-bot-token.ts`, sign in as the bot, and set the printed refresh token with `fly secrets set -a greenroom-staging-api CALENDAR_BOT_REFRESH_TOKEN=<token>`. The variable is optional: without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. Keychain name: `CALENDAR_BOT_REFRESH_TOKEN`.
+Band calendars are owned by a Google service account, not a member. Use `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` in the `greenroom-fyi` project and make sure the **Google Calendar API** is enabled there. Create a JSON key for the account (**IAM & Admin > Service accounts > Keys > Add key**), base64 it onto one line (`base64 -w0 key.json`), and stage it as the Fly secret `CALENDAR_SA_KEY` with `fly secrets set -a greenroom-staging-api CALENDAR_SA_KEY=<base64>`; delete the key file afterwards. The variable is optional: without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. Members receive the calendar as a share by email (no domain-wide delegation is needed). Keychain name: `CALENDAR_SA_KEY`.
 
 Keychain names: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER`.
 

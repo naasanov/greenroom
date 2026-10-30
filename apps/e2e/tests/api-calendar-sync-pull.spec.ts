@@ -5,10 +5,9 @@ import {
   practiceRsvps,
   practiceSeries,
 } from "@greenroom/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import {
-  AVA,
   BEN,
   connect,
   createGig,
@@ -19,7 +18,6 @@ import {
   newBand,
   nextTuesday,
   occurrence,
-  statusOf,
 } from "./calendar-sync-helpers.js";
 
 test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
@@ -44,8 +42,6 @@ test("remote gig edits and deletes reach the app without echoing back", async ({
     start: `${gig.date}T19:00:00.000Z`,
     end: `${gig.date}T22:00:00.000Z`,
   });
-  // Attendee answers on gigs are ignored.
-  await testApi.calendarAttendeeResponse(calendarId, g.id, BEN, "declined");
   const snapshot = await testApi.calendarEvents(calendarId);
   await testApi.calendarSync(bandId);
 
@@ -177,81 +173,6 @@ test("remote series edits, instance edits and cancels reach the app", async ({
   await testApi.calendarDelete(calendarId, m.id);
   await testApi.calendarSync(bandId);
   expect((await ava.api.get(base)).status()).toBe(404);
-});
-
-test("remote attendee answers become RSVPs", async ({ testApi, db }) => {
-  const { ava, bandId, join } = await newBand(testApi);
-  const ben = await join(BEN);
-  const start = nextTuesday(7);
-  const series = await createPractice(ava.api, bandId, start);
-  const sid = series.id as string;
-  const calendarId = await connect(ava.api, bandId);
-  const m = masterOf(await testApi.calendarEvents(calendarId), sid);
-  const rsvpOf = async (k: number) => {
-    const occ = await (
-      await ava.api.get(
-        `/bands/${bandId}/practices/${sid}/occurrences/${keyOf(occurrence(start, k))}`,
-      )
-    ).json();
-    return occ.attendees.find(
-      (a: { userId: string }) => a.userId === ben.user.id,
-    ).status;
-  };
-
-  // Instance-level answer first, then a series-level answer.
-  await testApi.calendarInstanceAttendeeResponse(
-    calendarId,
-    m.id,
-    iso(occurrence(start, 2)),
-    BEN,
-    "declined",
-  );
-  await testApi.calendarSync(bandId);
-  expect(await rsvpOf(2)).toBe("not_going");
-  expect(await rsvpOf(3)).toBe("no_response");
-
-  await testApi.calendarAttendeeResponse(calendarId, m.id, BEN, "accepted");
-  await testApi.calendarSync(bandId);
-  expect(await rsvpOf(0)).toBe("going");
-  expect(await rsvpOf(3)).toBe("going");
-  expect(await rsvpOf(2)).toBe("not_going");
-  const rows = await db
-    .select()
-    .from(practiceRsvps)
-    .where(
-      and(
-        eq(practiceRsvps.seriesId, sid),
-        eq(practiceRsvps.userId, ben.user.id),
-      ),
-    );
-  expect(rows.length).toBeGreaterThan(40);
-  expect(
-    rows.every((r) => r.originalStart.getTime() > Date.now() - 31 * 864e5),
-  ).toBe(true);
-  // Nobody else was touched.
-  expect(rows.some((r) => r.userId === (undefined as unknown))).toBe(false);
-
-  // Tentative on one occurrence from Google, then an app answer flows back out.
-  await testApi.calendarInstanceAttendeeResponse(
-    calendarId,
-    m.id,
-    iso(occurrence(start, 4)),
-    BEN,
-    "tentative",
-  );
-  await testApi.calendarSync(bandId);
-  expect(await rsvpOf(4)).toBe("maybe");
-  await ben.api.put(
-    `/bands/${bandId}/practices/${sid}/occurrences/${keyOf(occurrence(start, 4))}/rsvp`,
-    { data: { status: "not_going" } },
-  );
-  await testApi.calendarSync(bandId);
-  expect(await rsvpOf(4)).toBe("not_going");
-  const events = await testApi.calendarEvents(calendarId);
-  expect(statusOf(instanceOf(events, m.id, occurrence(start, 4))!, BEN)).toBe(
-    "declined",
-  );
-  expect(statusOf(masterOf(events, sid), AVA)).toBe("needsAction");
 });
 
 test("deletes beat concurrent edits and the later app write wins", async ({

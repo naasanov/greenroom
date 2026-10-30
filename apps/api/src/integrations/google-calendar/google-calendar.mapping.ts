@@ -1,7 +1,5 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type {
-  AttendeeResponse,
-  CalendarAttendee,
   CalendarEvent,
   CalendarEventInput,
 } from "./google-calendar.adapter.js";
@@ -38,13 +36,9 @@ function toGoogleTime(
   return { dateTime: value, date: null, ...(timeZone ? { timeZone } : {}) };
 }
 
-/**
- * Builds an events.insert/patch body from an input or patch. Attendees keep
- * the response status of emails already present in `existing`.
- */
+/** Builds an events.insert/patch body from an input or patch. */
 export function buildEventBody(
   input: Partial<CalendarEventInput> & { cancelled?: boolean },
-  existing: CalendarAttendee[] = [],
 ): calendar_v3.Schema$Event {
   const body: calendar_v3.Schema$Event = {};
   if (input.summary !== undefined) body.summary = input.summary;
@@ -57,14 +51,6 @@ export function buildEventBody(
     body.end = toGoogleTime(input.end, input.allDay, input.timeZone);
   }
   if (input.recurrence !== undefined) body.recurrence = input.recurrence;
-  if (input.attendeeEmails !== undefined) {
-    const responses = lowerKeys(input.attendeeResponses);
-    body.attendees = input.attendeeEmails.map((email) => {
-      const prior = existing.find((a) => a.email === email);
-      const status = responses[email.toLowerCase()] ?? prior?.responseStatus;
-      return status ? { email, responseStatus: status } : { email };
-    });
-  }
   if (input.privateProperties !== undefined) {
     body.extendedProperties = { private: input.privateProperties };
   }
@@ -73,21 +59,6 @@ export function buildEventBody(
   }
   return body;
 }
-
-function lowerKeys(
-  responses: Record<string, AttendeeResponse> | undefined,
-): Record<string, AttendeeResponse> {
-  return Object.fromEntries(
-    Object.entries(responses ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
-  );
-}
-
-const RESPONSES: readonly AttendeeResponse[] = [
-  "accepted",
-  "tentative",
-  "declined",
-  "needsAction",
-];
 
 /** Maps a Google Calendar event resource to CalendarEvent. */
 export function mapCalendarEvent(raw: calendar_v3.Schema$Event): CalendarEvent {
@@ -101,17 +72,6 @@ export function mapCalendarEvent(raw: calendar_v3.Schema$Event): CalendarEvent {
     start,
     end,
     recurrence: raw.recurrence ?? [],
-    attendees: (raw.attendees ?? []).flatMap((a) =>
-      a.email
-        ? [
-            {
-              email: a.email,
-              responseStatus:
-                RESPONSES.find((r) => r === a.responseStatus) ?? "needsAction",
-            },
-          ]
-        : [],
-    ),
     cancelled: raw.status === "cancelled",
     etag: raw.etag ?? "",
     updated: raw.updated ?? "",

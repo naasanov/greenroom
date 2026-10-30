@@ -1,22 +1,15 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
-import {
-  bands,
-  gigs,
-  memberships,
-  practiceSeries,
-  type Database,
-} from "@greenroom/db";
+import { bands, memberships, type Database } from "@greenroom/db";
 import { DRIZZLE } from "../db/db.constants.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { testingEnabled } from "../testing/testing.enabled.js";
 
 export const PUSH_QUEUE = "calendar-push";
 
-export type PushKind =
-  "gig" | "gig-att" | "series" | "series-att" | "occ" | "rsvp";
+export type PushKind = "gig" | "series" | "occ" | "acl";
 
-/** One pending app-to-Google reconcile. `occ` and `rsvp` also carry the occurrence start. */
+/** One pending app-to-Google reconcile. `occ` also carries the occurrence start; `acl` has the band id as `id`. */
 export interface PushJob {
   bandId: string;
   kind: PushKind;
@@ -68,56 +61,22 @@ export class CalendarSyncQueue {
     });
   }
 
-  rsvp(bandId: string, seriesId: string, original: Date): Promise<void> {
-    return this.add({
-      bandId,
-      kind: "rsvp",
-      id: seriesId,
-      startMs: original.getTime(),
-    });
+  /** Reconciles who the band calendar is shared with against the active members. */
+  async bandAcl(bandId: string): Promise<void> {
+    await this.add({ bandId, kind: "acl", id: bandId });
   }
 
-  /** Re-pushes the attendee list of every gig and series of the band. */
-  async bandAttendees(bandId: string): Promise<void> {
-    try {
-      if (!(await this.isSetUp(bandId))) return;
-      const [g, s] = await Promise.all([
-        this.db
-          .select({ id: gigs.id })
-          .from(gigs)
-          .where(and(eq(gigs.bandId, bandId), isNull(gigs.deletedAt))),
-        this.db
-          .select({ id: practiceSeries.id })
-          .from(practiceSeries)
-          .where(
-            and(
-              eq(practiceSeries.bandId, bandId),
-              isNull(practiceSeries.deletedAt),
-            ),
-          ),
-      ]);
-      await Promise.all([
-        ...g.map((r) => this.add({ bandId, kind: "gig-att", id: r.id }, true)),
-        ...s.map((r) =>
-          this.add({ bandId, kind: "series-att", id: r.id }, true),
-        ),
-      ]);
-    } catch (err) {
-      this.warn("bandAttendees", err);
-    }
-  }
-
-  /** Every set-up band the user is an active member of gets an attendee refresh. */
-  async userAttendees(userId: string): Promise<void> {
+  /** Every set-up band the user is an active member of gets an ACL reconcile. */
+  async userAcl(userId: string): Promise<void> {
     try {
       const rows = await this.db
         .select({ bandId: memberships.bandId })
         .from(memberships)
         .innerJoin(bands, eq(bands.id, memberships.bandId))
         .where(and(eq(memberships.userId, userId), isNull(memberships.leftAt)));
-      await Promise.all(rows.map((r) => this.bandAttendees(r.bandId)));
+      await Promise.all(rows.map((r) => this.bandAcl(r.bandId)));
     } catch (err) {
-      this.warn("userAttendees", err);
+      this.warn("userAcl", err);
     }
   }
 
@@ -150,8 +109,7 @@ export class CalendarSyncQueue {
   occurrenceDirty(seriesId: string, startMs: number): boolean {
     return (
       this.dirty.has(`series:${seriesId}`) ||
-      this.dirty.has(`occ:${seriesId}:${startMs}`) ||
-      this.dirty.has(`rsvp:${seriesId}:${startMs}`)
+      this.dirty.has(`occ:${seriesId}:${startMs}`)
     );
   }
 
@@ -165,16 +123,12 @@ export class CalendarSyncQueue {
     const key = jobKey(job);
     this.dirty.delete(key);
     this.processed.add(key);
-    // A full series or gig push covers the narrower pushes queued for it.
+    // A full series push covers the occurrence pushes queued for it.
     if (job.kind === "series") {
-      this.dirty.delete(`series-att:${job.id}`);
       for (const [k, j] of this.dirty) {
-        if ((j.kind === "occ" || j.kind === "rsvp") && j.id === job.id) {
-          this.dirty.delete(k);
-        }
+        if (j.kind === "occ" && j.id === job.id) this.dirty.delete(k);
       }
     }
-    if (job.kind === "gig") this.dirty.delete(`gig-att:${job.id}`);
   }
 
   /** Drops all in-memory state (test reset). */

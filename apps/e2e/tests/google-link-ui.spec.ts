@@ -1,5 +1,6 @@
 import type { BandSeedResult } from "@greenroom/db";
-import { USERS } from "@greenroom/db";
+import { bands, USERS } from "@greenroom/db";
+import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import { fakeGoogleConsent } from "./google-helpers.js";
 
@@ -25,6 +26,8 @@ test("calendar banner can be dismissed and stays dismissed", async ({
 
 test("sync calendar from the banner, then manage it in settings", async ({
   page,
+  db,
+  testApi,
 }) => {
   await page.goto("/events");
   await page
@@ -36,6 +39,21 @@ test("sync calendar from the banner, then manage it in settings", async ({
   await setup.getByRole("button", { name: "Done" }).click();
   await expect(page).toHaveURL(/\/events$/);
   await expect(page.getByTestId("calendar-banner")).toBeHidden();
+
+  // Members get the calendar shared as readers; events carry no attendees.
+  const [band] = await db
+    .select()
+    .from(bands)
+    .where(eq(bands.id, seed.bands.nightOwls.id));
+  const calendarId = band!.calendarId!;
+  const readers = (await testApi.calendarAcl(calendarId))
+    .filter((r) => r.role === "reader")
+    .map((r) => r.email);
+  expect(readers).toContain(USERS.ava.email);
+  expect(readers).toContain(USERS.ben.email);
+  for (const e of await testApi.calendarEvents(calendarId)) {
+    expect(e).not.toHaveProperty("attendees");
+  }
 
   await page.goto("/settings");
   const row = page.getByTestId("settings-google-calendar");

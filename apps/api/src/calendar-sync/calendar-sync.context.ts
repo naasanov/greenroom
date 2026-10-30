@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { bands, memberships, users, type Database } from "@greenroom/db";
 import { DRIZZLE } from "../db/db.constants.js";
 import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
-import { attendeeEmails, type SyncMember } from "./calendar-sync.mapping.js";
+import { shareEmails, type SyncMember } from "./calendar-sync.mapping.js";
 
 /** Everything a sync step needs about one linked, set-up band. */
 export interface BandSyncContext {
@@ -11,7 +11,7 @@ export interface BandSyncContext {
   calendarId: string;
   accessToken: string;
   members: SyncMember[];
-  /** Invite addresses of the active members, deduplicated. */
+  /** Addresses the calendar is shared with: active members, deduplicated. */
   emails: string[];
 }
 
@@ -37,7 +37,7 @@ export class SyncContextService {
       calendarId: band.calendarId,
       accessToken,
       members,
-      emails: attendeeEmails(members),
+      emails: shareEmails(members),
     };
   }
 

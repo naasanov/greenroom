@@ -1,11 +1,13 @@
 import { auth, calendar, type calendar_v3 } from "@googleapis/calendar";
 import type {
+  CalendarAclRule,
   CalendarChangesResult,
   CalendarDeleteResult,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
   CalendarEventResult,
+  CalendarShareResult,
   GoogleCalendarAdapter,
 } from "./google-calendar.adapter.js";
 import {
@@ -15,6 +17,12 @@ import {
 } from "./google-calendar.mapping.js";
 
 const PAGE_SIZE = 250;
+const ROLES: readonly CalendarAclRule["role"][] = [
+  "owner",
+  "writer",
+  "reader",
+  "freeBusyReader",
+];
 
 function httpStatus(err: unknown): number | undefined {
   const e = err as {
@@ -35,7 +43,7 @@ function calendarFor(accessToken: string): calendar_v3.Calendar {
   return calendar({ version: "v3", auth: client });
 }
 
-/** Talks to Calendar v3 with the caller's access token; every write notifies attendees. */
+/** Talks to Calendar v3 with the caller's access token; events have no attendees. */
 export class RealGoogleCalendarAdapter implements GoogleCalendarAdapter {
   async createCalendar(
     accessToken: string,
@@ -55,7 +63,6 @@ export class RealGoogleCalendarAdapter implements GoogleCalendarAdapter {
   ): Promise<CalendarEvent> {
     const res = await calendarFor(accessToken).events.insert({
       calendarId,
-      sendUpdates: "all",
       requestBody: buildEventBody(input),
     });
     return mapCalendarEvent(res.data);
@@ -80,7 +87,6 @@ export class RealGoogleCalendarAdapter implements GoogleCalendarAdapter {
       await calendarFor(accessToken).events.delete({
         calendarId,
         eventId,
-        sendUpdates: "all",
       });
       return { status: "ok" };
     } catch (err) {
@@ -140,6 +146,66 @@ export class RealGoogleCalendarAdapter implements GoogleCalendarAdapter {
     return { status: "ok", events: out, nextSyncToken };
   }
 
+  async shareCalendar(
+    accessToken: string,
+    calendarId: string,
+    email: string,
+  ): Promise<CalendarShareResult> {
+    try {
+      await calendarFor(accessToken).acl.insert({
+        calendarId,
+        sendNotifications: true,
+        requestBody: { role: "reader", scope: { type: "user", value: email } },
+      });
+      return { status: "shared" };
+    } catch (err) {
+      const s = httpStatus(err);
+      if (s === 409) return { status: "already-shared" };
+      // Addresses Google cannot resolve to an account are refused with a 4xx.
+      if (s === 400 || s === 404) return { status: "rejected" };
+      throw err;
+    }
+  }
+
+  async listAclRules(
+    accessToken: string,
+    calendarId: string,
+  ): Promise<CalendarAclRule[]> {
+    const cal = calendarFor(accessToken);
+    const out: CalendarAclRule[] = [];
+    let pageToken: string | undefined;
+    do {
+      const res: { data: calendar_v3.Schema$Acl } = await cal.acl.list({
+        calendarId,
+        maxResults: PAGE_SIZE,
+        pageToken,
+      });
+      for (const r of res.data.items ?? []) {
+        const role = ROLES.find((x) => x === r.role);
+        if (r.id && r.scope?.type === "user" && r.scope.value && role) {
+          out.push({ id: r.id, email: r.scope.value, role });
+        }
+      }
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
+    return out;
+  }
+
+  async deleteAclRule(
+    accessToken: string,
+    calendarId: string,
+    ruleId: string,
+  ): Promise<CalendarDeleteResult> {
+    try {
+      await calendarFor(accessToken).acl.delete({ calendarId, ruleId });
+      return { status: "ok" };
+    } catch (err) {
+      const s = httpStatus(err);
+      if (s === 404 || s === 410) return { status: "not-found" };
+      throw err;
+    }
+  }
+
   // ---- internals ----
 
   private async patch(
@@ -151,18 +217,11 @@ export class RealGoogleCalendarAdapter implements GoogleCalendarAdapter {
   ): Promise<CalendarEventResult> {
     const cal = calendarFor(accessToken);
     try {
-      // Attendee patches replace the list, so existing responses are carried over.
-      let existing: CalendarEvent["attendees"] = [];
-      if (patch.attendeeEmails !== undefined) {
-        const cur = await cal.events.get({ calendarId, eventId });
-        existing = mapCalendarEvent(cur.data).attendees;
-      }
       const res = await cal.events.patch(
         {
           calendarId,
           eventId,
-          sendUpdates: "all",
-          requestBody: buildEventBody(patch, existing),
+          requestBody: buildEventBody(patch),
         },
         ifMatchEtag ? { headers: { "If-Match": ifMatchEtag } } : undefined,
       );

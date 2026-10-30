@@ -138,11 +138,16 @@ export const instanceOf = (
       new Date(x.originalStart).getTime() === start.getTime(),
   );
 
-export const statusOf = (ev: FakeCalendarEvent, email: string) =>
-  ev.attendees.find((a) => a.email === email)?.responseStatus;
-
-export const emailsOf = (ev: FakeCalendarEvent): string[] =>
-  ev.attendees.map((a) => a.email).sort();
+/** Sorted emails of the reader rules on a fake calendar's ACL. */
+export async function readersOf(
+  testApi: TestApi,
+  calendarId: string,
+): Promise<string[]> {
+  return (await testApi.calendarAcl(calendarId))
+    .filter((r) => r.role === "reader")
+    .map((r) => r.email)
+    .sort();
+}
 
 /** Set up and return the calendar id for a band. */
 export async function connect(

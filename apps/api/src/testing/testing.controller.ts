@@ -26,7 +26,7 @@ import { CalendarSyncService } from "../calendar-sync/calendar-sync.service.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
   FakeIntegrationsRegistry,
-  type AttendeeResponse,
+  type CalendarAclRule,
   type CalendarEvent,
   type CalendarEventPatch,
   type SentMagicLink,
@@ -197,45 +197,20 @@ export class TestingController {
     return { ok: true };
   }
 
-  @Post("calendar/simulate/attendee-response")
+  /** Current ACL rules of a fake calendar, owner included. */
+  @Post("calendar/acl")
   @HttpCode(200)
-  calendarAttendeeResponse(
-    @Body()
-    b: {
-      calendarId: string;
-      eventId: string;
-      email: string;
-      responseStatus: AttendeeResponse;
-    },
-  ): { ok: true } {
-    this.registry.googleCalendar.simulateAttendeeResponse(
-      b.calendarId,
-      b.eventId,
-      b.email,
-      b.responseStatus,
-    );
-    return { ok: true };
+  calendarAcl(@Body() b: { calendarId: string }): CalendarAclRule[] {
+    return this.registry.googleCalendar.aclRules(b.calendarId);
   }
 
-  @Post("calendar/simulate/instance-attendee-response")
+  /** Simulates the owner sharing the calendar by hand in the Google UI. */
+  @Post("calendar/simulate/acl-rule")
   @HttpCode(200)
-  calendarInstanceAttendeeResponse(
-    @Body()
-    b: {
-      calendarId: string;
-      recurringEventId: string;
-      originalStart: string;
-      email: string;
-      responseStatus: AttendeeResponse;
-    },
-  ): { ok: true } {
-    this.registry.googleCalendar.simulateInstanceAttendeeResponse(
-      b.calendarId,
-      b.recurringEventId,
-      b.originalStart,
-      b.email,
-      b.responseStatus,
-    );
+  calendarSimulateAcl(@Body() b: { calendarId: string; email: string }): {
+    ok: true;
+  } {
+    this.registry.googleCalendar.simulateAclRule(b.calendarId, b.email);
     return { ok: true };
   }
 

@@ -33,7 +33,8 @@ export function CalendarBanner({ bandId }: { bandId: string }) {
         >
           <CalendarDays className="size-5 shrink-0 text-muted-foreground" />
           <p className="min-w-0 flex-1 text-sm">
-            Keep your Google Calendar in sync with gigs and practices.
+            Sync gigs and practices to a shared Google Calendar. Members get it
+            by email.
           </p>
           <Button size="sm" variant="outline" onClick={() => setSetup(true)}>
             Sync

@@ -16,6 +16,7 @@ import {
   type BandSyncContext,
 } from "./calendar-sync.context.js";
 import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
+import { CalendarAclService } from "./calendar-sync.acl.js";
 import { CalendarPullService } from "./calendar-sync.pull.js";
 import { CalendarPushService } from "./calendar-sync.push.js";
 import {
@@ -41,6 +42,7 @@ export class CalendarSyncService {
     private readonly queue: CalendarSyncQueue,
     private readonly push: CalendarPushService,
     private readonly pull: CalendarPullService,
+    private readonly acl: CalendarAclService,
   ) {}
 
   private locked<T>(fn: () => Promise<T>): Promise<T> {
@@ -52,8 +54,8 @@ export class CalendarSyncService {
   // ---- setup ----
 
   /**
-   * Creates the band's calendar when missing, takes a sync token, and pushes every
-   * gig and practice. Safe to call again: it reuses the calendar and updates events.
+   * Creates the band's calendar when missing, shares it with the active members,
+   * takes a sync token, and pushes every gig and practice. Safe to call again.
    */
   setup(bandId: string, timeZone: string): Promise<CalendarSetupResult> {
     return this.locked(async () => {
@@ -61,7 +63,7 @@ export class CalendarSyncService {
       if (!token) {
         throw new ConflictException({
           code: CALENDAR_SYNC_ERROR_CODES.botNotConfigured,
-          message: "The calendar bot account is not configured",
+          message: "The calendar service account is not configured",
         });
       }
       const [band] = await this.db
@@ -86,6 +88,7 @@ export class CalendarSyncService {
           .where(eq(calendarSyncStates.bandId, bandId));
       }
       const ctx = (await this.contexts.get(bandId))!;
+      await this.acl.reconcile(ctx);
 
       const [state] = await this.db
         .select()
@@ -150,7 +153,7 @@ export class CalendarSyncService {
       cache.set(job.bandId, await this.contexts.get(job.bandId));
     }
     const ctx = cache.get(job.bandId);
-    // A band without a calendar (or without a bot token) has nothing to push.
+    // A band without a calendar (or without a service account key) has nothing to push.
     if (ctx) await this.push.run(ctx, job);
     this.queue.done(job);
   }
