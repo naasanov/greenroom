@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import {
   createGigSchema,
@@ -14,6 +14,7 @@ import {
 import { FormField } from "@/components/app/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   EMPTY_PLACE,
@@ -45,6 +46,7 @@ const gigFormSchema = z
       z.string().trim().email("Enter a valid email address."),
     ]),
     notes: z.string().trim().max(10000),
+    showOnPublicCalendar: z.boolean(),
   })
   .superRefine((v, ctx) => {
     if (v.endTime && !v.startTime) {
@@ -86,6 +88,7 @@ function toPayload(v: GigFormValues, timeZone: string): CreateGig {
     contactPhone: orNull(v.contactPhone),
     contactEmail: orNull(v.contactEmail),
     notes: orNull(v.notes),
+    showOnPublicCalendar: v.showOnPublicCalendar,
   });
 }
 
@@ -109,6 +112,7 @@ function defaultsFor(gig: Gig | undefined, date: string): GigFormValues {
     contactPhone: gig?.contactPhone ?? "",
     contactEmail: gig?.contactEmail ?? "",
     notes: gig?.notes ?? "",
+    showOnPublicCalendar: gig?.showOnPublicCalendar ?? true,
   };
 }
 
@@ -273,6 +277,28 @@ export function GigForm({
           {...form.register("notes")}
         />
       </FormField>
+
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <label htmlFor={id("public")} className="text-sm font-medium">
+            Show on public calendar
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Turn off for tentative or private gigs.
+          </p>
+        </div>
+        <Controller
+          control={form.control}
+          name="showOnPublicCalendar"
+          render={({ field }) => (
+            <Switch
+              id={id("public")}
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          )}
+        />
+      </div>
 
       <FormActions error={serverError}>
         {onCancel ? (

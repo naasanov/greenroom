@@ -8,6 +8,7 @@ import type { BandDetail, BandSummary } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
 import { GoogleSettings } from "@/components/google/google-settings";
 import { BandPhotoRow } from "@/components/settings/band-photo-row";
+import { PublicCalendarRow } from "@/components/settings/public-calendar-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,6 +222,7 @@ export function BandSection({ band }: { band: BandSummary }) {
           Loading...
         </p>
       )}
+      <PublicCalendarRow bandId={band.id} />
       <GoogleSettings bandId={band.id} />
     </SectionCard>
   );

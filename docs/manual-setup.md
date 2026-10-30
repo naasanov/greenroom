@@ -91,6 +91,18 @@ Error reporting for the web app and the API.
 
 Keychain names: `SENTRY_DSN_WEB`, `SENTRY_DSN_API`, `SENTRY_AUTH_TOKEN`.
 
+## GitHub feedback token
+The in-app feedback widget opens GitHub issues from the server, so the API needs a token.
+
+1. On GitHub: **Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new token**.
+2. Name `greenroom-feedback`, expiration as long as allowed, **Resource owner** `naasanov`, **Only select repositories** > `greenroom`.
+3. **Repository permissions**: **Issues** > **Read and write**. Nothing else. Generate and copy the token.
+4. Store it as `GITHUB_FEEDBACK_TOKEN` and stage it as a Fly secret on each API app (`fly secrets set -a greenroom-staging-api GITHUB_FEEDBACK_TOKEN=<token>`). Optionally set `GITHUB_FEEDBACK_REPO` (default `naasanov/greenroom`). Never paste the token into chat or logs.
+
+Without the token, real mode answers `503 FEEDBACK_NOT_CONFIGURED`; fake mode needs nothing.
+
+Keychain name: `GITHUB_FEEDBACK_TOKEN`.
+
 ## Secrets
 Done by following "How to hand over secrets" above for each item. Mark this done once every Keychain name listed in the other items is stored and the orchestrator has confirmed it loaded them.
 

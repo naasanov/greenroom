@@ -29,6 +29,7 @@ import {
   type CalendarAclRule,
   type CalendarEvent,
   type CalendarEventPatch,
+  type FakeIssue,
   type SentMagicLink,
 } from "../integrations/index.js";
 
@@ -72,6 +73,12 @@ export class TestingController {
   magicLinks(@Query("to") to?: string): { links: SentMagicLink[] } {
     const all = this.registry.email.sentMagicLinks();
     return { links: to ? all.filter((l) => l.to === to) : all };
+  }
+
+  /** Issues the GitHub fake received, in creation order. */
+  @Get("github/issues")
+  githubIssues(): FakeIssue[] {
+    return this.registry.github.createdIssues();
   }
 
   /** Creates the user if needed plus a session, and returns the raw cookie. */

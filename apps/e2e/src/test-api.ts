@@ -99,6 +99,19 @@ export class TestApi {
     return this.call("post", "login", { data: { email } });
   }
 
+  /** Issues the GitHub fake received, in creation order. */
+  async githubIssues(): Promise<
+    {
+      number: number;
+      url: string;
+      title: string;
+      body: string;
+      labels: string[];
+    }[]
+  > {
+    return this.call("get", "github/issues");
+  }
+
   /** Makes the Spotify fake reject every issued refresh token. */
   async revokeSpotifyRefreshTokens(): Promise<void> {
     await this.call("post", "spotify/revoke-refresh-tokens");

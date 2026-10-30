@@ -9,3 +9,5 @@ export * from "./links.js";
 export * from "./google.js";
 export * from "./media.js";
 export * from "./calendar-sync.js";
+export * from "./feedback.js";
+export * from "./public-calendar.js";

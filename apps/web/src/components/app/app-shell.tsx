@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BandSwitcher, type BandSummary } from "@/components/app/band-switcher";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Placement, ShellLayout } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
@@ -267,6 +268,7 @@ export function AppShell({
             className="ml-3"
           />
           <div className="flex-1" />
+          <FeedbackWidget bandId={activeBandId} />
           <ProfileButton {...profile} onClick={onProfileClick} />
         </div>
       </header>

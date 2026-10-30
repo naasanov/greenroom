@@ -167,6 +167,12 @@ function GigDetails({
       </section>
       <div data-testid="gig-sections" className="flex flex-col gap-6">
         <SetlistSection builder={setlist} />
+        {setlist.setlist?.items.length ? (
+          <Button asChild variant="outline">
+            {/* A full page load lets the service worker cache the stage route. */}
+            <a href={`/gigs/${gig.id}/stage`}>Stage mode</a>
+          </Button>
+        ) : null}
         <LineupSection builder={lineup} />
         <MediaSection bandId={bandId} gigId={gig.id} />
         <UploadLinkButton bandId={bandId} gigId={gig.id} />

@@ -83,9 +83,9 @@ Parallel group 5A
 
 # Phase 7: Remaining features
 Parallel group 7A
-- **7.1 Stage mode + offline.** Dark full-screen view, tap to advance, swipe back, wake lock, service worker caching upcoming setlists. Status: Not started
-- **7.2 Public gig calendar.** Public fields only, per-gig toggle, list/calendar views, band profile header. Status: Not started
-- **7.3 Feedback widget.** Posts to backend, which opens GitHub issues. Status: Not started
+- **7.1 Stage mode + offline.** Dark full-screen view, tap to advance, swipe back, wake lock, service worker caching upcoming setlists. Status: Done (stage route at /gigs/:id/stage outside the auth gate so it opens offline; service worker public/sw.js caches hashed build assets and stage pages; upcoming setlists and song notes cached in localStorage while online; verified by e2e stage-mode.spec.ts on desktop)
+- **7.2 Public gig calendar.** Public fields only, per-gig toggle, list/calendar views, band profile header. Status: Done (no migration needed, columns pre-existed; admin link in Settings, public page at /c/<token>, GET /public/calendar/:token)
+- **7.3 Feedback widget.** Posts to backend, which opens GitHub issues. Status: Done (POST /feedback with GitHub adapter and fake, header widget, e2e specs; needs `GITHUB_FEEDBACK_TOKEN` in real mode)
 
 🛑 **GATE 5: Stage mode + public page review.** Status: Not started
 
