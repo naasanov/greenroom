@@ -1,7 +1,7 @@
 "use client";
 
 import { Folder, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,12 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
+import { useBands } from "@/lib/queries";
 import {
   fetchPickerConfig,
+  useCreateDriveFolder,
   useFakePicker,
   useSetDriveFolder,
 } from "@/lib/queries/google";
+import type { GooglePickerConfig } from "@greenroom/shared";
 
 // Minimal typings for the parts of the Google Picker this app uses.
 interface PickerDoc {
@@ -40,8 +44,9 @@ interface PickerNamespace {
     setSelectFolderEnabled(v: boolean): unknown;
     setIncludeFolders(v: boolean): unknown;
     setMimeTypes(types: string): unknown;
+    setParent(id: string): unknown;
   };
-  ViewId: { FOLDERS: unknown };
+  ViewId: { DOCS: unknown };
   Action: { PICKED: string; CANCEL: string };
 }
 declare global {
@@ -90,7 +95,13 @@ export function DriveFolderPicker({
   onOpenChange: (open: boolean) => void;
 }) {
   const setFolder = useSetDriveFolder(bandId);
-  const [mode, setMode] = useState<"loading" | "fake" | "error">("loading");
+  const createFolder = useCreateDriveFolder(bandId);
+  const bands = useBands();
+  const bandName = bands.data?.find((b) => b.id === bandId)?.name ?? "";
+  const [mode, setMode] = useState<"loading" | "fake" | "real" | "error">(
+    "loading",
+  );
+  const [config, setConfig] = useState<GooglePickerConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { mutate } = setFolder;
   const closeRef = useRef(onOpenChange);
@@ -105,35 +116,10 @@ export function DriveFolderPicker({
     setMode("loading");
     setError(null);
     fetchPickerConfig(bandId)
-      .then(async (config) => {
+      .then((c) => {
         if (cancelled) return;
-        if (config.fake) return setMode("fake");
-        const picker = await loadPickerLib();
-        if (cancelled) return;
-        const view = new picker.DocsView(picker.ViewId.FOLDERS);
-        view.setSelectFolderEnabled(true);
-        view.setIncludeFolders(true);
-        view.setMimeTypes("application/vnd.google-apps.folder");
-        const builder = new picker.PickerBuilder()
-          .addView(view)
-          .setOAuthToken(config.accessToken)
-          .setTitle("Choose your band's folder")
-          .setCallback((r) => {
-            if (r.action === picker.Action.PICKED && r.docs?.[0]) {
-              mutate(r.docs[0].id, {
-                onSuccess: () => closeRef.current(false),
-                onError: (e) => {
-                  setError(errorText(e));
-                  setMode("error");
-                },
-              });
-            } else if (r.action === picker.Action.CANCEL) {
-              closeRef.current(false);
-            }
-          });
-        if (config.developerKey) builder.setDeveloperKey(config.developerKey);
-        if (config.appId) builder.setAppId(config.appId);
-        builder.build().setVisible(true);
+        setConfig(c);
+        setMode(c.fake ? "fake" : "real");
       })
       .catch(() => {
         if (cancelled) return;
@@ -143,7 +129,46 @@ export function DriveFolderPicker({
     return () => {
       cancelled = true;
     };
-  }, [open, bandId, mutate]);
+  }, [open, bandId]);
+
+  async function openPicker() {
+    if (!config) return;
+    setError(null);
+    try {
+      const picker = await loadPickerLib();
+      // DOCS rooted at My Drive lets the user click into folders like normal Drive.
+      const view = new picker.DocsView(picker.ViewId.DOCS);
+      view.setParent("root");
+      view.setIncludeFolders(true);
+      view.setSelectFolderEnabled(true);
+      view.setMimeTypes("application/vnd.google-apps.folder");
+      const builder = new picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(config.accessToken)
+        .setTitle("Choose your band's folder")
+        .setCallback((r) => {
+          if (r.action === picker.Action.PICKED && r.docs?.[0]) {
+            mutate(r.docs[0].id, {
+              onSuccess: () => closeRef.current(false),
+              onError: (e) => setError(errorText(e)),
+            });
+          }
+        });
+      if (config.developerKey) builder.setDeveloperKey(config.developerKey);
+      if (config.appId) builder.setAppId(config.appId);
+      builder.build().setVisible(true);
+    } catch {
+      setError("We could not open Google Drive. Please try again.");
+    }
+  }
+
+  function create(name: string) {
+    setError(null);
+    createFolder.mutate(name, {
+      onSuccess: () => onOpenChange(false),
+      onError: () => setError("We could not create that folder. Try again."),
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,8 +189,10 @@ export function DriveFolderPicker({
         {mode === "fake" ? (
           <FakeFolderList
             bandId={bandId}
-            pending={setFolder.isPending}
+            pending={setFolder.isPending || createFolder.isPending}
             error={error}
+            defaultName={bandName}
+            onCreate={create}
             onPick={(id) => {
               setError(null);
               mutate(id, {
@@ -174,6 +201,23 @@ export function DriveFolderPicker({
               });
             }}
           />
+        ) : mode === "real" ? (
+          <div className="flex flex-col gap-3">
+            <Button variant="outline" onClick={() => void openPicker()}>
+              <Folder />
+              Choose from Google Drive
+            </Button>
+            <NewFolderForm
+              defaultName={bandName}
+              pending={setFolder.isPending || createFolder.isPending}
+              onCreate={create}
+            />
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </div>
         ) : mode === "error" ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -192,16 +236,60 @@ export function DriveFolderPicker({
   );
 }
 
+/** Name input and Create button; the folder is made in My Drive root. */
+function NewFolderForm({
+  defaultName,
+  pending,
+  onCreate,
+}: {
+  defaultName: string;
+  pending: boolean;
+  onCreate: (name: string) => void;
+}) {
+  const [edited, setEdited] = useState<string | null>(null);
+  const name = edited ?? defaultName;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) onCreate(name.trim());
+  };
+  return (
+    <form
+      onSubmit={submit}
+      data-testid="drive-new-folder"
+      className="flex flex-col gap-2"
+    >
+      <label htmlFor="drive-new-folder-name" className="text-sm font-medium">
+        New folder
+      </label>
+      <div className="flex gap-2">
+        <Input
+          id="drive-new-folder-name"
+          value={name}
+          maxLength={200}
+          onChange={(e) => setEdited(e.target.value)}
+        />
+        <Button type="submit" disabled={pending || !name.trim()}>
+          Create
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function FakeFolderList({
   bandId,
   pending,
   error,
+  defaultName,
   onPick,
+  onCreate,
 }: {
   bandId: string;
   pending: boolean;
   error: string | null;
+  defaultName: string;
   onPick: (id: string) => void;
+  onCreate: (name: string) => void;
 }) {
   const folders = useFakePicker(bandId, true);
   return (
@@ -229,6 +317,11 @@ function FakeFolderList({
       ) : (
         <p className="text-sm text-muted-foreground">No folders found.</p>
       )}
+      <NewFolderForm
+        defaultName={defaultName}
+        pending={pending}
+        onCreate={onCreate}
+      />
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

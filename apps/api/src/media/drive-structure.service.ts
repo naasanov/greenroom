@@ -82,16 +82,38 @@ export class DriveStructureService {
       band.driveGigsFolderId &&
       band.drivePhotosFolderId
     );
+    let folderName: string | null = null;
+    if (link && band.driveRootFolderId) {
+      const token = await this.links.getAccessToken(bandId, "drive");
+      const found = token
+        ? await this.drive
+            .getFile(token, band.driveRootFolderId)
+            .catch(() => null)
+        : null;
+      if (found?.status === "ok") folderName = found.file.name;
+    }
     return {
       linked: !!link,
       folderSet: !!link && folderSet,
       folderId: band.driveRootFolderId,
+      folderName,
       folderUrl: band.driveRootFolderId
         ? driveFolderUrl(band.driveRootFolderId)
         : null,
       gigsFolderId: band.driveGigsFolderId,
       photosFolderId: band.drivePhotosFolderId,
     };
+  }
+
+  /** Creates a folder in My Drive root and makes it the band's folder. */
+  async createRootFolder(bandId: string, name: string): Promise<DriveStatus> {
+    const token = await this.links.getAccessToken(bandId, "drive");
+    if (!token) throw new ConflictException(NOT_LINKED);
+    const folder = await this.drive.createFolder(token, {
+      name,
+      parentId: "root",
+    });
+    return this.setRootFolder(bandId, folder.id);
   }
 
   /** Points the band at a chosen folder and builds or reuses its structure folders. */

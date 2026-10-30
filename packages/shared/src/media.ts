@@ -13,6 +13,8 @@ export const driveStatusSchema = z.object({
   /** True once a folder has been chosen and the Gigs / Profile photos folders exist. */
   folderSet: z.boolean(),
   folderId: z.string().nullable(),
+  /** Current Drive name of the chosen folder, null when unset or unreadable. */
+  folderName: z.string().nullable(),
   folderUrl: z.string().nullable(),
   gigsFolderId: z.string().nullable(),
   photosFolderId: z.string().nullable(),
@@ -23,6 +25,11 @@ export const setDriveFolderSchema = z.object({
   folderId: z.string().trim().min(1).max(200),
 });
 export type SetDriveFolder = z.infer<typeof setDriveFolderSchema>;
+
+export const createDriveFolderSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
+export type CreateDriveFolder = z.infer<typeof createDriveFolderSchema>;
 
 export const fakePickerFolderSchema = z.object({
   id: z.string(),

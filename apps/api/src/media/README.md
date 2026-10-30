@@ -14,8 +14,9 @@ All need a session and band membership (non-members 404) unless noted. Drive not
 
 | Route | Notes |
 | --- | --- |
-| `GET /bands/:id/integrations/google/drive/status` | `DriveStatus`. |
+| `GET /bands/:id/integrations/google/drive/status` | `DriveStatus`. `folderName` is read live from Drive (null when unset or unreadable), so Drive-side renames show up. |
 | `POST /bands/:id/integrations/google/drive/folder` `{ folderId }` | Any member. 422 `DRIVE_NOT_A_FOLDER` for a missing, trashed, or non-folder id. Reuses `Gigs` / `Profile photos` children by name else creates them; starts the changes cursor on a fresh link. Picking another folder only replaces the pointers: existing gig folders and files stay where they are, and gigs keep their `drive_folder_id`. Returns `DriveStatus`. |
+| `POST /bands/:id/integrations/google/drive/folders` `{ name }` | Any member. Creates a folder named `name` (1 to 200 chars) in My Drive root through the Drive adapter, then sets it as the band folder exactly like `POST .../drive/folder`. 409 `GOOGLE_NOT_LINKED`. Returns `DriveStatus`. |
 | `GET .../drive/fake-picker` | Fake mode only (404 otherwise). `{ folders: [{ id, name }] }`; seeds "Band stuff" and "Greenroom demo" when the fake Drive is empty. |
 | `GET /bands/:id/gigs/:gigId/media` | `GigMedia`. Unlinked: `driveLinked: false`, empty lists. |
 | `POST /bands/:id/gigs/:gigId/media/folders` `{ name }` | Creates the Drive subfolder (and the gig folder if needed). Returns `MediaFolder`. |

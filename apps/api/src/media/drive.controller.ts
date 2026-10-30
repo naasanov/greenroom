@@ -8,7 +8,9 @@ import {
   Post,
 } from "@nestjs/common";
 import {
+  createDriveFolderSchema,
   setDriveFolderSchema,
+  type CreateDriveFolder,
   type DriveStatus,
   type FakePicker,
   type SetDriveFolder,
@@ -44,6 +46,15 @@ export class DriveController {
     @Body(new ZodPipe(setDriveFolderSchema)) body: SetDriveFolder,
   ): Promise<DriveStatus> {
     return this.structure.setRootFolder(bandId, body.folderId);
+  }
+
+  @Post("folders")
+  @HttpCode(200)
+  createFolder(
+    @Param("bandId") bandId: string,
+    @Body(new ZodPipe(createDriveFolderSchema)) body: CreateDriveFolder,
+  ): Promise<DriveStatus> {
+    return this.structure.createRootFolder(bandId, body.name);
   }
 
   // Stand-in for the Google Picker when integrations are faked (staging, e2e).

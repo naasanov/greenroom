@@ -122,3 +122,19 @@ export function useSetDriveFolder(bandId: string) {
     },
   });
 }
+
+export function useCreateDriveFolder(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      api(`${base(bandId)}/drive/folders`, {
+        method: "POST",
+        body: { name },
+        schema: driveStatusSchema,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: googleKeys.all(bandId) });
+      void qc.invalidateQueries({ queryKey: googleKeys.media(bandId) });
+    },
+  });
+}

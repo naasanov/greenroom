@@ -78,6 +78,28 @@ test("non-admins do not see band settings", async ({
   await expect(page.getByTestId("settings-google")).toHaveCount(0);
 });
 
+test("create a new Drive folder named after the band and see its name in settings", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await fakeGoogleConsent(page);
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = page.getByRole("dialog", { name: gig.title });
+  await drawer.getByRole("button", { name: "Link Google Drive" }).click();
+
+  const picker = page.getByTestId("drive-picker");
+  const input = picker.getByLabel("New folder");
+  await expect(input).toHaveValue("The Night Owls");
+  await input.fill("Gig photos");
+  await picker.getByRole("button", { name: "Create" }).click();
+  await expect(picker).toBeHidden();
+
+  await page.goto("/settings");
+  await expect(page.getByTestId("settings-google-drive-detail")).toHaveText(
+    "Folder: Gig photos",
+  );
+});
+
 test("link Drive from a gig drawer, pick a folder, manage it in settings", async ({
   page,
 }) => {
@@ -107,7 +129,7 @@ test("link Drive from a gig drawer, pick a folder, manage it in settings", async
   const status = page.getByTestId("settings-google-drive-status");
   await expect(status).toHaveText("Linked as band@example.com");
   await expect(page.getByTestId("settings-google-drive-detail")).toHaveText(
-    "Folder set",
+    "Folder: Band stuff",
   );
   await expect(page.getByRole("link", { name: "Open in Drive" })).toBeVisible();
 

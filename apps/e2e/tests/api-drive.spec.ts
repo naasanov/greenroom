@@ -82,6 +82,7 @@ test("folder setup: validation, fake picker, structure, reuse, replace", async (
     linked: true,
     folderSet: true,
     folderId: stuff.id,
+    folderName: "Band stuff",
     gigsFolderId: existingGigs.id,
   });
   const photos = (await fake.files()).find((f) => f.name === "Profile photos");
@@ -108,12 +109,32 @@ test("folder setup: validation, fake picker, structure, reuse, replace", async (
   expect(swapped.gigsFolderId).not.toBe(existingGigs.id);
   expect(swapped.folderId).toBe(demo.id);
   expect(await db.select().from(driveSyncCursors)).toHaveLength(1);
+
+  // Creating a new folder puts it in My Drive root and selects it.
+  expect((await ava.post(`${DRIVE}/folders`, { data: {} })).status()).toBe(400);
+  expect(
+    (await ava.post(`${DRIVE}/folders`, { data: { name: "  " } })).status(),
+  ).toBe(400);
+  const created = await ava.post(`${DRIVE}/folders`, {
+    data: { name: "Fresh folder" },
+  });
+  expect(created.status()).toBe(200);
+  const fresh = await created.json();
+  expect(fresh).toMatchObject({ folderSet: true, folderName: "Fresh folder" });
+  const made = (await fake.files()).find((f) => f.id === fresh.folderId);
+  expect(made).toMatchObject({ name: "Fresh folder", parentId: "root" });
+  expect(
+    (await fake.files()).find((f) => f.id === fresh.gigsFolderId)?.parentId,
+  ).toBe(fresh.folderId);
 });
 
 test("non-members get 404 on drive routes", async ({ testApi }) => {
   await testApi.seed("band");
   const outsider = await clientFor(testApi, "outsider@example.com");
   expect((await outsider.get(`${DRIVE}/status`)).status()).toBe(404);
+  expect(
+    (await outsider.post(`${DRIVE}/folders`, { data: { name: "x" } })).status(),
+  ).toBe(404);
   expect(
     (
       await outsider.post(`${DRIVE}/folder`, { data: { folderId: "x" } })

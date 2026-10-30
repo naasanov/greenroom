@@ -83,7 +83,9 @@ function DriveRow({ bandId }: { bandId: string }) {
       detail={
         drive?.linked
           ? folderSet
-            ? "Folder set"
+            ? status.data?.folderName
+              ? `Folder: ${status.data.folderName}`
+              : "Folder set"
             : "No folder chosen yet"
           : null
       }
