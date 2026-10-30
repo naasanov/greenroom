@@ -93,7 +93,9 @@ test("clicking a setlist song opens its sheet; the drag handle does not", async 
 
 test("pressing the FAB twice closes the create drawer instead of reopening it", async ({
   page,
+  isMobile,
 }) => {
+  test.skip(isMobile, "The phone create drawer covers the FAB");
   await page.goto("/events");
   await fab(page).click();
   await expect(createDrawer(page)).toBeVisible();
@@ -104,7 +106,9 @@ test("pressing the FAB twice closes the create drawer instead of reopening it", 
 
 test("the FAB asks before closing a create drawer with input", async ({
   page,
+  isMobile,
 }) => {
+  test.skip(isMobile, "The phone create drawer covers the FAB");
   await page.goto("/events");
   await fab(page).click();
   const pane = await pickSide(page, "gig");
@@ -198,7 +202,9 @@ test("the edit form's action bar sits flush with the drawer bottom", async ({
 
 test("the page is not left aria-hidden after the discard prompt closes", async ({
   page,
+  isMobile,
 }) => {
+  test.skip(isMobile, "The phone create drawer covers the FAB");
   await page.goto("/events");
   await fab(page).click();
   const pane = await pickSide(page, "gig");

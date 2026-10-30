@@ -200,10 +200,25 @@ test("copy to clipboard puts Title - Artist lines on the clipboard", async ({
   testApi,
   loginAs,
   context,
+  browserName,
 }) => {
   const seed = await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const stubbed = browserName !== "chromium";
+  if (stubbed) {
+    // Only chromium supports clipboard permissions; elsewhere capture writeText.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (t: string) => {
+            (window as unknown as { __copied: string }).__copied = t;
+          },
+        },
+      });
+    });
+  } else {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  }
   const gig = seed.gigs.upcomingClub;
   const bandId = seed.bands.nightOwls.id;
   const api = await apiAs(testApi, USERS.ava.email);
@@ -223,7 +238,13 @@ test("copy to clipboard puts Title - Artist lines on the clipboard", async ({
   await expect(copy).toBeEnabled();
   await copy.click();
   await expect(copy).toHaveText("Copied");
-  const text = await page.evaluate(() => navigator.clipboard.readText());
+  const text = await page.evaluate(
+    (useStub) =>
+      useStub
+        ? (window as unknown as { __copied: string }).__copied
+        : navigator.clipboard.readText(),
+    stubbed,
+  );
   const lines = text.split("\n");
   expect(lines).toHaveLength(2);
   expect(lines[0]).toBe("Skyline Drive - The Meridians");

@@ -189,5 +189,8 @@ test("a month chip shows its time range under the title", async ({ page }) => {
   await expect(chip.getByTestId("chip-details")).toContainText("8:00 PM");
   const head = (await chip.locator(".gr-chip-head").boundingBox())!;
   const box = (await chip.boundingBox())!;
-  expect(head.y - box.y).toBeLessThan(8);
+  const details = (await chip.getByTestId("chip-details").boundingBox())!;
+  // The title row sits near the chip top (phone chips pad more) and the range below it.
+  expect(head.y - box.y).toBeLessThan(16);
+  expect(details.y).toBeGreaterThanOrEqual(head.y);
 });
