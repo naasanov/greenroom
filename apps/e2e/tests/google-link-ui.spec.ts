@@ -147,7 +147,7 @@ test("link Drive from a gig drawer, pick a folder, manage it in settings", async
   await picker.getByRole("button", { name: "Band stuff" }).click();
   await expect(picker).toBeHidden();
   await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}$`));
-  await expect(drawer.getByTestId("media-empty")).toHaveText("No media yet");
+  await expect(drawer.getByTestId("media-add")).toHaveText("Add media");
 
   await page.goto("/settings");
   const status = page.getByTestId("settings-google-drive-status");

@@ -363,14 +363,14 @@ function HistoryView({ builder }: { builder: SetlistBuilder }) {
 function useEntered(active: boolean): boolean {
   const [entered, setEntered] = useState(false);
   useEffect(() => {
-    if (!active) {
-      setEntered(false);
-      return;
-    }
+    if (!active) return;
     const id = requestAnimationFrame(() =>
       requestAnimationFrame(() => setEntered(true)),
     );
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(id);
+      setEntered(false);
+    };
   }, [active]);
   return entered && active;
 }
