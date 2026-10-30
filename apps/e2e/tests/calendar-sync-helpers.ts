@@ -39,25 +39,6 @@ export async function newBand(testApi: TestApi) {
   return { ava, bandId, join };
 }
 
-/** Runs the fake Google link flow for the calendar service. */
-export async function linkCalendar(
-  api: APIRequestContext,
-  bandId: string,
-  account = "cal@example.com",
-): Promise<void> {
-  const start = await api.get(
-    `/bands/${bandId}/integrations/google/calendar/start`,
-    { params: { redirectTo: "/band/events" }, maxRedirects: 0 },
-  );
-  expect(start.status()).toBe(302);
-  const state = new URL(start.headers()["location"]!).searchParams.get("state");
-  const cb = await api.get("/integrations/google/callback", {
-    params: { code: `fake-code:${account}`, state: state! },
-    maxRedirects: 0,
-  });
-  expect(cb.headers()["location"]).toContain("google=connected");
-}
-
 export async function setupCalendar(
   api: APIRequestContext,
   bandId: string,
@@ -163,12 +144,10 @@ export const statusOf = (ev: FakeCalendarEvent, email: string) =>
 export const emailsOf = (ev: FakeCalendarEvent): string[] =>
   ev.attendees.map((a) => a.email).sort();
 
-/** Link, set up and return the calendar id for a band. */
+/** Set up and return the calendar id for a band. */
 export async function connect(
   api: APIRequestContext,
   bandId: string,
-  account?: string,
 ): Promise<string> {
-  await linkCalendar(api, bandId, account);
   return (await setupCalendar(api, bandId))["calendarId"] as string;
 }

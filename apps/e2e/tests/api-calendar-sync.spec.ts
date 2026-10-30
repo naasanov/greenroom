@@ -18,7 +18,6 @@ import {
   emailsOf,
   instanceOf,
   keyOf,
-  linkCalendar,
   masterOf,
   newBand,
   nextTuesday,
@@ -72,18 +71,11 @@ test("setup creates one calendar and pushes gigs and practices with attendees", 
     { params: { scope: "this" } },
   );
 
-  // Nothing is pushed before the band links Calendar.
+  // Nothing is pushed before setup, and any member can run it without a Google link.
   expect(
     (await (await ava.api.get(sync(bandId, "/sync"))).json()).pending,
   ).toBe(0);
-  const unlinked = await ava.api.post(sync(bandId, "/setup"), {
-    data: { timeZone: "UTC" },
-  });
-  expect(unlinked.status()).toBe(409);
-  expect((await unlinked.json()).code).toBe("GOOGLE_NOT_LINKED");
-
-  await linkCalendar(ava.api, bandId);
-  const result = await setupCalendar(ava.api, bandId);
+  const result = await setupCalendar(ben.api, bandId);
   const calendarId = result.calendarId as string;
   expect(result).toMatchObject({ gigs: 2, practiceSeries: 1 });
   expect(result.lastSyncedAt).not.toBeNull();
@@ -361,7 +353,7 @@ test("membership and calendar email changes update attendees", async ({
   expect(members).toHaveLength(2);
 });
 
-test("unlinked bands push nothing; unlink clears ids; relink starts fresh", async ({
+test("bands without a calendar push nothing; disconnect clears ids; setup again starts fresh", async ({
   testApi,
   db,
 }) => {
@@ -375,8 +367,7 @@ test("unlinked bands push nothing; unlink clears ids; relink starts fresh", asyn
     { params: { scope: "this" } },
   );
 
-  // Linked but not set up: still nothing to push.
-  await linkCalendar(ava.api, bandId);
+  // Not set up: nothing to push.
   await ava.api.patch(`/bands/${bandId}/gigs/${gig.id}`, {
     data: { title: "Edited" },
   });
@@ -390,7 +381,7 @@ test("unlinked bands push nothing; unlink clears ids; relink starts fresh", asyn
   const events = await testApi.calendarEvents(calendarId);
   expect(masterOf(events, gig.id).summary).toBe("Edited");
 
-  // Unlink: ids, etags and sync state are cleared; the Google calendar stays.
+  // Disconnect: ids, etags and sync state are cleared; the Google calendar stays.
   const del = await ava.api.delete(
     `/bands/${bandId}/integrations/google/calendar`,
   );
@@ -410,7 +401,7 @@ test("unlinked bands push nothing; unlink clears ids; relink starts fresh", asyn
   expect(band!.calendarId).toBeNull();
   expect(await testApi.calendarEvents(calendarId)).toHaveLength(events.length);
 
-  // Changes while unlinked are not pushed anywhere.
+  // Changes while disconnected are not pushed anywhere.
   await ava.api.patch(`/bands/${bandId}/gigs/${gig.id}`, {
     data: { title: "While unlinked" },
   });
@@ -421,8 +412,8 @@ test("unlinked bands push nothing; unlink clears ids; relink starts fresh", asyn
   await testApi.calendarFlush();
   expect(await testApi.calendarEvents(calendarId)).toHaveLength(events.length);
 
-  // Relinking runs setup fresh: a new calendar with every event.
-  const second = await connect(ava.api, bandId, "other@example.com");
+  // Setting up again runs fresh: a new calendar with every event.
+  const second = await connect(ava.api, bandId);
   expect(second).not.toBe(calendarId);
   const fresh = await testApi.calendarEvents(second);
   expect(masterOf(fresh, gig.id).summary).toBe("While unlinked");
@@ -430,14 +421,4 @@ test("unlinked bands push nothing; unlink clears ids; relink starts fresh", asyn
   expect(
     instanceOf(fresh, masterOf(fresh, sid).id, occurrence(start, 1))!.cancelled,
   ).toBe(true);
-
-  // Linking a different account over a live link also starts over.
-  await linkCalendar(ava.api, bandId, "third@example.com");
-  const [reset] = await db.select().from(bands).where(eq(bands.id, bandId));
-  expect(reset!.calendarId).toBeNull();
-  const [gAfter] = await db.select().from(gigs).where(eq(gigs.id, gig.id));
-  expect(gAfter!.gcalEventId).toBeNull();
-  const third = (await setupCalendar(ava.api, bandId)).calendarId as string;
-  expect(third).not.toBe(second);
-  expect(masterOf(await testApi.calendarEvents(third), gig.id)).toBeTruthy();
 });

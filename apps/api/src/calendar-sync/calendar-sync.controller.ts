@@ -13,7 +13,7 @@ import { CalendarSyncService } from "./calendar-sync.service.js";
 export class CalendarSyncController {
   constructor(private readonly sync: CalendarSyncService) {}
 
-  /** Creates the band calendar if needed and pushes all events. 409 GOOGLE_NOT_LINKED without a link. */
+  /** Creates the band calendar if needed and pushes all events. 409 CALENDAR_BOT_NOT_CONFIGURED when the bot token is missing. */
   @BandMember()
   @Post("setup")
   @HttpCode(200)

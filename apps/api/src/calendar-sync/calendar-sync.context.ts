@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
 import { bands, memberships, users, type Database } from "@greenroom/db";
 import { DRIZZLE } from "../db/db.constants.js";
-import { GoogleLinksService } from "../google-connect/index.js";
+import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
 import { attendeeEmails, type SyncMember } from "./calendar-sync.mapping.js";
 
 /** Everything a sync step needs about one linked, set-up band. */
@@ -19,17 +19,17 @@ export interface BandSyncContext {
 export class SyncContextService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
-    private readonly links: GoogleLinksService,
+    private readonly bot: CalendarBotTokenService,
   ) {}
 
-  /** Null when the band has no calendar yet or its Google link is gone. */
+  /** Null when the band has no calendar yet or the bot token is unavailable. */
   async get(bandId: string): Promise<BandSyncContext | null> {
     const [band] = await this.db
       .select({ calendarId: bands.calendarId })
       .from(bands)
       .where(eq(bands.id, bandId));
     if (!band?.calendarId) return null;
-    const accessToken = await this.links.getAccessToken(bandId, "calendar");
+    const accessToken = await this.bot.getAccessToken();
     if (!accessToken) return null;
     const members = await this.members(bandId);
     return {

@@ -23,14 +23,13 @@ test("calendar banner can be dismissed and stays dismissed", async ({
   await expect(banner).toBeHidden();
 });
 
-test("connect calendar from the banner, then manage it in settings", async ({
+test("sync calendar from the banner, then manage it in settings", async ({
   page,
 }) => {
-  await fakeGoogleConsent(page);
   await page.goto("/events");
   await page
     .getByTestId("calendar-banner")
-    .getByRole("button", { name: "Connect" })
+    .getByRole("button", { name: "Sync" })
     .click();
   const setup = page.getByTestId("calendar-setup");
   await expect(setup.getByText("Your band calendar is ready.")).toBeVisible();
@@ -41,7 +40,7 @@ test("connect calendar from the banner, then manage it in settings", async ({
   await page.goto("/settings");
   const row = page.getByTestId("settings-google-calendar");
   await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Linked as band@example.com",
+    "Syncing with Google Calendar",
   );
   await expect(row.getByText(/Last synced/)).toBeVisible();
 
@@ -51,18 +50,25 @@ test("connect calendar from the banner, then manage it in settings", async ({
     .getByRole("button", { name: "Disconnect" })
     .click();
   await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Not linked",
+    "Not synced",
   );
 });
 
-test("a denied calendar sign-in shows an error", async ({ page }) => {
-  await fakeGoogleConsent(page, "deny");
+test("sync calendar from settings without any Google sign-in", async ({
+  page,
+}) => {
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Connect Google Calendar" }).click();
-  await expect(
-    page.getByRole("dialog", { name: /Couldn't connect Google Calendar/ }),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/settings$/);
+  const row = page.getByTestId("settings-google-calendar");
+  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
+    "Not synced",
+  );
+  await row.getByRole("button", { name: "Sync to Google Calendar" }).click();
+  const setup = page.getByTestId("calendar-setup");
+  await expect(setup.getByText("Your band calendar is ready.")).toBeVisible();
+  await setup.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
+    "Syncing with Google Calendar",
+  );
 });
 
 test("non-admins do not see band settings", async ({

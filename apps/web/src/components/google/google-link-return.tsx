@@ -3,7 +3,6 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { GoogleLinkErrorReason, GoogleService } from "@greenroom/shared";
-import { CalendarSetupDialog } from "@/components/google/calendar-setup-dialog";
 import { DriveFolderPicker } from "@/components/google/drive-folder-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +15,6 @@ import {
 import { pathWithout } from "@/lib/queries/spotify";
 
 type Flow =
-  | { kind: "calendar" }
   | { kind: "drive" }
   | { kind: "error"; service: GoogleService | null; reason: string };
 
@@ -30,8 +28,8 @@ const REASONS: Record<GoogleLinkErrorReason, string> = {
 const PARAMS = ["google", "service", "reason"];
 
 /**
- * Handles the return from the Google sign-in: runs calendar setup or opens the
- * Drive folder picker, shows failures, and strips the params from the URL.
+ * Handles the return from the Google sign-in: opens the Drive folder
+ * picker, shows failures, and strips the params from the URL.
  */
 export function GoogleLinkReturn({ bandId }: { bandId: string }) {
   const router = useRouter();
@@ -40,8 +38,7 @@ export function GoogleLinkReturn({ bandId }: { bandId: string }) {
   const google = params.get("google");
   const service = params.get("service");
   const reason = params.get("reason");
-  const svc: GoogleService | null =
-    service === "drive" || service === "calendar" ? service : null;
+  const svc: GoogleService | null = service === "drive" ? service : null;
   const returned =
     google === "connected" && svc
       ? `connected:${svc}`
@@ -66,17 +63,8 @@ export function GoogleLinkReturn({ bandId }: { bandId: string }) {
   }, [returned, pathname, params, router]);
 
   const close = () => setFlow(null);
-  const label =
-    flow?.kind === "error" && flow.service === "calendar"
-      ? "Google Calendar"
-      : "Google Drive";
   return (
     <>
-      <CalendarSetupDialog
-        bandId={bandId}
-        open={flow?.kind === "calendar"}
-        onOpenChange={(o) => !o && close()}
-      />
       <DriveFolderPicker
         bandId={bandId}
         open={flow?.kind === "drive"}
@@ -86,7 +74,7 @@ export function GoogleLinkReturn({ bandId }: { bandId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">
-              Couldn&apos;t connect {label}
+              Couldn&apos;t connect Google Drive
             </DialogTitle>
             <DialogDescription role="alert">
               {flow?.kind === "error"

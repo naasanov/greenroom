@@ -87,7 +87,14 @@ export class GoogleLinksService {
     };
     return {
       drive: { ...of("drive"), folderId: band?.folderId ?? null },
-      calendar: { ...of("calendar"), calendarId: band?.calendarId ?? null },
+      // Calendar is owned by the bot account, so it is linked once the band has a calendar.
+      calendar: {
+        linked: !!band?.calendarId,
+        email: null,
+        linkedBy: null,
+        linkedAt: null,
+        calendarId: band?.calendarId ?? null,
+      },
     };
   }
 
@@ -144,7 +151,7 @@ export class GoogleLinksService {
     if (
       !row ||
       !row.bandId ||
-      (service !== "drive" && service !== "calendar") ||
+      service !== "drive" ||
       row.expiresAt.getTime() < Date.now()
     ) {
       return invalid;
@@ -177,18 +184,6 @@ export class GoogleLinksService {
     }
     if (!tokens.refreshToken) return fail("exchange_failed");
 
-    // A different Google account cannot see the old calendar, so sync starts over.
-    if (service === "calendar") {
-      const prior = await this.getLink(row.bandId, "calendar");
-      if (prior && prior.googleSub !== profile.sub) {
-        await this.clearCalendarSync(row.bandId);
-        await this.db
-          .update(bands)
-          .set({ calendarId: null })
-          .where(eq(bands.id, row.bandId));
-      }
-    }
-
     const values = {
       googleSub: profile.sub,
       googleEmail: profile.email,
@@ -207,17 +202,24 @@ export class GoogleLinksService {
       });
     await this.db
       .update(bands)
-      .set(
-        service === "drive"
-          ? { driveLinkedByUserId: row.userId }
-          : { calendarLinkedByUserId: row.userId },
-      )
+      .set({ driveLinkedByUserId: row.userId })
       .where(eq(bands.id, row.bandId));
     return { ok: true, redirectTo: row.redirectTo, service };
   }
 
-  /** Revokes the refresh token (best effort), deletes the link and clears the band columns. */
+  /**
+   * Drive: revokes the refresh token (best effort), deletes the link and clears the
+   * band columns. Calendar: clears the band's calendar columns and sync state only.
+   */
   async disconnect(bandId: string, service: GoogleService): Promise<void> {
+    if (service === "calendar") {
+      await this.db
+        .update(bands)
+        .set({ calendarId: null, calendarLinkedByUserId: null })
+        .where(eq(bands.id, bandId));
+      await this.clearCalendarSync(bandId);
+      return;
+    }
     const link = await this.getLink(bandId, service);
     if (link) {
       try {

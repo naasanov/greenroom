@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { GoogleConnectModule } from "../google-connect/google-connect.module.js";
+import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
 import { SyncContextService } from "./calendar-sync.context.js";
 import { CalendarSyncController } from "./calendar-sync.controller.js";
 import { CalendarPullService } from "./calendar-sync.pull.js";
@@ -11,9 +11,9 @@ import { CalendarSyncWorker } from "./calendar-sync.worker.js";
 // Global so the events, bands and auth services can enqueue pushes without importing this module.
 @Global()
 @Module({
-  imports: [GoogleConnectModule],
   controllers: [CalendarSyncController],
   providers: [
+    CalendarBotTokenService,
     CalendarSyncQueue,
     SyncContextService,
     CalendarPullService,

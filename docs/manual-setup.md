@@ -26,16 +26,17 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - App name `Greenroom`, user support email: yours. Audience: **External**. Contact email: yours. Agree and **Create**.
    - **Branding**: app home page `https://greenroom.fyi`, authorized domain `greenroom.fyi`. Save.
    - **Data access > Add or remove scopes**: add `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `https://www.googleapis.com/auth/drive`, `https://www.googleapis.com/auth/calendar`. Save.
-   - **Audience > Publishing status**: click **Publish app** to move it to **In production**. Do not submit it for verification. Testing mode would make Drive and Calendar logins expire every 7 days. Sign-in shows no warning; the admin who links Drive or Calendar sees Google's "unverified app" screen once (click **Advanced > Go to Greenroom**). Unverified apps are capped at 100 users.
+   - **Audience > Publishing status**: click **Publish app** to move it to **In production**. Do not submit it for verification. Testing mode would make Drive and Calendar logins expire every 7 days. Sign-in shows no warning; the admin who links Drive sees Google's "unverified app" screen once (click **Advanced > Go to Greenroom**). Unverified apps are capped at 100 users.
 5. Create the OAuth client: **Clients** (or **Credentials > Create credentials > OAuth client ID**) > type **Web application**, name `Greenroom web`.
    - Authorized JavaScript origins: `https://staging.greenroom.fyi`, `https://greenroom.fyi`, `http://localhost:3000`
-   - Authorized redirect URIs (all six):
+   - Authorized redirect URIs (all seven):
      - `https://api.staging.greenroom.fyi/auth/google/callback`
      - `https://api.staging.greenroom.fyi/integrations/google/callback`
      - `https://api.greenroom.fyi/auth/google/callback`
      - `https://api.greenroom.fyi/integrations/google/callback`
      - `http://localhost:4000/auth/google/callback`
      - `http://localhost:4000/integrations/google/callback`
+     - `http://localhost:53682` (only for the calendar bot token script)
    - **Create**, then store the two values shown: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 6. Create the server key for Places: **APIs & Services > Credentials > Create credentials > API key**. Open it (**Edit API key**):
    - Name `Greenroom server (Places)`. Application restrictions: **None** (the server has no fixed IP). API restrictions: **Restrict key** > only **Places API (New)**. Save.
@@ -44,6 +45,8 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - Name `Greenroom browser (Picker)`. Application restrictions: **Websites**, add `https://staging.greenroom.fyi/*`, `https://greenroom.fyi/*`, `http://localhost:3000/*`. API restrictions: only **Google Picker API**. Save.
    - Store it as `GOOGLE_PICKER_API_KEY`.
 8. Copy the project number: **IAM & Admin > Settings** > **Project number** (digits only, not the project ID). Store it as `GOOGLE_PROJECT_NUMBER`.
+
+Band calendars are owned by one bot Google account instead of a member. Create a plain Google account for it, then on a laptop run `GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... node apps/api/scripts/calendar-bot-token.ts`, sign in as the bot, and set the printed refresh token with `fly secrets set -a greenroom-staging-api CALENDAR_BOT_REFRESH_TOKEN=<token>`. The variable is optional: without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. Keychain name: `CALENDAR_BOT_REFRESH_TOKEN`.
 
 Keychain names: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER`.
 

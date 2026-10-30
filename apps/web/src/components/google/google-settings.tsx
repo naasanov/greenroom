@@ -140,7 +140,7 @@ function DriveRow({ bandId }: { bandId: string }) {
 function CalendarRow({ bandId }: { bandId: string }) {
   const integrations = useGoogleIntegrations(bandId);
   const cal = integrations.data?.calendar;
-  const ready = !!cal?.linked && !!cal.calendarId;
+  const ready = !!cal?.calendarId;
   const sync = useCalendarSync(bandId, ready);
   const disconnect = useDisconnectGoogle(bandId, "calendar");
   const [setup, setSetup] = useState(false);
@@ -153,26 +153,18 @@ function CalendarRow({ bandId }: { bandId: string }) {
       status={
         !cal
           ? "Loading..."
-          : cal.linked
-            ? `Linked as ${cal.email ?? "a Google account"}${ready ? "" : ", setup not finished"}`
-            : "Not linked"
+          : ready
+            ? "Syncing with Google Calendar"
+            : "Not synced"
       }
       detail={ready && sync.data ? agoLabel(sync.data.lastSyncedAt) : null}
     >
-      {cal && !cal.linked ? (
-        <Button
-          variant="outline"
-          onClick={() => connectGoogle(bandId, "calendar", RETURN_TO)}
-        >
-          Connect Google Calendar
-        </Button>
-      ) : null}
-      {cal?.linked && !cal.calendarId ? (
+      {cal && !ready ? (
         <Button variant="outline" onClick={() => setSetup(true)}>
-          Finish setup
+          Sync to Google Calendar
         </Button>
       ) : null}
-      {cal?.linked ? (
+      {ready ? (
         <Button
           variant="outline"
           disabled={disconnect.isPending}
@@ -190,7 +182,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
         open={confirming}
         onOpenChange={setConfirming}
         title="Disconnect Google Calendar?"
-        description="Gigs and practices stop syncing. Events already on your calendar stay there."
+        description="Gigs and practices stop syncing. Events already on members' calendars stay there."
         confirmLabel="Disconnect"
         destructive
         onConfirm={() => disconnect.mutate()}

@@ -142,26 +142,27 @@ test("link, status, picker config, replay, role checks, and unlink", async ({
   expect(replay.searchParams.get("google")).toBe("error");
   expect(replay.searchParams.get("reason")).toBe("invalid_state");
 
-  // Calendar links independently, with a different account.
-  const cal = await start(ava, "calendar", "/band/events");
-  expect(cal.location.searchParams.get("scope")).toBe(
-    `openid email ${SCOPE.calendar}`,
-  );
-  const calDest = await callback(ava, {
-    code: "fake-code:cal@example.com",
-    state: cal.state,
+  // Calendar has no sign-in; it counts as linked once the band has a calendar.
+  expect(
+    (await ava.get(`${BASE}/calendar/start`, { maxRedirects: 0 })).status(),
+  ).toBe(404);
+  expect((await (await ava.get(BASE)).json()).calendar).toMatchObject({
+    linked: false,
+    calendarId: null,
   });
-  expect(calDest.searchParams.get("service")).toBe("calendar");
-  const both = await (await ava.get(BASE)).json();
-  expect(both.drive.email).toBe("band@example.com");
-  expect(both.calendar.email).toBe("cal@example.com");
-  expect(both.calendar.linkedBy.userId).toBe(USERS.ava.id);
 
   // Unlinking drive needs an admin and leaves calendar alone.
   await db
     .update(bands)
-    .set({ driveRootFolderId: "folder-1" })
+    .set({ driveRootFolderId: "folder-1", calendarId: "cal-1" })
     .where(eq(bands.id, BAND));
+  const both = await (await ava.get(BASE)).json();
+  expect(both.drive.email).toBe("band@example.com");
+  expect(both.calendar).toMatchObject({
+    linked: true,
+    calendarId: "cal-1",
+    email: null,
+  });
   expect((await ben.delete(`${BASE}/drive`)).status()).toBe(403);
   expect((await ava.delete(`${BASE}/drive`)).status()).toBe(204);
   expect((await ava.delete(`${BASE}/drive`)).status()).toBe(204);
@@ -171,7 +172,7 @@ test("link, status, picker config, replay, role checks, and unlink", async ({
   const [cleared] = await db.select().from(bands).where(eq(bands.id, BAND));
   expect(cleared!.driveRootFolderId).toBeNull();
   expect(cleared!.driveLinkedByUserId).toBeNull();
-  expect(cleared!.calendarLinkedByUserId).toBe(USERS.ava.id);
+  expect(cleared!.calendarId).toBe("cal-1");
 
   await ava.dispose();
   await ben.dispose();
@@ -199,7 +200,7 @@ test("callback reports denial, bad redirectTo falls back to /, and unknown servi
   const bogus = await callback(anon, { code: "bogus", state: "nope" });
   expect(bogus.searchParams.get("reason")).toBe("invalid_state");
 
-  const badCode = await start(ava, "calendar");
+  const badCode = await start(ava, "drive");
   const failed = await callback(anon, {
     code: "garbage",
     state: badCode.state,

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { isApiError } from "@/lib/api";
 import { useCalendarSetup } from "@/lib/queries/google";
 
 /** Creates the band calendar when opened and reports progress and the result. */
@@ -54,7 +55,9 @@ export function CalendarSetupDialog({
         {setup.isError ? (
           <div className="flex flex-col gap-3">
             <p role="alert" className="text-sm text-destructive">
-              We could not set up your calendar. Please try again.
+              {isApiError(setup.error, 409)
+                ? "Calendar sync is not available yet. Please try again later."
+                : "We could not set up your calendar. Please try again."}
             </p>
             <div className="flex gap-2">
               <Button onClick={() => mutate()}>Try again</Button>

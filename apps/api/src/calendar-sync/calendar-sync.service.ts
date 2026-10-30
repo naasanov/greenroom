@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import { bands, calendarSyncStates, type Database } from "@greenroom/db";
 import {
   CALENDAR_SYNC_ERROR_CODES,
@@ -7,7 +7,6 @@ import {
   type CalendarSyncStatus,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
-import { GoogleLinksService } from "../google-connect/index.js";
 import {
   GOOGLE_CALENDAR,
   type GoogleCalendarAdapter,
@@ -16,6 +15,7 @@ import {
   SyncContextService,
   type BandSyncContext,
 } from "./calendar-sync.context.js";
+import { CalendarBotTokenService } from "./calendar-bot-token.service.js";
 import { CalendarPullService } from "./calendar-sync.pull.js";
 import { CalendarPushService } from "./calendar-sync.push.js";
 import {
@@ -36,7 +36,7 @@ export class CalendarSyncService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(GOOGLE_CALENDAR) private readonly calendar: GoogleCalendarAdapter,
-    private readonly links: GoogleLinksService,
+    private readonly bot: CalendarBotTokenService,
     private readonly contexts: SyncContextService,
     private readonly queue: CalendarSyncQueue,
     private readonly push: CalendarPushService,
@@ -57,11 +57,11 @@ export class CalendarSyncService {
    */
   setup(bandId: string, timeZone: string): Promise<CalendarSetupResult> {
     return this.locked(async () => {
-      const token = await this.links.getAccessToken(bandId, "calendar");
+      const token = await this.bot.getAccessToken();
       if (!token) {
         throw new ConflictException({
-          code: CALENDAR_SYNC_ERROR_CODES.notLinked,
-          message: "Google Calendar is not linked",
+          code: CALENDAR_SYNC_ERROR_CODES.botNotConfigured,
+          message: "The calendar bot account is not configured",
         });
       }
       const [band] = await this.db
@@ -150,7 +150,7 @@ export class CalendarSyncService {
       cache.set(job.bandId, await this.contexts.get(job.bandId));
     }
     const ctx = cache.get(job.bandId);
-    // An unlinked or not-yet-set-up band has nothing to push.
+    // A band without a calendar (or without a bot token) has nothing to push.
     if (ctx) await this.push.run(ctx, job);
     this.queue.done(job);
   }
@@ -167,10 +167,13 @@ export class CalendarSyncService {
     });
   }
 
-  /** The scheduled pass: every band with a calendar link. */
+  /** The scheduled pass: every band with a calendar. */
   async syncAll(): Promise<void> {
-    const bandIds = await this.links.listLinkedBands("calendar");
-    for (const bandId of bandIds) {
+    const rows = await this.db
+      .select({ id: bands.id })
+      .from(bands)
+      .where(isNotNull(bands.calendarId));
+    for (const { id: bandId } of rows) {
       try {
         await this.syncBand(bandId);
       } catch (err) {

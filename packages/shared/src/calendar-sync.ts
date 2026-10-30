@@ -2,7 +2,7 @@ import { z } from "zod";
 import { timeZoneSchema } from "./events.js";
 
 export const CALENDAR_SYNC_ERROR_CODES = {
-  notLinked: "GOOGLE_NOT_LINKED",
+  botNotConfigured: "CALENDAR_BOT_NOT_CONFIGURED",
 } as const;
 
 /** Body of POST /bands/:bandId/integrations/google/calendar/setup. */

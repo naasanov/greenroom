@@ -1,11 +1,11 @@
 # Calendar sync
 
-Two-way sync between a band's gigs and practices and a dedicated Google Calendar. The Events tab works without it; nothing here runs until a band links Calendar and calls setup. Credentials come from `google-connect` (`GoogleLinksService.getAccessToken(bandId, "calendar")`); all Google calls go through the `GoogleCalendarAdapter`.
+Two-way sync between a band's gigs and practices and a dedicated Google Calendar. The Events tab works without it; nothing here runs until a band calls setup. Every band calendar is owned by one server-held bot Google account: `CalendarBotTokenService` turns the optional env `CALENDAR_BOT_REFRESH_TOKEN` (scope `calendar`, with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) into cached access tokens (refreshed within 60s of expiry, one shared refresh at a time). Members need no Google link. Mint the token with `node apps/api/scripts/calendar-bot-token.ts`. In `INTEGRATIONS_MODE=fake` no token is needed. All Google calls go through the `GoogleCalendarAdapter`.
 
 ## Endpoints
-- `POST /bands/:bandId/integrations/google/calendar/setup` `{ timeZone }` (any member). `409 GOOGLE_NOT_LINKED` without a link. Creates the calendar (summary = band name) if `bands.calendar_id` is null, takes a sync token, pushes every live gig dated 30 days ago or later and every live practice series. Idempotent. Returns `{ calendarId, gigs, practiceSeries, lastSyncedAt }`. The web calls it after returning with `?google=connected&service=calendar`.
+- `POST /bands/:bandId/integrations/google/calendar/setup` `{ timeZone }` (any member). `409 CALENDAR_BOT_NOT_CONFIGURED` in real mode when the bot token is missing or revoked. Creates the calendar on the bot account (summary = band name) if `bands.calendar_id` is null, takes a sync token, pushes every live gig dated 30 days ago or later and every live practice series. Idempotent. Returns `{ calendarId, gigs, practiceSeries, lastSyncedAt }`. The web calls it from the "Sync to Google Calendar" actions. Each active member gets one invite on their own calendar.
 - `GET /bands/:bandId/integrations/google/calendar/sync` returns `{ lastSyncedAt, pending }` (last pull time; unpushed app changes in this process).
-- `DELETE .../google/calendar` (in google-connect) clears every `gcal_event_id`, `gcal_etag`, `gcal_instance_etag` and the `calendar_sync_states` row, and `bands.calendar_id`. The Google calendar is left alone. Linking a different Google account over a live link does the same; the next setup starts fresh.
+- `DELETE .../google/calendar` (in google-connect) clears every `gcal_event_id`, `gcal_etag`, `gcal_instance_etag` and the `calendar_sync_states` row, and `bands.calendar_id`. The Google calendar is left alone and no token is revoked; the next setup creates a fresh calendar. Existing `band_google_links` rows with service `calendar` are ignored.
 
 ## Mapping
 - Every event carries `greenroomKind` (`gig` or `practice`) and `greenroomId` as private properties.
@@ -23,7 +23,7 @@ Services enqueue after writes through `CalendarSyncQueue` (never throws, no-op w
 - Queue `calendar-push` (pg-boss, policy `short`, singleton key per event, 3s delay to coalesce bursts, retryLimit 5 with backoff).
 
 ## Pull (Google to app)
-Queue `calendar-pull`, cron `* * * * *`: per linked band, `listChanges` with the stored token; `sync-token-expired` triggers a full list (events whose Google event is absent are treated as deleted). Per tagged event whose etag differs from the stored one:
+Queue `calendar-pull`, cron `* * * * *`: per band with a `calendar_id`, `listChanges` with the stored token; `sync-token-expired` triggers a full list (events whose Google event is absent are treated as deleted). Per tagged event whose etag differs from the stored one:
 - gigs: title, location (as venue text, address cleared, when it differs from what is pushed), start/end/all-day, time zone; deletes soft-delete.
 - series: title, location, time, duration, time zone, recurrence; deletes soft-delete. A recurrence the app cannot represent (not exactly one supported RRULE) keeps the app's rule and re-enqueues a push. A schedule change drops overrides and RSVPs that no longer line up with an occurrence.
 - instances: edits become overrides, cancellations become cancelled overrides; instance attendee answers become RSVPs.
