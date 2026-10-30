@@ -2,6 +2,9 @@ import { USERS, bands, users } from "@greenroom/db";
 import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 
+// Route stubs do not apply reliably to pages controlled by a service worker.
+test.use({ serviceWorkers: "block" });
+
 test("member edits their name and instruments", async ({
   page,
   testApi,

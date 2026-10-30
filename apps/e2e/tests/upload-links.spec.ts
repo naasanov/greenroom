@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import { BAND, PNG, clientFor, setupDrive } from "./api-media-helpers.js";
 
+// Route stubs do not apply reliably to pages controlled by a service worker.
+test.use({ serviceWorkers: "block" });
+
 test.skip(({ isMobile }) => isMobile, "Chromium only on this machine");
 
 const SHOTS = process.env.UPLOAD_LINK_SHOTS;
