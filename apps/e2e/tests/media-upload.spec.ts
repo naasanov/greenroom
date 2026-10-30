@@ -22,6 +22,9 @@ const SHOTS =
 const MIB = 1024 * 1024;
 const CHUNK = 8 * MIB;
 
+// Route stubs cannot intercept requests from a page controlled by the service worker (WebKit).
+test.use({ serviceWorkers: "block" });
+
 let seed: BandSeedResult;
 let m: MediaSeed;
 let dir: string;

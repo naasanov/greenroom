@@ -12,6 +12,9 @@ import {
   type MediaSeed,
 } from "./media-gallery-helpers.js";
 
+// Route stubs cannot intercept requests from a page controlled by the service worker (WebKit).
+test.use({ serviceWorkers: "block" });
+
 let seed: BandSeedResult;
 let m: MediaSeed;
 

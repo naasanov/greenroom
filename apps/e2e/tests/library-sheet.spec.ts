@@ -2,6 +2,9 @@ import { USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { cards, chooseSort, openLibrary, sheet } from "./library-helpers.js";
 
+// Route stubs cannot intercept requests from a page controlled by the service worker (WebKit).
+test.use({ serviceWorkers: "block" });
+
 test.beforeEach(async ({ testApi, loginAs }) => {
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
