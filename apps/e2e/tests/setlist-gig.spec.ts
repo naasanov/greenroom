@@ -512,6 +512,7 @@ test("a YouTube-only song shows its thumbnail in the setlist row", async ({
 
 test("adding a new song in place appends it to the setlist", async ({
   page,
+  isMobile,
 }) => {
   await openGig(page, seed.gigs.tentative);
   await openLibrary(page);
@@ -524,6 +525,8 @@ test("adding a new song in place appends it to the setlist", async ({
   await sheet.getByRole("button", { name: "Done" }).click();
   await expect(rows(page)).toHaveCount(1);
   expect(await rowTitles(page)).toEqual(["Brand New Tune"]);
+  // The phone library is a stacked drawer that need not stay open behind the sheet.
+  if (isMobile) return;
   await expect(libraryRow(page, "Brand New Tune")).toHaveAttribute(
     "aria-pressed",
     "true",
