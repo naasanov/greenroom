@@ -52,10 +52,10 @@ test("admin reads and resets the link; the old token stops working", async ({
   ).toBe(200);
 });
 
-test("only admins manage the link", async ({ testApi }) => {
+test("members read the link but only admins reset it", async ({ testApi }) => {
   await testApi.seed("band");
   const dev = await clientFor(testApi, USERS.dev.email);
-  expect((await dev.get(linkUrl)).status()).toBe(403);
+  expect((await dev.get(linkUrl)).status()).toBe(200);
   expect((await dev.post(`${linkUrl}/reset`)).status()).toBe(403);
   const pub = await anon();
   expect((await pub.get(linkUrl)).status()).toBe(401);

@@ -13,6 +13,7 @@ import {
   bandMemberSchema,
   bandSummarySchema,
   inviteLinkSchema,
+  invitePlaceholderSchema,
   invitePreviewSchema,
   gigLinkSchema,
   myInstrumentsSchema,
@@ -21,6 +22,8 @@ import {
   userSchema,
   type BandRole,
   type CreateBand,
+  type CreatePlaceholder,
+  type UpdatePlaceholder,
   type LeaveBand,
   type UpdateBand,
   type Gig,
@@ -40,6 +43,8 @@ export const keys = {
   band: (bandId: string) => ["bands", bandId, "detail"] as const,
   invite: (bandId: string) => ["bands", bandId, "invite"] as const,
   invitePreview: (token: string) => ["invites", token] as const,
+  invitePlaceholders: (token: string) =>
+    ["invites", token, "placeholders"] as const,
   instruments: ["me", "instruments"] as const,
   link: (kind: string, id: string, date?: string | null) =>
     ["links", kind, id, date ?? null] as const,
@@ -190,6 +195,53 @@ export function useAcceptInvite(token: string) {
         schema: bandSummarySchema,
       }),
     onSuccess: () => refreshBands(qc),
+  });
+}
+
+export function useInvitePlaceholders(token: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.invitePlaceholders(token),
+    queryFn: () =>
+      api(`/invites/${encodeURIComponent(token)}/placeholders`, {
+        schema: z.array(invitePlaceholderSchema),
+      }),
+    enabled,
+    retry: false,
+  });
+}
+
+/** Joins the band and merges the chosen roster-only member into the signed-in user. */
+export function useLinkPlaceholder(token: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (placeholderUserId: string) =>
+      api(`/invites/${encodeURIComponent(token)}/link`, {
+        method: "POST",
+        body: { placeholderUserId },
+        schema: bandSummarySchema,
+      }),
+    onSuccess: () => refreshBands(qc),
+  });
+}
+
+export function useCreatePlaceholder(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreatePlaceholder) =>
+      api(`/bands/${bandId}/placeholders`, { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(bandId) }),
+  });
+}
+
+export function useUpdatePlaceholder(bandId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { userId: string; patch: UpdatePlaceholder }) =>
+      api(`/bands/${bandId}/placeholders/${v.userId}`, {
+        method: "PATCH",
+        body: v.patch,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(bandId) }),
   });
 }
 

@@ -21,7 +21,9 @@ test("media section shows the empty state, thumbnails with counts, and missing i
   const drawer = page.getByRole("dialog", { name: gig.title });
 
   await page.goto(`/gigs/${gig.id}`);
-  await expect(drawer.getByTestId("media-empty")).toHaveText("No media yet");
+  await expect(drawer.getByTestId("media-empty")).toHaveCount(0);
+  await expect(drawer.getByTestId("media-add")).toHaveText("Add media");
+  await expect(drawer.getByTestId("media-add")).toHaveClass(/min-h-24/);
 
   // Touching media creates the gig's Drive folder, then files appear via the poller.
   await ava.post(`/bands/${BAND}/gigs/${gig.id}/media/folders`, {

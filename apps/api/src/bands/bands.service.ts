@@ -1,5 +1,6 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -8,8 +9,16 @@ import {
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import {
   bands,
+  feedback,
+  gigs,
   inviteLinks,
+  bandGoogleLinks,
+  mediaItems,
   memberships,
+  practiceRsvps,
+  practiceSeries,
+  publicUploadLinks,
+  uploadSessions,
   userInstruments,
   users,
   type Database,
@@ -20,6 +29,9 @@ import {
   type BandMember,
   type BandRole,
   type BandSummary,
+  type CreatePlaceholder,
+  type InvitePlaceholder,
+  type UpdatePlaceholder,
   type InviteLinkInfo,
   type InvitePreview,
   type MyInstruments,
@@ -143,6 +155,9 @@ export class BandsService {
         userId: users.id,
         displayName: users.displayName,
         email: users.email,
+        isPlaceholder: users.isPlaceholder,
+        placeholderEmail: users.placeholderEmail,
+        placeholderNotes: users.placeholderNotes,
         avatarUrl: users.avatarUrl,
         role: memberships.role,
         joinedAt: memberships.joinedAt,
@@ -163,8 +178,10 @@ export class BandsService {
           )
           .orderBy(asc(userInstruments.position))
       : [];
-    return rows.map((r) => ({
+    return rows.map(({ placeholderEmail, placeholderNotes, ...r }) => ({
       ...r,
+      email: r.isPlaceholder ? (placeholderEmail ?? "") : r.email,
+      notes: r.isPlaceholder ? placeholderNotes : null,
       joinedAt: r.joinedAt.toISOString(),
       instruments: groupInstruments(
         instruments.filter((i) => i.userId === r.userId),
@@ -196,6 +213,16 @@ export class BandsService {
     return m;
   }
 
+  private async assertRealUser(tx: Tx, userId: string): Promise<void> {
+    const [u] = await tx
+      .select({ isPlaceholder: users.isPlaceholder })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (u?.isPlaceholder) {
+      throw new BadRequestException("Roster-only members cannot be admins");
+    }
+  }
+
   private async adminCount(tx: Tx, bandId: string): Promise<number> {
     const [row] = await tx
       .select({ n: count() })
@@ -221,6 +248,7 @@ export class BandsService {
     await this.db.transaction(async (tx) => {
       await this.lockBand(tx, bandId);
       const m = await this.activeMembership(tx, bandId, userId);
+      await this.assertRealUser(tx, userId);
       if (
         m.role === "admin" &&
         role !== "admin" &&
@@ -263,7 +291,14 @@ export class BandsService {
       const [total] = await tx
         .select({ n: count() })
         .from(memberships)
-        .where(and(eq(memberships.bandId, bandId), isNull(memberships.leftAt)));
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(
+          and(
+            eq(memberships.bandId, bandId),
+            isNull(memberships.leftAt),
+            eq(users.isPlaceholder, false),
+          ),
+        );
       if (total!.n <= 1) {
         if (!deleteBand) {
           throw new ConflictException({
@@ -301,6 +336,17 @@ export class BandsService {
     userId: string,
     input: SetInstruments,
   ): Promise<MyInstruments> {
+    await this.db.transaction((tx) =>
+      this.replaceInstruments(tx, userId, input),
+    );
+    return this.getInstruments(userId);
+  }
+
+  private async replaceInstruments(
+    tx: Tx,
+    userId: string,
+    input: SetInstruments,
+  ): Promise<void> {
     const presets = [...new Set(input.presets)];
     const seen = new Set<string>();
     const custom = input.custom.filter((c) => {
@@ -309,17 +355,57 @@ export class BandsService {
       seen.add(k);
       return true;
     });
+    await tx.delete(userInstruments).where(eq(userInstruments.userId, userId));
+    const values = [
+      ...presets.map((presetKey) => ({ userId, presetKey })),
+      ...custom.map((customName) => ({ userId, customName })),
+    ].map((v, position) => ({ ...v, position }));
+    if (values.length) await tx.insert(userInstruments).values(values);
+  }
+
+  // Roster-only members
+
+  async createPlaceholder(
+    bandId: string,
+    input: CreatePlaceholder,
+  ): Promise<void> {
     await this.db.transaction(async (tx) => {
+      const id = randomUUID();
+      await tx.insert(users).values({
+        id,
+        email: `placeholder-${id}@placeholder.invalid`,
+        displayName: input.displayName,
+        isPlaceholder: true,
+        placeholderEmail: input.email ?? null,
+        placeholderNotes: input.notes ?? null,
+      });
       await tx
-        .delete(userInstruments)
-        .where(eq(userInstruments.userId, userId));
-      const values = [
-        ...presets.map((presetKey) => ({ userId, presetKey })),
-        ...custom.map((customName) => ({ userId, customName })),
-      ].map((v, position) => ({ ...v, position }));
-      if (values.length) await tx.insert(userInstruments).values(values);
+        .insert(memberships)
+        .values({ bandId, userId: id, role: "member" });
+      await this.replaceInstruments(tx, id, input.instruments);
     });
-    return this.getInstruments(userId);
+  }
+
+  async updatePlaceholder(
+    bandId: string,
+    userId: string,
+    patch: UpdatePlaceholder,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await this.activeMembership(tx, bandId, userId);
+      const [u] = await tx.select().from(users).where(eq(users.id, userId));
+      if (!u?.isPlaceholder) throw new NotFoundException("Member not found");
+      const set: Partial<typeof users.$inferInsert> = {};
+      if (patch.displayName !== undefined) set.displayName = patch.displayName;
+      if (patch.email !== undefined) set.placeholderEmail = patch.email;
+      if (patch.notes !== undefined) set.placeholderNotes = patch.notes;
+      if (Object.keys(set).length) {
+        await tx.update(users).set(set).where(eq(users.id, userId));
+      }
+      if (patch.instruments) {
+        await this.replaceInstruments(tx, userId, patch.instruments);
+      }
+    });
   }
 
   // Invites
@@ -423,6 +509,181 @@ export class BandsService {
     });
     if (joined) await this.calendarSync.bandAcl(band.id);
     return summary;
+  }
+
+  /** Roster-only members the signed-in user could claim; empty if already a member. */
+  async invitePlaceholders(
+    token: string,
+    userId: string,
+  ): Promise<InvitePlaceholder[]> {
+    const band = await this.bandForToken(token);
+    const [mine] = await this.db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.bandId, band.id),
+          eq(memberships.userId, userId),
+          isNull(memberships.leftAt),
+        ),
+      );
+    if (mine) return [];
+    const rows = await this.members(band.id);
+    return rows
+      .filter((m) => m.isPlaceholder)
+      .map((m) => ({
+        userId: m.userId,
+        displayName: m.displayName,
+        instruments: m.instruments,
+      }));
+  }
+
+  /** Joins via the invite and merges the chosen roster-only member into the user. */
+  async linkPlaceholder(
+    token: string,
+    userId: string,
+    placeholderUserId: string,
+  ): Promise<BandSummary> {
+    const band = await this.bandForToken(token);
+    let joined = false;
+    const summary = await this.db.transaction(async (tx) => {
+      await this.lockBand(tx, band.id);
+      const [existing] = await tx
+        .select()
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.bandId, band.id),
+            eq(memberships.userId, userId),
+            isNull(memberships.leftAt),
+          ),
+        );
+      if (existing) return toSummary(band, existing.role);
+      const [target] = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(
+          and(
+            eq(memberships.bandId, band.id),
+            eq(memberships.userId, placeholderUserId),
+            isNull(memberships.leftAt),
+            eq(users.isPlaceholder, true),
+          ),
+        );
+      if (!target) {
+        throw new ConflictException({
+          message: "That roster entry is no longer available",
+          code: BAND_ERROR_CODES.placeholderNotLinkable,
+        });
+      }
+      await this.mergePlaceholder(tx, placeholderUserId, userId);
+      await tx
+        .update(users)
+        .set({ lastBandId: band.id })
+        .where(eq(users.id, userId));
+      joined = true;
+      return toSummary(band, "member");
+    });
+    if (joined) await this.calendarSync.bandAcl(band.id);
+    return summary;
+  }
+
+  /** Repoints every reference to the placeholder at the real user, then deletes it. */
+  private async mergePlaceholder(
+    tx: Tx,
+    from: string,
+    to: string,
+  ): Promise<void> {
+    await tx
+      .update(memberships)
+      .set({ userId: to })
+      .where(eq(memberships.userId, from));
+    const have = await tx
+      .select()
+      .from(userInstruments)
+      .where(eq(userInstruments.userId, to));
+    const taken = new Set(
+      have.map((i) => i.presetKey ?? `c:${i.customName!.toLowerCase()}`),
+    );
+    const moving = await tx
+      .select()
+      .from(userInstruments)
+      .where(eq(userInstruments.userId, from))
+      .orderBy(asc(userInstruments.position));
+    let position = have.length;
+    for (const i of moving) {
+      const key = i.presetKey ?? `c:${i.customName!.toLowerCase()}`;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      await tx
+        .update(userInstruments)
+        .set({ userId: to, position: position++ })
+        .where(eq(userInstruments.id, i.id));
+    }
+    const mine = await tx
+      .select({
+        seriesId: practiceRsvps.seriesId,
+        originalStart: practiceRsvps.originalStart,
+      })
+      .from(practiceRsvps)
+      .where(eq(practiceRsvps.userId, to));
+    for (const r of mine) {
+      await tx
+        .delete(practiceRsvps)
+        .where(
+          and(
+            eq(practiceRsvps.userId, from),
+            eq(practiceRsvps.seriesId, r.seriesId),
+            eq(practiceRsvps.originalStart, r.originalStart),
+          ),
+        );
+    }
+    await tx
+      .update(practiceRsvps)
+      .set({ userId: to })
+      .where(eq(practiceRsvps.userId, from));
+    await tx
+      .update(gigs)
+      .set({ createdByUserId: to })
+      .where(eq(gigs.createdByUserId, from));
+    await tx
+      .update(practiceSeries)
+      .set({ createdByUserId: to })
+      .where(eq(practiceSeries.createdByUserId, from));
+    await tx
+      .update(publicUploadLinks)
+      .set({ createdByUserId: to })
+      .where(eq(publicUploadLinks.createdByUserId, from));
+    await tx
+      .update(mediaItems)
+      .set({ uploadedByUserId: to })
+      .where(eq(mediaItems.uploadedByUserId, from));
+    await tx
+      .update(uploadSessions)
+      .set({ uploadedByUserId: to })
+      .where(eq(uploadSessions.uploadedByUserId, from));
+    await tx
+      .update(feedback)
+      .set({ userId: to })
+      .where(eq(feedback.userId, from));
+    await tx
+      .update(bandGoogleLinks)
+      .set({ linkedByUserId: to })
+      .where(eq(bandGoogleLinks.linkedByUserId, from));
+    await tx
+      .update(inviteLinks)
+      .set({ createdByUserId: to })
+      .where(eq(inviteLinks.createdByUserId, from));
+    await tx
+      .update(bands)
+      .set({ driveLinkedByUserId: to })
+      .where(eq(bands.driveLinkedByUserId, from));
+    await tx
+      .update(bands)
+      .set({ calendarLinkedByUserId: to })
+      .where(eq(bands.calendarLinkedByUserId, from));
+    await tx.delete(users).where(eq(users.id, from));
   }
 
   /** Sets the user's last used band; 404 unless they are an active member. */

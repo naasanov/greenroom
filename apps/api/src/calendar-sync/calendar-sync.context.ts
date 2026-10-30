@@ -50,7 +50,13 @@ export class SyncContextService {
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.bandId, bandId), isNull(memberships.leftAt)))
+      .where(
+        and(
+          eq(memberships.bandId, bandId),
+          isNull(memberships.leftAt),
+          eq(users.isPlaceholder, false),
+        ),
+      )
       .orderBy(memberships.joinedAt, users.id);
     return rows.map((r) => ({
       userId: r.userId,

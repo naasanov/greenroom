@@ -22,6 +22,7 @@ import {
 import { CalendarBanner } from "@/components/google/calendar-banner";
 import { GoogleLinkReturn } from "@/components/google/google-link-return";
 import { GigDrawer } from "@/components/events/gig-drawer";
+import { CopyPublicCalendarLink } from "@/components/events/public-calendar-copy";
 import { PracticeDrawer } from "@/components/events/practice-drawer";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
 import { cn } from "@/lib/utils";
@@ -415,6 +416,8 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
             This practice has no occurrence on that date.
           </p>
         ) : null}
+
+        {bandId ? <CopyPublicCalendarLink bandId={bandId} /> : null}
 
         <EventCalendar
           mode={mode}

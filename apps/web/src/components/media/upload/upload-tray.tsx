@@ -11,6 +11,7 @@ import { UploadTile } from "./upload-tile";
 /** Thin bottom tray: batch bar, a Select all button, and one tile per upload. */
 export function UploadTray({
   entries,
+  hiddenKeys,
   selected,
   editingKey,
   songTitle,
@@ -25,6 +26,8 @@ export function UploadTray({
   onHeight,
 }: {
   entries: UploadEntry[];
+  /** Entries shown in the gallery instead of the tray list. */
+  hiddenKeys?: Set<string>;
   selected: Set<string>;
   editingKey: string | null;
   songTitle: (id: string | null) => string | null;
@@ -146,19 +149,21 @@ export function UploadTray({
         data-testid="upload-list"
         className="mx-auto flex max-w-5xl gap-3 overflow-x-auto px-4 pt-2.5 pb-[max(0.25rem,env(safe-area-inset-bottom))]"
       >
-        {entries.map((e) => (
-          <UploadTile
-            key={e.key}
-            entry={e}
-            selected={selected.has(e.key)}
-            editing={editingKey === e.key}
-            songTitle={songTitle(e.songId)}
-            onToggle={() => onToggle(e.key)}
-            onStartRename={() => onStartRename(e.key)}
-            onRename={(name) => onRename(e.key, name)}
-            onRetry={() => onRetry(e.key)}
-          />
-        ))}
+        {entries
+          .filter((e) => !hiddenKeys?.has(e.key))
+          .map((e) => (
+            <UploadTile
+              key={e.key}
+              entry={e}
+              selected={selected.has(e.key)}
+              editing={editingKey === e.key}
+              songTitle={songTitle(e.songId)}
+              onToggle={() => onToggle(e.key)}
+              onStartRename={() => onStartRename(e.key)}
+              onRename={(name) => onRename(e.key, name)}
+              onRetry={() => onRetry(e.key)}
+            />
+          ))}
       </ul>
       <ConfirmDialog
         open={confirm}

@@ -84,7 +84,7 @@ test("sections list Unsorted first, then folders, with a play badge and counts",
 
 test("empty Unsorted is hidden when folders exist", async ({ page }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   for (const n of ["u1.png", "u2.png", "clip.mp4"]) {
     await tile(page, n).getByTestId("media-open").click();
   }
@@ -140,7 +140,7 @@ test("select, tap-to-place into a folder, select all and deselect all", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   await tile(page, "u1.png").getByTestId("media-open").click();
   await tile(page, "u2.png").getByTestId("media-open").click();
   await expect(page.getByTestId("selection-count")).toHaveText("2");
@@ -185,7 +185,7 @@ test("long press starts a selection", async ({ page }) => {
 
 test("move to folder through the action bar menu", async ({ page }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   await tile(page, "clip.mp4").getByTestId("media-open").click();
   await barButton(page, "Move to folder").click();
   await page.getByRole("button", { name: "Move to Posed" }).click();
@@ -218,7 +218,7 @@ test("rename through the action bar needs exactly one item", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   await tile(page, "u1.png").getByTestId("media-open").click();
   await tile(page, "u2.png").getByTestId("media-open").click();
   await expect(barButton(page, "Rename")).toHaveCount(0);
@@ -232,7 +232,7 @@ test("rename through the action bar needs exactly one item", async ({
 
 test("delete confirms and moves items to Drive trash", async ({ page }) => {
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   await tile(page, "u1.png").getByTestId("media-open").click();
   await tile(page, "u2.png").getByTestId("media-open").click();
   await barButton(page, "Delete").click();
@@ -325,7 +325,7 @@ test("link to song lists setlist songs first and renames unrenamed items", async
   expect(put.ok()).toBe(true);
 
   await openGallery(page, m.gigId);
-  await page.getByTestId("select-start").click();
+  await page.getByTestId("select-fab").click();
   await tile(page, "u1.png").getByTestId("media-open").click();
   await barButton(page, "Link to song").click();
   const rows = page.getByTestId("song-pick-row");
@@ -436,6 +436,19 @@ test("select FAB toggles selection mode", async ({ page }) => {
   await page.getByTestId("select-fab").click();
   await expect(tile(page, "u1.png")).toHaveAttribute("data-selected", "false");
   await expect(bar(page)).toHaveAttribute("data-visible", "false");
+});
+
+test("section jump arrows stay available in selecting mode", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("select-fab").click();
+  await expect(page.getByTestId("jump-down")).toBeEnabled();
+  await page.getByTestId("jump-down").click();
+  await expect(
+    section(page, "Stage").getByTestId("section-toggle"),
+  ).toBeInViewport();
+  await expect(page.getByTestId("jump-up")).toBeEnabled();
 });
 
 test("+ FAB offers Upload and New folder", async ({ page }) => {

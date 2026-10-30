@@ -1,6 +1,6 @@
 "use client";
 
-import { FileQuestion, FileVideo, ImageIcon, Upload } from "lucide-react";
+import { FileQuestion, FileVideo, ImageIcon, Plus, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import type { GigMedia, MediaItem } from "@greenroom/shared";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
@@ -99,6 +99,7 @@ export function MediaSection({
   };
 
   let body;
+  let empty = false;
   if (!data || !drive) {
     body = null;
   } else if (!ready) {
@@ -106,14 +107,8 @@ export function MediaSection({
   } else {
     const total = data.counts.photos + data.counts.videos + data.counts.other;
     if (total === 0) {
-      body = (
-        <p
-          data-testid="media-empty"
-          className="rounded-2xl border border-dashed px-4 py-5 text-center text-sm text-muted-foreground"
-        >
-          No media yet
-        </p>
-      );
+      empty = true;
+      body = null;
     } else {
       const inner = (
         <>
@@ -171,9 +166,18 @@ export function MediaSection({
               setOver(false);
               addFiles(Array.from(e.dataTransfer.files));
             }}
-            className={`flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm font-medium outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`}
+            className={
+              empty
+                ? `flex min-h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-base font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`
+                : `flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm font-medium outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`
+            }
           >
-            <Upload className="size-4" /> Add media
+            {empty ? (
+              <Plus className="size-5" />
+            ) : (
+              <Upload className="size-4" />
+            )}{" "}
+            Add media
           </button>
           <input
             ref={input}

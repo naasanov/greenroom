@@ -154,7 +154,8 @@ test("invite flow: admin shares the link, a new user signs in, joins, and sees t
   await loginAs(USERS.ava.email);
   await page.goto("/");
   await page.getByRole("link", { name: "Roster" }).click();
-  await page.getByRole("button", { name: "Invite link" }).click();
+  await page.getByRole("button", { name: "Add to roster" }).click();
+  await page.getByTestId("fab-action-invite").click();
   const field = page.getByLabel("Invite link", { exact: true });
   await expect(field).toHaveValue(/\/invite\/.+/);
   const first = await field.inputValue();

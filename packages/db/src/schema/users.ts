@@ -1,4 +1,5 @@
 import {
+  boolean,
   customType,
   index,
   pgEnum,
@@ -22,6 +23,10 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   calendarEmail: text("calendar_email"),
   googleSub: text("google_sub").unique(),
+  // Roster-only member with no login. `email` holds a unique unroutable address.
+  isPlaceholder: boolean("is_placeholder").notNull().default(false),
+  placeholderEmail: text("placeholder_email"),
+  placeholderNotes: text("placeholder_notes"),
   lastBandId: uuid("last_band_id").references((): AnyPgColumn => bands.id, {
     onDelete: "set null",
   }),

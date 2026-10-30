@@ -180,7 +180,8 @@ test("admin resets the invite link and the old one stops working", async ({
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
   await page.goto("/roster");
-  await page.getByRole("button", { name: "Invite link" }).click();
+  await page.getByRole("button", { name: "Add to roster" }).click();
+  await page.getByTestId("fab-action-invite").click();
   const field = page.getByLabel("Invite link", { exact: true });
   await expect(field).toHaveValue(/\/invite\/.+/);
   const first = await field.inputValue();
@@ -226,4 +227,83 @@ test("invite button is a symmetric pill clear of the tab bar", async ({
       expect(box.y + box.height).toBeLessThanOrEqual(t.y);
     }
   }
+});
+
+test("admin adds a member manually; the tag shows and details can be edited", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/roster");
+  await page.getByRole("button", { name: "Add to roster" }).click();
+  await page.getByTestId("fab-action-add-manually").click();
+  const drawer = page.getByRole("dialog", { name: "Add member" });
+  await drawer.getByLabel("Name").fill("Pat Placeholder");
+  await drawer.getByLabel("Notes (optional)").fill("Plays when free");
+  await drawer.getByRole("button", { name: "Add to roster" }).click();
+  await expect(drawer).toBeHidden();
+
+  const pat = card(page, "Pat Placeholder");
+  await expect(pat).toContainText("Not on Greenroom");
+  await pat.getByRole("button").first().click();
+  const s = sheet(page, "Pat Placeholder");
+  await expect(s.getByTestId("member-notes")).toHaveText("Plays when free");
+  await expect(s.getByRole("button", { name: "Make admin" })).toHaveCount(0);
+  await s.getByRole("button", { name: "Edit details" }).click();
+  const edit = page.getByRole("dialog", { name: "Edit member" });
+  await edit.getByLabel("Name").fill("Patricia");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(card(page, "Patricia")).toBeVisible();
+});
+
+test("a regular member sees only the invite pill, no add menu", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto("/roster");
+  await expect(page.getByRole("button", { name: "Add to roster" })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("button", { name: "Invite link" })).toBeVisible();
+});
+
+test("invite page offers to claim a roster-only member", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  const seeded = await testApi.seed("band");
+  const { user, cookie } = await testApi.login(USERS.ava.email);
+  void user;
+  const ava = await pwRequest.newContext({
+    baseURL: API_URL,
+    extraHTTPHeaders: { Cookie: `${cookie.name}=${cookie.value}` },
+  });
+  const id = seeded.bands.nightOwls.id;
+  await ava.post(`/bands/${id}/placeholders`, {
+    data: {
+      displayName: "Pat Placeholder",
+      instruments: { presets: ["drums"], custom: [] },
+    },
+  });
+  const token = (await (await ava.get(`/bands/${id}/invite`)).json()).token;
+  await ava.dispose();
+
+  await loginAs("claimer@example.com");
+  await page.goto(`/invite/${token}`);
+  await expect(page.getByText("Is one of these you?")).toBeVisible();
+  const entry = page.getByTestId("claim-entry");
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText("Pat Placeholder");
+  await entry.getByRole("button", { name: /That's me/ }).click();
+  await expect(page).not.toHaveURL(/\/invite\//);
+
+  await page.goto("/roster");
+  await expect(page.getByTestId("member-card")).toHaveCount(5);
+  await expect(page.getByText("Not on Greenroom")).toHaveCount(0);
 });

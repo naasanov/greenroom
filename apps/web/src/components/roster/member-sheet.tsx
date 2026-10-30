@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, ShieldCheck, ShieldOff, UserMinus } from "lucide-react";
+import { Mail, Pencil, ShieldCheck, ShieldOff, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { BAND_ERROR_CODES, type BandMember } from "@greenroom/shared";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
@@ -21,6 +21,7 @@ export function MemberSheet({
   onOpenChange,
   viewerIsAdmin,
   viewerId,
+  onEdit,
 }: {
   bandId: string;
   member: BandMember | null;
@@ -28,6 +29,7 @@ export function MemberSheet({
   onOpenChange: (open: boolean) => void;
   viewerIsAdmin: boolean;
   viewerId: string;
+  onEdit?: () => void;
 }) {
   const setRole = useSetMemberRole(bandId);
   const remove = useRemoveMember(bandId);
@@ -54,7 +56,13 @@ export function MemberSheet({
           onOpenChange(o);
         }}
         title={member?.displayName ?? "Member"}
-        subtitle={member?.role === "admin" ? "Admin" : "Member"}
+        subtitle={
+          member?.role === "admin"
+            ? "Admin"
+            : member?.isPlaceholder
+              ? "Not on Greenroom"
+              : "Member"
+        }
       >
         {member ? (
           <div className="flex flex-col gap-6" data-testid="member-sheet">
@@ -67,22 +75,41 @@ export function MemberSheet({
                 {member.role === "admin" ? (
                   <Badge variant="secondary">Admin</Badge>
                 ) : null}
+                {member.isPlaceholder ? (
+                  <Badge variant="outline">Not on Greenroom</Badge>
+                ) : null}
               </div>
             </div>
 
-            <section className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">
-                Contact
-              </h3>
-              <a
-                href={`mailto:${member.email}`}
-                data-testid="member-email"
-                className="flex min-h-11 items-center gap-3 rounded-xl border bg-background px-3 text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <Mail className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{member.email}</span>
-              </a>
-            </section>
+            {member.email ? (
+              <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Contact
+                </h3>
+                <a
+                  href={`mailto:${member.email}`}
+                  data-testid="member-email"
+                  className="flex min-h-11 items-center gap-3 rounded-xl border bg-background px-3 text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <Mail className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{member.email}</span>
+                </a>
+              </section>
+            ) : null}
+
+            {member.notes ? (
+              <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Notes
+                </h3>
+                <p
+                  data-testid="member-notes"
+                  className="text-sm whitespace-pre-wrap"
+                >
+                  {member.notes}
+                </p>
+              </section>
+            ) : null}
 
             <section className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold text-muted-foreground">
@@ -115,7 +142,11 @@ export function MemberSheet({
                 <h3 className="text-sm font-semibold text-muted-foreground">
                   Admin actions
                 </h3>
-                {member.role === "admin" ? (
+                {member.isPlaceholder ? (
+                  <Button variant="outline" size="lg" onClick={onEdit}>
+                    <Pencil /> Edit details
+                  </Button>
+                ) : member.role === "admin" ? (
                   <Button
                     variant="outline"
                     size="lg"

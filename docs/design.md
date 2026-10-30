@@ -303,8 +303,9 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 # Roster tab
 - List of band members as cards (same card style as the Music Library): name, photo, instrument icons.
 - Tapping a card opens the same right-hand detail sheet (full-screen on mobile) with contact info. A member's upcoming gigs are found through the agenda's member filter instead (decided 2026-10-22).
-- **Invite link button takes the place of the plus/create button** used on the other tabs.
-- **Deferred:** subs / fill-in players who aren't full members. It's an edge case; leave it out of the first implementation.
+- **A plus button takes the place of the create button** used on the other tabs. For admins it opens a small menu: "Invite" (the invite link) and "Add manually". Regular members keep a plain "Invite link" button.
+- **Roster-only members:** admins can add someone who will not sign up (or manage the whole band themselves) with a name, instruments, and optional email and notes. They are normal lineup-able members tagged "Not on Greenroom", never emailed or shared on the calendar, and cannot be admins. When someone joins by invite link and the band has such entries, they see "Is one of these you?" with "That's me" per entry or "None of these"; claiming merges the entry into their account.
+- **Deferred:** a fill-in/sub concept distinct from roster-only members.
 - **Roles:** the band creator is an admin. Admins can promote other members to admin, remove members, and reset (regenerate) the invite link. Everyone else is a regular member.
 
 # Stage mode (setlist reading view)

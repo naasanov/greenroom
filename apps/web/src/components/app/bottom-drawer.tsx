@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { X, type LucideIcon } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -26,6 +26,8 @@ export interface BottomDrawerProps {
   headerAction?: ReactNode;
   /** Icon button(s) pinned to the header's left edge, mirroring headerAction. */
   headerLeading?: ReactNode;
+  /** Icon for the header close button. */
+  closeIcon?: LucideIcon;
   /** Optional trigger element for uncontrolled use. */
   trigger?: ReactNode;
   /** Pinned below the scrolling body, above the safe area. */
@@ -58,6 +60,7 @@ export function BottomDrawer({
   hideHeader,
   headerAction,
   headerLeading,
+  closeIcon: CloseIcon = X,
   trigger,
   footer,
   aside,
@@ -148,7 +151,7 @@ export function BottomDrawer({
                 className="text-muted-foreground"
                 onClick={requestClose}
               >
-                <X />
+                <CloseIcon />
               </Button>
             </div>
           </DrawerHeader>

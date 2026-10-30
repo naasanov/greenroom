@@ -56,3 +56,7 @@ export function NativeSelect({
     </div>
   );
 }
+
+/** WebKit gives native date and time inputs an intrinsic width; this lets the grid size them. */
+export const NATIVE_DATE_TIME_INPUT =
+  "block min-w-0 w-full max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left";

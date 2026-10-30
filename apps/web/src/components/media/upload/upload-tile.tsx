@@ -90,6 +90,7 @@ function Preview({ entry }: { entry: UploadEntry }) {
 
 export function UploadTile({
   entry,
+  fill = false,
   selected,
   editing,
   songTitle,
@@ -99,6 +100,8 @@ export function UploadTile({
   onRetry,
 }: {
   entry: UploadEntry;
+  /** Fills a gallery grid cell instead of the fixed tray size. */
+  fill?: boolean;
   selected: boolean;
   editing: boolean;
   songTitle: string | null;
@@ -127,7 +130,8 @@ export function UploadTile({
       data-folder={entry.folderId ?? ""}
       data-song={entry.songId ?? ""}
       className={cn(
-        "flex w-[4.5rem] shrink-0 flex-col transition-all duration-500",
+        "flex flex-col transition-all duration-500",
+        fill ? "min-w-0" : "w-[4.5rem] shrink-0",
         entry.flying && "-translate-y-16 opacity-0",
       )}
     >
@@ -138,7 +142,8 @@ export function UploadTile({
         data-testid="upload-open"
         onClick={onToggle}
         className={cn(
-          "relative size-[4.5rem] touch-manipulation rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "relative touch-manipulation rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          fill ? "aspect-square w-full" : "size-[4.5rem]",
           selected && "ring-3 ring-primary",
         )}
       >
@@ -204,7 +209,10 @@ export function UploadTile({
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") onRename(null);
           }}
-          className="relative z-10 h-11 w-44 min-w-0 rounded-md bg-muted px-1 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:text-xs"
+          className={cn(
+            "relative z-10 h-11 min-w-0 rounded-md bg-muted px-1 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:text-xs",
+            fill ? "w-full" : "w-44",
+          )}
         />
       ) : (
         <button

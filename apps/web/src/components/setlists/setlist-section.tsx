@@ -1,6 +1,13 @@
 "use client";
 
-import { GripVertical, Link2, Pencil, Plus, Upload, X } from "lucide-react";
+import {
+  ExternalLink,
+  GripVertical,
+  Pencil,
+  Plus,
+  Upload,
+  X,
+} from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
@@ -128,7 +135,7 @@ export function SetlistSection({
               className="text-muted-foreground"
               onClick={() => setReferencesOpen(true)}
             >
-              <Link2 />
+              <ExternalLink />
             </Button>
           ) : null}
           {setlist && setlist.songCount > 0 && builder.setlistId ? (

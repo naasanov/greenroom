@@ -438,3 +438,52 @@ test("share button copies the canonical practice link", async ({
     `${WEB_URL}/practices/${seed.practice.seriesId}?date=${date}`,
   );
 });
+
+test("the view state toggles Show on public calendar and saves immediately", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await showGigDate(page, gig.id, gig.title);
+  await eventIn(page, gig.title).click();
+  const drawer = dialog(page, gig.title);
+  const toggle = drawer.getByRole("switch", {
+    name: "Show on public calendar",
+  });
+  await expect(toggle).toBeChecked();
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && r.url().includes(gig.id),
+  );
+  await toggle.click();
+  await saved;
+  await expect(toggle).not.toBeChecked();
+});
+
+test("the events page copies the public calendar link", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (t: string) => {
+          (window as unknown as { __copied: string }).__copied = t;
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+  await page.goto("/events");
+  await page.getByTestId("copy-public-calendar").click();
+  await expect(page.getByTestId("copy-public-calendar")).toHaveText(/Copied/);
+  const copied = await page.evaluate(
+    () => (window as unknown as { __copied: string }).__copied,
+  );
+  expect(copied).toMatch(/\/c\//);
+});
+
+test("the new gig drawer does not scroll horizontally", async ({ page }) => {
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const body = page.locator("[data-vaul-drawer] .overflow-y-auto").first();
+  await expect(body).toBeVisible();
+  const overflow = await body.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

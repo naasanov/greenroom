@@ -21,7 +21,11 @@ import {
   PlacePicker,
   type PlaceValue,
 } from "@/components/events/place-picker";
-import { FormActions, FieldError } from "@/components/events/form-parts";
+import {
+  FormActions,
+  FieldError,
+  NATIVE_DATE_TIME_INPUT,
+} from "@/components/events/form-parts";
 
 const optionalTime = z.union([z.literal(""), localTimeSchema]);
 
@@ -117,10 +121,6 @@ function defaultsFor(gig: Gig | undefined, date: string): GigFormValues {
 }
 
 /** Create or edit a gig. Only title and date are required. */
-/** WebKit gives native time inputs an intrinsic width; this lets the grid size them. */
-const TIME_INPUT =
-  "min-w-0 w-full max-w-full appearance-none [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left";
-
 export function GigForm({
   bandId,
   gig,
@@ -190,6 +190,7 @@ export function GigForm({
         <Input
           id={id("date")}
           type="date"
+          className={NATIVE_DATE_TIME_INPUT}
           aria-invalid={!!errors.date}
           {...form.register("date")}
         />
@@ -201,7 +202,7 @@ export function GigForm({
           <Input
             id={id("start")}
             type="time"
-            className={TIME_INPUT}
+            className={NATIVE_DATE_TIME_INPUT}
             aria-invalid={!!errors.startTime}
             {...form.register("startTime")}
           />
@@ -210,7 +211,7 @@ export function GigForm({
           <Input
             id={id("end")}
             type="time"
-            className={TIME_INPUT}
+            className={NATIVE_DATE_TIME_INPUT}
             aria-invalid={!!errors.endTime}
             {...form.register("endTime")}
           />
@@ -224,7 +225,7 @@ export function GigForm({
           <Input
             id={id("loadin")}
             type="time"
-            className={TIME_INPUT}
+            className={NATIVE_DATE_TIME_INPUT}
             {...form.register("loadInTime")}
           />
         </FormField>

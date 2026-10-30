@@ -33,6 +33,7 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByLabel("Playlist name")).toHaveValue(
     "The Night Owls library",
   );
+  await expect(dialog(page).getByRole("separator")).toHaveText("Or");
   await dialog(page).getByLabel("Playlist name").fill("Owls all songs");
   await exportButton(page).click();
   await expect(dialog(page).getByTestId("export-connect")).toContainText(

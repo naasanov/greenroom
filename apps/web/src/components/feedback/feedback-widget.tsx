@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageSquarePlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FEEDBACK_ERROR_CODES,
   FEEDBACK_MESSAGE_MAX,
@@ -30,6 +30,23 @@ function errorText(e: unknown): string {
   return "We could not send your feedback. Please try again.";
 }
 
+/** Height of the visual viewport, which shrinks when the on-screen keyboard opens. */
+function useVisualViewportHeight(active: boolean): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!active || !vv) return;
+    const update = () => setHeight(vv.height);
+    update();
+    vv.addEventListener("resize", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      setHeight(null);
+    };
+  }, [active]);
+  return height;
+}
+
 /** Header icon button that opens a dialog for sending feedback as a GitHub issue. */
 export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [open, setOpen] = useState(false);
@@ -37,6 +54,7 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const viewportHeight = useVisualViewportHeight(open);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
@@ -79,7 +97,15 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
         <MessageSquarePlus className="size-5" />
       </button>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent data-testid="feedback-dialog">
+        <DialogContent
+          data-testid="feedback-dialog"
+          style={
+            viewportHeight
+              ? { maxHeight: `${viewportHeight - 16}px` }
+              : undefined
+          }
+          className="top-2 max-h-[calc(100dvh-1rem)] translate-y-0 overflow-y-auto overscroll-contain sm:top-1/2 sm:-translate-y-1/2"
+        >
           <DialogHeader>
             <DialogTitle>Send feedback</DialogTitle>
             <DialogDescription>
@@ -105,6 +131,10 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                 maxLength={FEEDBACK_MESSAGE_MAX}
                 disabled={sending}
                 onChange={(e) => setMessage(e.target.value)}
+                onFocus={(e) => {
+                  const el = e.currentTarget;
+                  setTimeout(() => el.scrollIntoView({ block: "center" }), 300);
+                }}
                 placeholder="What happened, or what would help?"
               />
               {error ? (

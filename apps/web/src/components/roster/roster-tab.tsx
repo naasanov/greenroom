@@ -1,12 +1,14 @@
 "use client";
 
-import { Link2, Users } from "lucide-react";
+import { Link2, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import type { BandMember, BandSummary } from "@greenroom/shared";
+import { Fab } from "@/components/app/fab";
 import { EmptyState } from "@/components/app/empty-state";
 import { InstrumentIcon, instrumentLabel } from "@/components/app/instruments";
 import { ListCard } from "@/components/app/list-card";
 import { InviteDrawer } from "@/components/roster/invite-drawer";
+import { PlaceholderDrawer } from "@/components/roster/placeholder-drawer";
 import { MemberSheet } from "@/components/roster/member-sheet";
 import { memberInstruments } from "@/components/roster/member-utils";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +57,9 @@ function MemberCard({
             {member.role === "admin" ? (
               <Badge variant="secondary">Admin</Badge>
             ) : null}
+            {member.isPlaceholder ? (
+              <Badge variant="outline">Not on Greenroom</Badge>
+            ) : null}
           </div>
         }
       />
@@ -62,11 +67,13 @@ function MemberCard({
   );
 }
 
-/** Roster: member cards, a detail sheet, and the invite button where the FAB sits. */
+/** Roster: member cards, a detail sheet, and the invite or add menu where the FAB sits. */
 export function RosterTab({ band }: { band: BandSummary }) {
   const members = useMembers(band.id);
   const me = useMe().data;
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const selected = members.data?.find((m) => m.userId === selectedId) ?? null;
@@ -102,16 +109,36 @@ export function RosterTab({ band }: { band: BandSummary }) {
         </p>
       )}
 
-      {/* Same spot as the FAB. The wrapper carries the safe-area inset so the pill keeps symmetric padding. */}
-      <div className="pr-safe fixed right-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)] z-30 md:bottom-6">
-        <button
-          type="button"
-          onClick={() => setInviteOpen(true)}
-          className="flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-base font-medium whitespace-nowrap text-primary-foreground shadow-lift outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
-        >
-          <Link2 className="size-5 shrink-0" /> Invite link
-        </button>
-      </div>
+      {band.role === "admin" ? (
+        <Fab
+          label="Add to roster"
+          actions={[
+            {
+              key: "add-manually",
+              label: "Add manually",
+              icon: <UserPlus />,
+              onSelect: () => setAddOpen(true),
+            },
+            {
+              key: "invite",
+              label: "Invite",
+              icon: <Link2 />,
+              onSelect: () => setInviteOpen(true),
+            },
+          ]}
+        />
+      ) : (
+        /* Same spot as the FAB. The wrapper carries the safe-area inset so the pill keeps symmetric padding. */
+        <div className="pr-safe fixed right-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)] z-30 md:bottom-6">
+          <button
+            type="button"
+            onClick={() => setInviteOpen(true)}
+            className="flex h-14 items-center gap-2 rounded-full bg-primary px-5 text-base font-medium whitespace-nowrap text-primary-foreground shadow-lift outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95"
+          >
+            <Link2 className="size-5 shrink-0" /> Invite link
+          </button>
+        </div>
+      )}
 
       <MemberSheet
         bandId={band.id}
@@ -120,6 +147,20 @@ export function RosterTab({ band }: { band: BandSummary }) {
         onOpenChange={setSheetOpen}
         viewerIsAdmin={band.role === "admin"}
         viewerId={me?.id ?? ""}
+        onEdit={() => setEditOpen(true)}
+      />
+      <PlaceholderDrawer
+        bandId={band.id}
+        member={null}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
+      <PlaceholderDrawer
+        bandId={band.id}
+        member={selected?.isPlaceholder ? selected : null}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        nested
       />
       <InviteDrawer
         band={band}

@@ -64,8 +64,39 @@ export const bandMemberSchema = z.object({
   instruments: myInstrumentsSchema,
   role: bandRoleSchema,
   joinedAt: z.string(),
+  isPlaceholder: z.boolean(),
+  notes: z.string().nullable(),
 });
 export type BandMember = z.infer<typeof bandMemberSchema>;
+
+/** Roster member with no login; `email` is an optional contact address. */
+export const createPlaceholderSchema = z.object({
+  displayName: z.string().trim().min(1).max(100),
+  instruments: setInstrumentsSchema.default({ presets: [], custom: [] }),
+  email: z.string().trim().email().max(254).nullable().optional(),
+  notes: z.string().trim().max(1000).nullable().optional(),
+});
+export type CreatePlaceholder = z.infer<typeof createPlaceholderSchema>;
+
+export const updatePlaceholderSchema = z.object({
+  displayName: z.string().trim().min(1).max(100).optional(),
+  instruments: setInstrumentsSchema.optional(),
+  email: z.string().trim().email().max(254).nullable().optional(),
+  notes: z.string().trim().max(1000).nullable().optional(),
+});
+export type UpdatePlaceholder = z.infer<typeof updatePlaceholderSchema>;
+
+export const invitePlaceholderSchema = z.object({
+  userId: z.string().uuid(),
+  displayName: z.string(),
+  instruments: myInstrumentsSchema,
+});
+export type InvitePlaceholder = z.infer<typeof invitePlaceholderSchema>;
+
+export const linkPlaceholderSchema = z.object({
+  placeholderUserId: z.string().uuid(),
+});
+export type LinkPlaceholder = z.infer<typeof linkPlaceholderSchema>;
 
 export const updateMemberRoleSchema = z.object({ role: bandRoleSchema });
 export type UpdateMemberRole = z.infer<typeof updateMemberRoleSchema>;
@@ -92,4 +123,5 @@ export type InvitePreview = z.infer<typeof invitePreviewSchema>;
 export const BAND_ERROR_CODES = {
   lastAdmin: "LAST_ADMIN",
   onlyMemberMustDelete: "ONLY_MEMBER_MUST_DELETE",
+  placeholderNotLinkable: "PLACEHOLDER_NOT_LINKABLE",
 } as const;

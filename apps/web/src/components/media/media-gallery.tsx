@@ -92,6 +92,8 @@ import {
 import { MediaTile, type Density } from "./media-tile";
 import { MediaViewer } from "./media-viewer";
 import { useGigUploads } from "./upload/upload-provider";
+import type { UploadEntry } from "./upload/upload-store";
+import { UploadTile } from "./upload/upload-tile";
 import { UploadTray } from "./upload/upload-tray";
 
 const isTrayKey = (id: string) => id.startsWith("up-");
@@ -135,6 +137,8 @@ interface Section {
   folder: MediaFolderWithItems | null;
   name: string;
   items: MediaItem[];
+  /** Placed uploads still in flight (or awaiting their item), shown as tiles. */
+  uploads: UploadEntry[];
 }
 
 type FolderDialog =
@@ -223,10 +227,7 @@ function SectionHeader({
   return (
     <header
       data-testid="media-section-header"
-      className={cn(
-        "flex items-center gap-1 rounded-2xl pr-1 pl-2",
-        placing && "bg-primary/10 ring-2 ring-primary/60",
-      )}
+      className="flex items-center gap-1 rounded-2xl pr-1 pl-2"
     >
       <button
         type="button"
@@ -425,22 +426,74 @@ export function MediaGallery({
     () => [...(data?.folders ?? [])].sort((a, b) => a.position - b.position),
     [data?.folders],
   );
+  // Uploads with a chosen folder render in that folder while they run, until
+  // their media item shows up in the gallery data.
+  const landedIds = useMemo(
+    () =>
+      new Set(
+        media.data
+          ? [
+              ...media.data.unsorted,
+              ...media.data.folders.flatMap((f) => f.items),
+            ].map((i) => i.id)
+          : [],
+      ),
+    [media.data],
+  );
+  const galleryUploads = useMemo(
+    () =>
+      entries.filter(
+        (e) =>
+          e.placed &&
+          (e.status === "queued" ||
+            e.status === "uploading" ||
+            e.status === "done") &&
+          !(e.item && landedIds.has(e.item.id)),
+      ),
+    [entries, landedIds],
+  );
+  const galleryKeys = useMemo(
+    () => new Set(galleryUploads.map((e) => e.key)),
+    [galleryUploads],
+  );
   const sections: Section[] = useMemo(() => {
     if (!data) return [];
     const out: Section[] = [];
-    if (data.unsorted.length > 0 || folders.length === 0) {
+    const uploadsIn = (id: string | null) =>
+      galleryUploads.filter((e) => e.folderId === id);
+    if (
+      data.unsorted.length > 0 ||
+      uploadsIn(null).length > 0 ||
+      folders.length === 0
+    ) {
       out.push({
         key: "unsorted",
         folder: null,
         name: "Unsorted",
         items: data.unsorted,
+        uploads: uploadsIn(null),
       });
     }
     for (const f of folders) {
-      out.push({ key: f.id, folder: f, name: f.name, items: f.items });
+      out.push({
+        key: f.id,
+        folder: f,
+        name: f.name,
+        items: f.items,
+        uploads: uploadsIn(f.id),
+      });
     }
     return out;
-  }, [data, folders]);
+  }, [data, folders, galleryUploads]);
+
+  // Placed uploads whose item has landed in the gallery are done with the queue.
+  useEffect(() => {
+    const landed = entries.filter(
+      (e) =>
+        e.placed && e.status === "done" && e.item && landedIds.has(e.item.id),
+    );
+    if (landed.length > 0) store.dismiss(landed.map((e) => e.key));
+  }, [entries, landedIds, store]);
   const all = useMemo(() => (data ? orderedItems(data) : []), [data]);
   const byId = useMemo(() => new Map(all.map((i) => [i.id, i])), [all]);
   const selectedIds = all.filter((i) => selected.has(i.id)).map((i) => i.id);
@@ -763,7 +816,13 @@ export function MediaGallery({
           </div>
         ) : null}
         {sections.map((section) => {
-          if (section.items.length === 0 && !section.folder) return null;
+          if (
+            section.items.length === 0 &&
+            section.uploads.length === 0 &&
+            !section.folder
+          ) {
+            return null;
+          }
           const isCollapsed = collapsed.has(section.key);
           const folderIndex = section.folder
             ? folders.findIndex((f) => f.id === section.folder!.id)
@@ -806,7 +865,8 @@ export function MediaGallery({
                   )
                 }
               />
-              {isCollapsed ? null : section.items.length === 0 ? (
+              {isCollapsed ? null : section.items.length === 0 &&
+                section.uploads.length === 0 ? (
                 <p className="px-2 py-3 text-sm text-muted-foreground">
                   Empty folder
                 </p>
@@ -826,6 +886,22 @@ export function MediaGallery({
                       onStartRename={() => setEditingId(item.id)}
                       onRename={(name) => commitRename(item, name)}
                       dragCount={selected.has(item.id) ? selectedIds.length : 1}
+                    />
+                  ))}
+                  {section.uploads.map((e) => (
+                    <UploadTile
+                      key={e.key}
+                      entry={e}
+                      fill={density !== "names"}
+                      selected={selected.has(e.key)}
+                      editing={editingKey === e.key}
+                      songTitle={
+                        e.songId ? (songTitles.get(e.songId) ?? null) : null
+                      }
+                      onToggle={() => toggleTray(e.key)}
+                      onStartRename={() => setEditingKey(e.key)}
+                      onRename={(name) => commitTrayRename(e.key, name)}
+                      onRetry={() => store.retry(e.key)}
                     />
                   ))}
                 </ul>
@@ -892,27 +968,6 @@ export function MediaGallery({
                 <span className="hidden sm:inline">Open in </span>Drive
               </a>
             </Button>
-          ) : null}
-          {ready && all.length > 0 ? (
-            selecting ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="select-cancel"
-                onClick={clearSelection}
-              >
-                <X /> Cancel
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="select-start"
-                onClick={() => setSelecting(true)}
-              >
-                Select
-              </Button>
-            )
           ) : null}
         </div>
         {ready ? (
@@ -1005,7 +1060,7 @@ export function MediaGallery({
             data-testid="fab-stack"
             className="pr-safe fixed right-4 bottom-[calc(var(--tray-h,0px)+5.75rem)] z-30 flex w-14 flex-col items-center gap-2"
           >
-            {!selecting && sections.length > 1 ? (
+            {sections.length > 1 ? (
               <>
                 <Button
                   variant="secondary"
@@ -1065,6 +1120,7 @@ export function MediaGallery({
       {ready && entries.length > 0 ? (
         <UploadTray
           entries={entries}
+          hiddenKeys={galleryKeys}
           selected={selected}
           editingKey={editingKey}
           songTitle={(id) => (id ? (songTitles.get(id) ?? null) : null)}

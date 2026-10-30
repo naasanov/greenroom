@@ -20,3 +20,5 @@ save(@CurrentMembership() m: BandMembership) {}
 - Instruments are per user (`user_instruments`), not per membership. Presets live in `@greenroom/shared`.
 - 409 bodies carry `code`: `LAST_ADMIN`, `ONLY_MEMBER_MUST_DELETE` (`BAND_ERROR_CODES`).
 - Invites: one active link per band; `GET /invites/:token` is public, accept needs a session.
+- Roster-only members: `POST /bands/:bandId/placeholders` (admin) creates a `users` row with `is_placeholder` (unroutable `@placeholder.invalid` email, optional contact email and notes in `placeholder_*`) plus a normal membership. `PATCH .../placeholders/:userId` edits it; removal uses the member DELETE. They cannot be admins and are skipped by calendar sharing and the sole-member leave check.
+- Claiming: `GET /invites/:token/placeholders` (session) lists claimable entries (empty if already a member); `POST /invites/:token/link { placeholderUserId }` joins and merges in one transaction (membership repointed so lineups survive, instruments merged, other user FKs repointed, placeholder deleted). Already a member is a no-op; a bad target is 409 `PLACEHOLDER_NOT_LINKABLE`.

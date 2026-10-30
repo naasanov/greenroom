@@ -11,6 +11,9 @@ import {
 } from "@nestjs/common";
 import {
   createBandSchema,
+  createPlaceholderSchema,
+  linkPlaceholderSchema,
+  updatePlaceholderSchema,
   leaveBandSchema,
   setCurrentBandSchema,
   setInstrumentsSchema,
@@ -20,6 +23,10 @@ import {
   type BandMember,
   type BandSummary,
   type CreateBand,
+  type CreatePlaceholder,
+  type InvitePlaceholder,
+  type LinkPlaceholder,
+  type UpdatePlaceholder,
   type InviteLinkInfo,
   type InvitePreview,
   type LeaveBand,
@@ -79,6 +86,27 @@ export class BandsController {
   }
 
   @BandAdmin()
+  @Post(":bandId/placeholders")
+  @HttpCode(204)
+  async createPlaceholder(
+    @CurrentMembership() m: BandMembership,
+    @Body(new ZodPipe(createPlaceholderSchema)) body: CreatePlaceholder,
+  ): Promise<void> {
+    await this.bands.createPlaceholder(m.bandId, body);
+  }
+
+  @BandAdmin()
+  @Patch(":bandId/placeholders/:userId")
+  @HttpCode(204)
+  async updatePlaceholder(
+    @CurrentMembership() m: BandMembership,
+    @Param("userId") userId: string,
+    @Body(new ZodPipe(updatePlaceholderSchema)) body: UpdatePlaceholder,
+  ): Promise<void> {
+    await this.bands.updatePlaceholder(m.bandId, userId, body);
+  }
+
+  @BandAdmin()
   @Patch(":bandId/members/:userId")
   @HttpCode(204)
   async setRole(
@@ -131,6 +159,24 @@ export class InvitesController {
   @Get(":token")
   preview(@Param("token") token: string): Promise<InvitePreview> {
     return this.bands.previewInvite(token);
+  }
+
+  @Get(":token/placeholders")
+  placeholders(
+    @Param("token") token: string,
+    @CurrentUser() user: User,
+  ): Promise<InvitePlaceholder[]> {
+    return this.bands.invitePlaceholders(token, user.id);
+  }
+
+  @Post(":token/link")
+  @HttpCode(200)
+  link(
+    @Param("token") token: string,
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(linkPlaceholderSchema)) body: LinkPlaceholder,
+  ): Promise<BandSummary> {
+    return this.bands.linkPlaceholder(token, user.id, body.placeholderUserId);
   }
 
   @Post(":token/accept")

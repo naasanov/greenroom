@@ -50,8 +50,6 @@ interface Patch {
 }
 
 const CONCURRENCY = 2;
-const FLY_AFTER_MS = 700;
-const LAND_AFTER_MS = 1300;
 
 function describeError(e: unknown): { message: string; retryable: boolean } {
   if (e instanceof ApiError) {
@@ -366,15 +364,8 @@ export class UploadStore {
       void this.qc.invalidateQueries({
         queryKey: ["bands", entry.bandId, "song-media"],
       });
-      // Finished files stay in the tray until the user places them; those that
-      // already have a folder choice leave right away.
-      if (this.current(key)?.placed) {
-        setTimeout(
-          () => this.update(key, (e) => ({ ...e, flying: true })),
-          FLY_AFTER_MS,
-        );
-        setTimeout(() => this.remove([key]), LAND_AFTER_MS);
-      }
+      // Finished files stay in the tray until the user places them. Placed ones
+      // render in their gallery folder and are dismissed once the item lands.
     } catch (e) {
       if (isAbortError(e) || this.cancelled.has(key)) {
         // Cancelled by the user; the entry is already gone.

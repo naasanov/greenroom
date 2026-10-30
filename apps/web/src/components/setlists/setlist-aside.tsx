@@ -10,7 +10,14 @@ import {
   X,
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
 import { BottomDrawer, SideDrawer } from "@/components/app/bottom-drawer";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
@@ -352,6 +359,22 @@ function HistoryView({ builder }: { builder: SetlistBuilder }) {
   );
 }
 
+/** False until a frame after `active` turns true, so a new sheet slides in. */
+function useEntered(active: boolean): boolean {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setEntered(false);
+      return;
+    }
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => setEntered(true)),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [active]);
+  return entered && active;
+}
+
 /**
  * The song sheet for adding a song in place. It lives in a non-modal Radix
  * dialog layer so its inputs keep focus even though the sheet is portaled
@@ -375,7 +398,8 @@ function AddSongSheet({
 }) {
   const dirty = useRef(false);
   const [discard, setDiscard] = useState(false);
-  const open = !!sheet?.open;
+  const entered = useEntered(!!sheet);
+  const open = !!sheet?.open && entered;
 
   const requestClose = () => {
     if (dirty.current) setDiscard(true);

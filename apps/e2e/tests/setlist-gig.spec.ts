@@ -191,6 +191,13 @@ test("running total counts songs, minutes and songs without a length", async ({
   await expect(total(page)).toHaveText("5 songs · 11 min · 2 without a length");
 });
 
+test("Open references is an open icon, not a link icon", async ({ page }) => {
+  await openGig(page, seed.gigs.upcomingClub);
+  const button = page.getByRole("button", { name: "Open references" });
+  await expect(button.locator("svg.lucide-external-link")).toBeVisible();
+  await expect(button.locator("svg.lucide-link-2")).toHaveCount(0);
+});
+
 test("removing a row updates the list and the total", async ({ page }) => {
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);

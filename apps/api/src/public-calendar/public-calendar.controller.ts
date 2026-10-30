@@ -9,19 +9,20 @@ import {
 import { ThrottlerGuard } from "@nestjs/throttler";
 import type { PublicCalendar, PublicCalendarLink } from "@greenroom/shared";
 import { Public } from "../auth/decorators.js";
-import { BandAdmin } from "../bands/index.js";
+import { BandAdmin, BandMember } from "../bands/index.js";
 import { PublicCalendarService } from "./public-calendar.service.js";
 
-@BandAdmin()
 @Controller("bands/:bandId/public-calendar")
 export class PublicCalendarAdminController {
   constructor(private readonly calendar: PublicCalendarService) {}
 
+  @BandMember()
   @Get()
   link(@Param("bandId") bandId: string): Promise<PublicCalendarLink> {
     return this.calendar.link(bandId);
   }
 
+  @BandAdmin()
   @Post("reset")
   @HttpCode(200)
   reset(@Param("bandId") bandId: string): Promise<PublicCalendarLink> {

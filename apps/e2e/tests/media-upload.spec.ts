@@ -147,8 +147,14 @@ test("Select all then Move to folder works while items are still uploading", asy
   await expect
     .poll(async () => (await mySessions()).filter((s) => s.folderId).length)
     .toBe(2);
-  release();
   const stageSection = section(page, "Stage");
+  // The placeholders move into the chosen folder while still uploading.
+  await expect(stageSection.getByTestId("upload-tile")).toHaveCount(2);
+  await expect(stageSection.getByTestId("upload-tile").first()).toHaveAttribute(
+    "data-status",
+    "uploading",
+  );
+  release();
   await expect(stageSection.locator('[data-name="a.png"]')).toBeVisible();
   await expect(stageSection.locator('[data-name="b.png"]')).toBeVisible();
   // Placed uploads leave the tray on their own.

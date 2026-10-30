@@ -1,6 +1,12 @@
 "use client";
 
-import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
@@ -11,6 +17,7 @@ import {
 import { EVENT_TYPES } from "@/components/app/event-types";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
@@ -49,6 +56,7 @@ function GigDetails({
   onSave,
   onCancel,
   onDirty,
+  onTogglePublic,
   setlist,
   lineup,
 }: {
@@ -59,6 +67,7 @@ function GigDetails({
   onSave: (payload: CreateGig) => Promise<void>;
   onCancel: () => void;
   onDirty: (dirty: boolean) => void;
+  onTogglePublic: (show: boolean) => void;
   setlist: SetlistBuilder;
   lineup: LineupBuilder;
 }) {
@@ -100,69 +109,81 @@ function GigDetails({
             onDirtyChange={onDirty}
           />
         ) : (
-          <dl className="flex flex-col gap-4">
-            <Fact label="When">
-              <span
-                data-testid="gig-when"
-                className="flex flex-wrap justify-between gap-x-3"
-              >
-                <span>{dayLabel(gig.date)}</span>
-                <span className="ml-auto">{time ?? "No time yet"}</span>
-              </span>
-            </Fact>
-            {gig.loadInTime ? (
-              <Fact label="Load-in">{time12(gig.loadInTime)}</Fact>
-            ) : null}
-            {gig.venueName || gig.address ? (
-              <Fact label="Venue">
-                <span className="flex items-start gap-2">
-                  <span className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3">
-                    <span className="font-medium">{gig.venueName}</span>
-                    {gig.address ? (
-                      <span className="ml-auto min-w-0 text-right break-words text-muted-foreground">
-                        {gig.address}
-                      </span>
-                    ) : null}
-                  </span>
-                  <a
-                    href={mapsUrl(gig)}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open in Maps"
-                    className="mt-0.5 shrink-0 text-primary"
-                  >
-                    <ExternalLink className="size-4" />
-                  </a>
+          <>
+            <dl className="flex flex-col gap-4">
+              <Fact label="When">
+                <span
+                  data-testid="gig-when"
+                  className="flex flex-wrap justify-between gap-x-3"
+                >
+                  <span>{dayLabel(gig.date)}</span>
+                  <span className="ml-auto">{time ?? "No time yet"}</span>
                 </span>
               </Fact>
-            ) : null}
-            {hasContact ? (
-              <Fact label="Point of contact">
-                {gig.contactName ? <span>{gig.contactName}</span> : null}
-                {gig.contactPhone ? (
-                  <a
-                    href={`tel:${gig.contactPhone}`}
-                    className="block text-primary underline-offset-4 hover:underline"
-                  >
-                    {gig.contactPhone}
-                  </a>
-                ) : null}
-                {gig.contactEmail ? (
-                  <a
-                    href={`mailto:${gig.contactEmail}`}
-                    className="block text-primary underline-offset-4 hover:underline"
-                  >
-                    {gig.contactEmail}
-                  </a>
-                ) : null}
-              </Fact>
-            ) : null}
-            {gig.notes ? (
-              <Fact label="Notes">
-                <span className="whitespace-pre-wrap">{gig.notes}</span>
-              </Fact>
-            ) : null}
-          </dl>
+              {gig.loadInTime ? (
+                <Fact label="Load-in">{time12(gig.loadInTime)}</Fact>
+              ) : null}
+              {gig.venueName || gig.address ? (
+                <Fact label="Venue">
+                  <span className="flex items-start gap-2">
+                    <span className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3">
+                      <span className="font-medium">{gig.venueName}</span>
+                      {gig.address ? (
+                        <span className="ml-auto min-w-0 text-right break-words text-muted-foreground">
+                          {gig.address}
+                        </span>
+                      ) : null}
+                    </span>
+                    <a
+                      href={mapsUrl(gig)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Open in Maps"
+                      className="mt-0.5 shrink-0 text-primary"
+                    >
+                      <ExternalLink className="size-4" />
+                    </a>
+                  </span>
+                </Fact>
+              ) : null}
+              {hasContact ? (
+                <Fact label="Point of contact">
+                  {gig.contactName ? <span>{gig.contactName}</span> : null}
+                  {gig.contactPhone ? (
+                    <a
+                      href={`tel:${gig.contactPhone}`}
+                      className="block text-primary underline-offset-4 hover:underline"
+                    >
+                      {gig.contactPhone}
+                    </a>
+                  ) : null}
+                  {gig.contactEmail ? (
+                    <a
+                      href={`mailto:${gig.contactEmail}`}
+                      className="block text-primary underline-offset-4 hover:underline"
+                    >
+                      {gig.contactEmail}
+                    </a>
+                  ) : null}
+                </Fact>
+              ) : null}
+              {gig.notes ? (
+                <Fact label="Notes">
+                  <span className="whitespace-pre-wrap">{gig.notes}</span>
+                </Fact>
+              ) : null}
+            </dl>
+            <div className="flex items-center justify-between gap-4">
+              <label htmlFor="gig-view-public" className="text-sm font-medium">
+                Show on public calendar
+              </label>
+              <Switch
+                id="gig-view-public"
+                checked={gig.showOnPublicCalendar}
+                onCheckedChange={onTogglePublic}
+              />
+            </div>
+          </>
         )}
       </section>
       <div data-testid="gig-sections" className="flex flex-col gap-6">
@@ -272,6 +293,8 @@ export function GigDrawer({
           dismissible={!dirty}
           onDismissAttempt={requestClose}
           title={title}
+          closeIcon={ChevronDown}
+          bodyClassName="overflow-x-hidden"
           description={EVENT_TYPES.gig.label}
           headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}
           headerLeading={
@@ -304,6 +327,9 @@ export function GigDrawer({
               onSave={save}
               onCancel={cancelEdit}
               onDirty={onDirty}
+              onTogglePublic={(show) =>
+                update.mutate({ showOnPublicCalendar: show })
+              }
               setlist={setlist}
               lineup={lineup}
             />
