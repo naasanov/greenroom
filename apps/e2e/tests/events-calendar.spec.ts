@@ -180,7 +180,11 @@ test("a month chip fills the width and most of the height of its day", async ({
   expect(boxes[0]!.width).toBeGreaterThan(c.width - 12);
 });
 
-test("a month chip shows its time range under the title", async ({ page }) => {
+test("a month chip shows its time range under the title", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Phone chips show the title only");
   const gig = seed.gigs.upcomingClub;
   await showGigDate(page, gig.id, gig.title);
   const chip = calendar(page)
