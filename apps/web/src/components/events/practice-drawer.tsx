@@ -102,6 +102,7 @@ function PracticeDetails({
 }) {
   const me = useMe().data;
   const rsvp = useSetRsvp(bandId, occ.seriesId, occ.occurrenceKey, me?.id);
+  const [pendingRsvp, setPendingRsvp] = useState<RsvpChoice | null>(null);
   const series = usePracticeSeries(bandId, occ.seriesId, occ.recurring);
   const attendees: Attendee[] = occ.attendees.map((a) => ({
     id: a.userId,
@@ -184,8 +185,24 @@ function PracticeDetails({
           label="Your RSVP"
           fullWidth
           value={(occ.myRsvp === "no_response" ? "" : occ.myRsvp) as RsvpChoice}
-          onValueChange={(status) => rsvp.mutate(status)}
+          onValueChange={(status) =>
+            occ.recurring
+              ? setPendingRsvp(status)
+              : rsvp.mutate({ status, scope: "this" })
+          }
           options={RSVP_OPTIONS}
+        />
+        <EditScopeDialog
+          open={pendingRsvp !== null}
+          onOpenChange={(open) => !open && setPendingRsvp(null)}
+          action="rsvp"
+          onConfirm={(scope) => {
+            if (pendingRsvp)
+              rsvp.mutate({
+                status: pendingRsvp,
+                scope: SCOPE_TO_API[scope],
+              });
+          }}
         />
       </section>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import { useRef, useState, type ReactNode, type PointerEvent } from "react";
 import {
   Drawer,
@@ -168,7 +168,7 @@ export function SplitDrawer({
             className="absolute right-2 text-muted-foreground"
             onClick={requestClose}
           >
-            <X />
+            <ChevronDown />
           </Button>
         </div>
 

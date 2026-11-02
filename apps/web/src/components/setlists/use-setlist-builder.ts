@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   GigHistoryEntry,
   SetlistDetail,
+  SongSort,
   SongSummary,
 } from "@greenroom/shared";
 import {
@@ -13,6 +14,7 @@ import {
   type SetlistEditor,
   type SetlistSong,
 } from "@/lib/queries/setlists";
+import { loadSort } from "@/components/library/song-utils";
 import { useSongs } from "@/lib/queries/songs";
 import { useMediaQuery } from "@/lib/use-media-query";
 
@@ -39,6 +41,9 @@ export interface SetlistBuilder {
   loadError: boolean;
   editor: SetlistEditor;
   songs: SongSummary[] | undefined;
+  /** Library picker order, shared with the Music Library tab. */
+  sort: SongSort;
+  setSort: (sort: SongSort) => void;
   /** Runs an edit through `beforeChange`; `apply` gets the target setlist id override. */
   guarded: (apply: (target?: string) => void) => Promise<void>;
   libraryOpen: boolean;
@@ -92,7 +97,13 @@ export function useSetlistBuilder({
 }): SetlistBuilder {
   const detail = useSetlist(bandId, setlistId);
   const editor = useSetlistEditor(bandId, setlistId);
-  const songsQuery = useSongs(bandId, { q: "", sort: "title" });
+  const [sort, setSort] = useState<SongSort>("recent");
+  const [sortReady, setSortReady] = useState(false);
+  if (!sortReady && typeof window !== "undefined") {
+    setSortReady(true);
+    setSort(loadSort());
+  }
+  const songsQuery = useSongs(bandId, { q: "", sort }, sortReady);
   const copyMutation = useCopySetlist(bandId, setlistId);
   const [libraryOpen, setLibraryOpenState] = useState(false);
   const [historyOpen, setHistoryOpenState] = useState(false);
@@ -174,6 +185,8 @@ export function useSetlistBuilder({
     loadError: detail.isError,
     editor,
     songs: songsQuery.data,
+    sort,
+    setSort,
     guarded,
     libraryOpen,
     setLibraryOpen,

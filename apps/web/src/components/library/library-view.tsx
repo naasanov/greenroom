@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowUpDown,
   ListMusic,
   Music,
   Plus,
@@ -12,19 +11,11 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongSort } from "@greenroom/shared";
-import { SONG_SORTS } from "@greenroom/shared";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EmptyState } from "@/components/app/empty-state";
 import { Fab } from "@/components/app/fab";
 import { ListCard } from "@/components/app/list-card";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useCurrentBand } from "@/lib/current-band";
 import { usePrefetchSong, useSongs } from "@/lib/queries/songs";
@@ -32,12 +23,11 @@ import { pathWithout } from "@/lib/queries/spotify";
 import { cn } from "@/lib/utils";
 import { ExportDialog, useExportReturn } from "./export-dialog";
 import { ImportDialog } from "./import-dialog";
+import { SortMenu } from "./sort-menu";
 import { SongSheet, type SheetTarget } from "./song-sheet";
 import {
-  SORT_LABELS,
   formatDuration,
   loadSort,
-  saveSort,
   songArt,
 } from "./song-utils";
 import { useDebounced } from "./use-debounced";
@@ -182,30 +172,7 @@ export function LibraryView({ bandId }: { bandId: string }) {
               <Upload />
               <span className="hidden sm:inline">Export</span>
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" aria-label="Sort songs">
-                  <ArrowUpDown />
-                  <span>Sort: {SORT_LABELS[sort]}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(v) => {
-                    const next = v as SongSort;
-                    setSort(next);
-                    saveSort(next);
-                  }}
-                >
-                  {SONG_SORTS.map((s) => (
-                    <DropdownMenuRadioItem key={s} value={s}>
-                      {SORT_LABELS[s]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SortMenu sort={sort} onChange={setSort} />
           </div>
         </div>
 

@@ -138,7 +138,8 @@ test("a recurring practice shows a summary and creates its occurrences", async (
   await pane.getByLabel("Repeat", { exact: true }).selectOption("weekly");
   const days = pane.getByRole("group", { name: "Repeat on" });
   for (const d of ["Tue", "Thu"]) {
-    await days.getByRole("button", { name: d }).click();
+    const day = days.getByRole("button", { name: d });
+    if ((await day.getAttribute("aria-pressed")) !== "true") await day.click();
   }
   await pane.getByLabel("Ends").selectOption("count");
   await pane.getByLabel("Number of occurrences").fill("4");

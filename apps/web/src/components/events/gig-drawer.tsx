@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  ChevronDown,
-  ExternalLink,
-  Loader2,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
@@ -293,7 +287,6 @@ export function GigDrawer({
           dismissible={!dirty}
           onDismissAttempt={requestClose}
           title={title}
-          closeIcon={ChevronDown}
           bodyClassName="overflow-x-hidden"
           description={EVENT_TYPES.gig.label}
           headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}

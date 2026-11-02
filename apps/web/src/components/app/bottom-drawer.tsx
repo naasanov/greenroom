@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X, type LucideIcon } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -26,8 +26,6 @@ export interface BottomDrawerProps {
   headerAction?: ReactNode;
   /** Icon button(s) pinned to the header's left edge, mirroring headerAction. */
   headerLeading?: ReactNode;
-  /** Icon for the header close button. */
-  closeIcon?: LucideIcon;
   /** Optional trigger element for uncontrolled use. */
   trigger?: ReactNode;
   /** Pinned below the scrolling body, above the safe area. */
@@ -60,7 +58,6 @@ export function BottomDrawer({
   hideHeader,
   headerAction,
   headerLeading,
-  closeIcon: CloseIcon = X,
   trigger,
   footer,
   aside,
@@ -151,7 +148,7 @@ export function BottomDrawer({
                 className="text-muted-foreground"
                 onClick={requestClose}
               >
-                <CloseIcon />
+                <ChevronDown />
               </Button>
             </div>
           </DrawerHeader>
@@ -218,6 +215,7 @@ export function SideDrawer({
             title={title}
             headerAction={headerAction}
             onDone={() => onOpenChange(false)}
+            chevron
             heading={
               <DrawerTitle className="flex-1 truncate text-base font-semibold">
                 {title}
@@ -273,19 +271,34 @@ function SideDrawerHeader({
   heading,
   headerAction,
   onDone,
+  chevron,
 }: {
   title: string;
   heading: ReactNode;
   headerAction?: ReactNode;
   onDone: () => void;
+  /** Phone drawers close with the standard chevron; the side panel keeps Done. */
+  chevron?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 px-5 pt-3 pb-2">
       {heading}
       {headerAction}
-      <Button variant="ghost" size="sm" onClick={onDone}>
-        Done
-      </Button>
+      {chevron ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Close"
+          className="text-muted-foreground"
+          onClick={onDone}
+        >
+          <ChevronDown />
+        </Button>
+      ) : (
+        <Button variant="ghost" size="sm" onClick={onDone}>
+          Done
+        </Button>
+      )}
     </div>
   );
 }

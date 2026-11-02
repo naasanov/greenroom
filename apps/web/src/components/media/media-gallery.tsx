@@ -464,7 +464,9 @@ export function MediaGallery({
     if (
       data.unsorted.length > 0 ||
       uploadsIn(null).length > 0 ||
-      folders.length === 0
+      folders.length === 0 ||
+      entries.length > 0 ||
+      selecting
     ) {
       out.push({
         key: "unsorted",
@@ -484,7 +486,7 @@ export function MediaGallery({
       });
     }
     return out;
-  }, [data, folders, galleryUploads]);
+  }, [data, folders, galleryUploads, entries.length, selecting]);
 
   // Placed uploads whose item has landed in the gallery are done with the queue.
   useEffect(() => {
@@ -819,7 +821,9 @@ export function MediaGallery({
           if (
             section.items.length === 0 &&
             section.uploads.length === 0 &&
-            !section.folder
+            !section.folder &&
+            entries.length === 0 &&
+            !selecting
           ) {
             return null;
           }
@@ -1039,7 +1043,7 @@ export function MediaGallery({
             <Fab
               label="Add media"
               layout="desktop"
-              className="bottom-[calc(var(--tray-h,0px)+1.5rem)]"
+              className="pointer-events-none bottom-[calc(var(--tray-h,0px)+1.5rem)] [&_button]:pointer-events-auto"
               actions={[
                 {
                   key: "upload",
@@ -1058,7 +1062,7 @@ export function MediaGallery({
           ) : null}
           <div
             data-testid="fab-stack"
-            className="pr-safe fixed right-4 bottom-[calc(var(--tray-h,0px)+5.75rem)] z-30 flex w-14 flex-col items-center gap-2"
+            className="pr-safe fixed right-4 bottom-[calc(var(--tray-h,0px)+5.75rem)] z-20 flex w-14 flex-col items-center gap-2"
           >
             {sections.length > 1 ? (
               <>

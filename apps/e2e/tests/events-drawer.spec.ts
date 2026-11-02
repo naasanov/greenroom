@@ -1,6 +1,10 @@
 import type { BandSeedResult } from "@greenroom/db";
-import { practiceSeries, type Database } from "@greenroom/db";
-import { request as pwRequest, type Page } from "@playwright/test";
+import { USERS, practiceSeries, type Database } from "@greenroom/db";
+import {
+  request as pwRequest,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { API_URL, WEB_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
@@ -202,27 +206,87 @@ test("deleting a gig warns that media stays in Drive", async ({ page }) => {
   await expect(eventIn(page, gig.title)).toHaveCount(0);
 });
 
+const rsvpScopeDialog = (page: Page) =>
+  page.getByRole("dialog", { name: "RSVP to recurring event" });
+
+/** Date (YYYY-MM-DD) of the seeded weekly practice's k-th unmodified occurrence. */
+const occDate = (k: number) =>
+  new Date(Date.parse(seed.practice.firstStart) + k * 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+async function openOccurrence(page: Page, date: string) {
+  await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
+  const drawer = dialog(page, seed.practice.title);
+  await expect(drawer.getByTestId("attendee-list")).toBeVisible();
+  return drawer;
+}
+
+const going = (drawer: Locator) =>
+  drawer.getByRole("radio", { name: "Going", exact: true });
+
+async function rsvpGoing(page: Page, drawer: Locator, scope: string) {
+  await going(drawer).click();
+  const scopeDlg = rsvpScopeDialog(page);
+  await scopeDlg.getByRole("radio", { name: scope, exact: true }).click();
+  await scopeDlg.getByRole("button", { name: "Save RSVP" }).click();
+  await expect(going(drawer)).toBeChecked();
+}
+
 test("practice occurrence shows attendees and saves an RSVP", async ({
   page,
 }) => {
   const date = seed.practice.moved.startsAt.slice(0, 10);
-  await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
-  const drawer = dialog(page, seed.practice.title);
-  await expect(drawer.getByTestId("attendee-list")).toBeVisible();
-  await drawer.getByRole("radio", { name: "Going", exact: true }).click();
-  await expect(
-    drawer.getByRole("radio", { name: "Going", exact: true }),
-  ).toBeChecked();
+  const drawer = await openOccurrence(page, date);
+  await going(drawer).click();
+  await expect(rsvpScopeDialog(page)).toContainText("your response applies");
+  await rsvpScopeDialog(page)
+    .getByRole("button", { name: "Save RSVP" })
+    .click();
+  await expect(going(drawer)).toBeChecked();
   await expect(
     drawer.locator('[data-testid="attendee-list"] li[data-status="going"]'),
   ).toHaveCount(2);
   await page.reload();
-  await expect(
-    dialog(page, seed.practice.title).getByRole("radio", {
-      name: "Going",
-      exact: true,
-    }),
-  ).toBeChecked();
+  await expect(going(dialog(page, seed.practice.title))).toBeChecked();
+});
+
+test("RSVP scope this leaves other occurrences untouched", async ({ page }) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  await rsvpGoing(page, drawer, "This event");
+  const other = await openOccurrence(page, occDate(8));
+  await expect(going(other)).not.toBeChecked();
+  const same = await openOccurrence(page, occDate(7));
+  await expect(going(same)).toBeChecked();
+});
+
+test("RSVP scope this and following skips earlier occurrences", async ({
+  page,
+}) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  await rsvpGoing(page, drawer, "This and following events");
+  await expect(going(await openOccurrence(page, occDate(9)))).toBeChecked();
+  await expect(going(await openOccurrence(page, occDate(8)))).toBeChecked();
+  await expect(going(await openOccurrence(page, occDate(3)))).not.toBeChecked();
+});
+
+test("RSVP scope all reaches earlier and later occurrences", async ({
+  page,
+}) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  await rsvpGoing(page, drawer, "All events");
+  await expect(going(await openOccurrence(page, occDate(0)))).toBeChecked();
+  await expect(going(await openOccurrence(page, occDate(9)))).toBeChecked();
+});
+
+test("cancelling the RSVP scope dialog leaves the status unchanged", async ({
+  page,
+}) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  await going(drawer).click();
+  await rsvpScopeDialog(page).getByRole("button", { name: "Back" }).click();
+  await expect(rsvpScopeDialog(page)).toHaveCount(0);
+  await expect(going(drawer)).not.toBeChecked();
 });
 
 const scopeDialog = (page: Page) =>
@@ -458,8 +522,8 @@ test("the view state toggles Show on public calendar and saves immediately", asy
   await expect(toggle).not.toBeChecked();
 });
 
-test("the events page copies the public calendar link", async ({ page }) => {
-  await page.addInitScript(() => {
+const stubClipboard = (page: import("@playwright/test").Page) =>
+  page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
@@ -470,13 +534,54 @@ test("the events page copies the public calendar link", async ({ page }) => {
       },
     });
   });
+
+test("the export dialog shows the public link and copies it", async ({
+  page,
+}) => {
+  await stubClipboard(page);
   await page.goto("/events");
-  await page.getByTestId("copy-public-calendar").click();
-  await expect(page.getByTestId("copy-public-calendar")).toHaveText(/Copied/);
+  await expect(page.getByTestId("copy-public-calendar")).toHaveCount(0);
+  await page.getByTestId("public-calendar-export").click();
+  const dlg = page.getByTestId("public-calendar-dialog");
+  await expect(
+    dlg.getByRole("heading", { name: "Public gig calendar" }),
+  ).toBeVisible();
+  const input = dlg.getByLabel("Public calendar link");
+  await expect(input).toHaveValue(/\/c\//);
+  await dlg.getByRole("button", { name: "Copy link" }).click();
+  await expect(dlg.getByRole("button", { name: "Copied" })).toBeVisible();
   const copied = await page.evaluate(
     () => (window as unknown as { __copied: string }).__copied,
   );
-  expect(copied).toMatch(/\/c\//);
+  expect(copied).toBe(await input.inputValue());
+});
+
+test("the export dialog lets an admin reset the link", async ({ page }) => {
+  await page.goto("/events");
+  await page.getByTestId("public-calendar-export").click();
+  const dlg = page.getByTestId("public-calendar-dialog");
+  const input = dlg.getByLabel("Public calendar link");
+  await expect(input).toHaveValue(/\/c\//);
+  const before = await input.inputValue();
+  await dlg.getByRole("button", { name: "Reset link" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Reset link" })
+    .click();
+  await expect(input).not.toHaveValue(before);
+});
+
+test("the export dialog does not offer reset to a member", async ({
+  page,
+  loginAs,
+}) => {
+  await loginAs(USERS.dev.email);
+  await page.goto("/events");
+  await page.getByTestId("public-calendar-export").click();
+  const dlg = page.getByTestId("public-calendar-dialog");
+  await expect(dlg.getByLabel("Public calendar link")).toHaveValue(/\/c\//);
+  await expect(dlg.getByRole("button", { name: "Copy link" })).toBeVisible();
+  await expect(dlg.getByRole("button", { name: "Reset link" })).toHaveCount(0);
 });
 
 test("the new gig drawer does not scroll horizontally", async ({ page }) => {

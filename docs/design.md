@@ -22,7 +22,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - In the app you set the practice, and everyone gets an invite and RSVPs (going / maybe / not going).
 - You can mark that you're not making a practice from the app, and that updates Google Calendar.
 - You can also decline on Google Calendar, and that updates the app (two-way sync).
-- **RSVP display (in the practice drawer):** one attendee list, Google Calendar style, not separate lists. Going members show a check icon; not-going members show an X and sort to the bottom. **"Maybe" is supported** (maps to Google's tentative status) with a question-mark icon. Sort order: going, maybe, no response (neutral/no icon), then not going at the bottom.
+- **RSVP display (in the practice drawer):** one attendee list, Google Calendar style, not separate lists. Going members show a check icon; not-going members show an X and sort to the bottom. **"Maybe" is supported** (maps to Google's tentative status) with a question-mark icon. Sort order: going, maybe, no response (neutral/no icon), then not going at the bottom. **RSVPing on a recurring practice asks which occurrences it applies to** (this event, this and following, all events), the same picker as edit and cancel; non-recurring practices RSVP immediately.
 - **RSVPs mirror Google Calendar's native RSVP system:** each member's response maps to the attendee response status on the Calendar event (accepted / tentative / declined / needs action), so the same check marks show in Google Calendar and in the app, synced both ways.
 - Practices are cancelable.
 - A single practice can be moved to a different day without moving the rest of the recurring series.
@@ -192,6 +192,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Recurrence must map to what Google Calendar's API can represent (it uses the RRULE recurrence standard). Mirror RRULE's supported options rather than inventing custom recurrence that can't round-trip through Calendar sync.
 - **Event drawers sit on the right on desktop (decided 2026-10-24):** the create, gig, and practice drawers rise from the bottom in the right part of the screen, directly left of the FAB/agenda buttons, or directly left of the agenda sheet when it is open. Drawer titles are centered.
 - Bottom-drawer pattern throughout: chosen deliberately — thumb-reachable, touch/mobile-friendly, feels native when pulling the app up at a venue. Flow reveals only the next decision at each step (no wall of fields).
+- **Close control (decided 2026-11-02):** every bottom drawer closes with a down chevron button (aria-label "Close") in the header, never an X. A phone-stacked side drawer uses the same chevron instead of "Done"; the wide-screen side panel keeps "Done".
 - **Drawers are non-modal (decided 2026-10-20):** no dimmed or blurred backdrop, and the page behind stays interactive. A tap outside the drawer closes it AND goes through to what was tapped (e.g. gig A's drawer is open, tapping gig B closes A and opens B). If the drawer has unsaved input, an outside tap shows the discard-changes confirm instead and does not pass through. Inside a stacked drawer, tapping the drawer underneath closes only the top one.
 - **Replacing a drawer animates both at once (decided 2026-10-21):** when an outside tap opens a different drawer (gig A's drawer is open, tap gig B), the content never snaps to B. A's drawer slides down and closes while, at the same moment, B's drawer slides up over it. Both animations run simultaneously, with B on top.
 - **Stacked drawers look stacked:** a second drawer (library, roster, venue picker) on a phone slides up as its own drawer on top, with the drawer underneath still peeking out above it, not as a panel that replaces the first drawer's content.
@@ -254,6 +255,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - **Never public:** setlist, lineup, notes, point of contact, call/load-in time, media, and practices.
 - **Per-gig "show on public calendar" toggle, ON by default.** Turn it off for tentative bookings or private events.
 - **Views:** toggle between a list of upcoming shows and a calendar view. List is the default, since it reads best on phones. Both can reuse the app's existing agenda and calendar components in read-only mode.
+- **Sharing from the Events tab:** an export icon beside the month heading opens a dialog with the link, a copy button and (admins only) a reset button. It matches the settings row and is hidden until the link loads.
 
 # Music Library tab
 
@@ -293,7 +295,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 ## Library gaps resolved
 - **Search bar** over the library.
-- **Sort options:** Title A–Z, Artist A–Z, Recently added (default), Last played (most recent gig using the song), Most played (number of setlists it's in).
+- **Sort options:** Title A–Z, Artist A–Z, Recently added (default), Last played (most recent gig using the song), Most played (number of setlists it's in). The gig setlist library picker has the same sort (icon button beside search) and shares the persisted choice with the Music Library tab.
 - **"Used in" list** on the song detail sheet: which gigs/setlists use this song. Powers the delete warning and the last/most played sorts.
 - **Duplicate check on single adds:** "already in your library" if the song exists.
 - **Large playlist imports:** progress indicator plus an end summary (e.g. "52 added, 8 already in library").

@@ -286,16 +286,16 @@ export function useSetRsvp(
   const qc = useQueryClient();
   const key = keys.occurrence(bandId, seriesId, occurrenceKey);
   return useMutation({
-    mutationFn: (status: RsvpStatus) =>
+    mutationFn: ({ status, scope }: { status: RsvpStatus; scope: EditScope }) =>
       api(
         `/bands/${bandId}/practices/${seriesId}/occurrences/${occurrenceKey}/rsvp`,
         {
           method: "PUT",
-          body: { status },
+          body: { status, scope },
           schema: typed<PracticeOccurrence>(),
         },
       ),
-    onMutate: async (status) => {
+    onMutate: async ({ status }) => {
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<PracticeOccurrence>(key);
       qc.setQueryData<PracticeOccurrence>(key, (occ) =>
@@ -315,6 +315,11 @@ export function useSetRsvp(
       if (ctx?.previous) qc.setQueryData(key, ctx.previous);
     },
     onSuccess: (occ) => qc.setQueryData(key, occ),
+    onSettled: (_d, _e, vars) => {
+      if (vars.scope === "this") return;
+      void qc.invalidateQueries({ queryKey: ["bands", bandId, "practices"] });
+      void qc.invalidateQueries({ queryKey: eventKeys.all(bandId) });
+    },
   });
 }
 

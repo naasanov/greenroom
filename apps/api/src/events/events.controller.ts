@@ -166,6 +166,7 @@ export class PracticesController {
       seriesId,
       key,
       body.status,
+      body.scope,
     );
   }
 

@@ -148,6 +148,7 @@ export function EventCalendar({
   onRangeChange,
   onDayClick,
   onEventClick,
+  headerAction,
   selectedEvent,
 }: {
   mode: CalendarMode;
@@ -158,6 +159,8 @@ export function EventCalendar({
   onRangeChange: (range: { from: string; to: string }) => void;
   onDayClick: (date: string) => void;
   onEventClick: (event: CalendarEvent) => void;
+  /** Optional control rendered beside the month heading. */
+  headerAction?: React.ReactNode;
   selectedEvent?: SelectedEvent | null;
 }) {
   const calRef = useRef<FullCalendar>(null);
@@ -271,6 +274,7 @@ export function EventCalendar({
         >
           {title}
         </h2>
+        {headerAction}
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" onClick={() => nav("today")}>
             Today

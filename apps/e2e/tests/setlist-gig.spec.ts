@@ -2,7 +2,7 @@ import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
-import { apiAs } from "./library-helpers.js";
+import { apiAs, chooseSort } from "./library-helpers.js";
 
 const AVA = USERS.ava.email;
 let seed: BandSeedResult;
@@ -181,6 +181,36 @@ test("tapping library rows adds and removes songs with check marks", async ({
     "Low Tide",
     "Red Line",
   ]);
+});
+
+test("the library picker sorts songs and shares the Music Library sort", async ({
+  page,
+}) => {
+  await openGig(page, seed.gigs.tentative);
+  await openLibrary(page);
+
+  const names = async () =>
+    (
+      await page
+        .getByTestId("library-picker")
+        .getByRole("list", { name: "Library songs" })
+        .getByRole("button")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))
+    ).filter((n): n is string => !!n);
+
+  await chooseSort(page, "Title A-Z");
+  await expect.poll(names).toEqual([...(await names())].sort());
+  const byTitle = await names();
+
+  await chooseSort(page, "Artist A-Z");
+  await expect.poll(names).not.toEqual(byTitle);
+  expect((await names()).length).toBe(byTitle.length);
+
+  await closeLibrary(page);
+  await page.goto("/library");
+  await expect(page.getByRole("button", { name: "Sort songs" })).toHaveText(
+    /Artist A-Z/,
+  );
 });
 
 test("running total counts songs, minutes and songs without a length", async ({

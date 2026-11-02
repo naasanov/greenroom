@@ -36,6 +36,7 @@ import { copyItems } from "../setlists/items.js";
 import { resolveAssignment, startsHere } from "./assignment.js";
 import {
   buildOccurrence,
+  isRecurring,
   type OverrideRow,
   type SeriesRow,
 } from "./occurrences.js";
@@ -45,6 +46,7 @@ import {
   firstOccurrence,
   isOccurrence,
   occurrencesBefore,
+  occurrencesBetween,
   parseRecurrence,
   ruleCount,
   truncateRrule,
@@ -64,6 +66,10 @@ type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+/** Scoped RSVPs reach at most this far past today and touch at most this many rows. */
+const RSVP_HORIZON_DAYS = 365;
+const RSVP_MAX_ROWS = 366;
 const RSVP_ORDER: Record<RsvpStatus, number> = {
   going: 0,
   maybe: 1,
@@ -649,21 +655,68 @@ export class PracticesService {
     seriesId: string,
     key: string,
     status: RsvpStatus,
+    scope: EditScope = "this",
   ): Promise<PracticeOccurrence> {
     const series = await this.findSeries(bandId, seriesId);
     const { original, override } = await this.requireOccurrence(series, key);
-    await this.db
-      .insert(practiceRsvps)
-      .values({ bandId, seriesId, originalStart: original, userId, status })
-      .onConflictDoUpdate({
-        target: [
-          practiceRsvps.seriesId,
-          practiceRsvps.originalStart,
-          practiceRsvps.userId,
-        ],
-        set: { status },
-      });
+    const starts =
+      scope === "this" || !isRecurring(series)
+        ? [original]
+        : await this.rsvpTargets(series, original, scope);
+    await this.db.transaction((tx) =>
+      tx
+        .insert(practiceRsvps)
+        .values(
+          starts.map((originalStart) => ({
+            bandId,
+            seriesId,
+            originalStart,
+            userId,
+            status,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            practiceRsvps.seriesId,
+            practiceRsvps.originalStart,
+            practiceRsvps.userId,
+          ],
+          set: { status },
+        }),
+    );
     return this.detail(series, original, override, userId);
+  }
+
+  /** Non-cancelled occurrences in scope up to the horizon, always including `original`, capped. */
+  private async rsvpTargets(
+    series: SeriesRow,
+    original: Date,
+    scope: EditScope,
+  ): Promise<Date[]> {
+    const horizon = new Date(Date.now() + RSVP_HORIZON_DAYS * DAY_MS);
+    const from = scope === "all" ? series.dtstart : original;
+    const cancelled = await this.db
+      .select({ at: overridesTable.originalStart })
+      .from(overridesTable)
+      .where(
+        and(
+          eq(overridesTable.seriesId, series.id),
+          eq(overridesTable.cancelled, true),
+        ),
+      );
+    const skip = new Set(cancelled.map((c) => c.at.getTime()));
+    const others = occurrencesBetween(
+      series,
+      from,
+      horizon > original ? horizon : original,
+    ).filter(
+      (d) => d.getTime() !== original.getTime() && !skip.has(d.getTime()),
+    );
+    const room = RSVP_MAX_ROWS - 1;
+    return [
+      original,
+      ...(scope === "all" ? others.slice(-room) : others.slice(0, room)),
+    ];
   }
 
   // ---- setlist assignment ----

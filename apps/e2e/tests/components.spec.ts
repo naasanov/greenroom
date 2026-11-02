@@ -118,7 +118,7 @@ test("side drawer sits beside on desktop and stacks over on mobile", async ({
     }).toPass();
     await lib.getByText("Dreams").click();
 
-    await lib.getByRole("button", { name: "Done" }).click();
+    await lib.getByRole("button", { name: "Close" }).click();
     await expect(lib).toBeHidden();
   } else {
     const side = page.locator('aside[aria-label="Song library"]');

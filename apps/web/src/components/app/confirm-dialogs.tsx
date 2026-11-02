@@ -110,7 +110,7 @@ export function EditScopeDialog({
   hide = [],
 }: DialogBase & {
   onConfirm: (scope: EditScope) => void;
-  action?: "edit" | "cancel";
+  action?: "edit" | "cancel" | "rsvp";
   /** Scopes that do not apply to this change and are not offered. */
   hide?: EditScope[];
 }) {
@@ -119,7 +119,7 @@ export function EditScopeDialog({
   const scope = options.some((s) => s.value === picked)
     ? picked
     : (options[0]?.value ?? "all");
-  const verb = action === "edit" ? "Edit" : "Cancel";
+  const verb = { edit: "Edit", cancel: "Cancel", rsvp: "RSVP to" }[action];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
@@ -128,7 +128,9 @@ export function EditScopeDialog({
             {verb} recurring event
           </DialogTitle>
           <DialogDescription>
-            Choose which events this change applies to.
+            {action === "rsvp"
+              ? "Choose which events your response applies to."
+              : "Choose which events this change applies to."}
           </DialogDescription>
         </DialogHeader>
         <RadioGroup
@@ -157,7 +159,7 @@ export function EditScopeDialog({
               onOpenChange(false);
             }}
           >
-            OK
+            {action === "rsvp" ? "Save RSVP" : "OK"}
           </Button>
         </DialogFooter>
       </DialogContent>

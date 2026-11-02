@@ -22,6 +22,7 @@ import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
 import { BottomDrawer, SideDrawer } from "@/components/app/bottom-drawer";
 import { DiscardChangesDialog } from "@/components/app/confirm-dialogs";
 import { EmptyState } from "@/components/app/empty-state";
+import { SortMenu } from "@/components/library/sort-menu";
 import { SongSheet } from "@/components/library/song-sheet";
 import { useDebounced } from "@/components/library/use-debounced";
 import {
@@ -138,17 +139,25 @@ function LibraryView({
           label="Search the library"
           placeholder="Search songs"
           action={
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Copy from a past gig"
-              title="Copy from a past gig"
-              className="shrink-0"
-              onClick={() => builder.setHistoryOpen(true)}
-            >
-              <History />
-            </Button>
+            <>
+              <SortMenu
+                iconOnly
+                sort={builder.sort}
+                onChange={builder.setSort}
+                className="shrink-0"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Copy from a past gig"
+                title="Copy from a past gig"
+                className="shrink-0"
+                onClick={() => builder.setHistoryOpen(true)}
+              >
+                <History />
+              </Button>
+            </>
           }
         />
         {!filtered ? (

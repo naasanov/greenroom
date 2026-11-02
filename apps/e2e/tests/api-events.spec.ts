@@ -907,6 +907,101 @@ test("rsvp: per-user status and attendee ordering", async ({ testApi, db }) => {
   expect((await put(out.api, "going")).status()).toBe(404);
 });
 
+test("rsvp scope: this, this_and_following and all touch only the caller's rows", async ({
+  testApi,
+  db,
+}) => {
+  const a = await newBand(testApi);
+  const b = await client(testApi, "scope-b@example.com");
+  await db
+    .insert(memberships)
+    .values({ bandId: a.bandId, userId: b.user.id, role: "member" });
+  const s = await createPractice(
+    a.api,
+    a.bandId,
+    weekly({ end: { type: "count", count: 5 } }),
+  );
+  const keys: string[] = (await listEvents(a.api, a.bandId)).map(
+    (e) => e.occurrenceKey,
+  );
+  expect(keys).toHaveLength(5);
+  const path = (i: number) => occPath(a.bandId, s.id, keys[i]!);
+  const mine = async () =>
+    Promise.all(
+      keys.map(async (_, i) => {
+        const res = await a.api.get(path(i));
+        return res.ok() ? (await res.json()).myRsvp : null;
+      }),
+    );
+  const put = (i: number, data: Json) => a.api.put(`${path(i)}/rsvp`, { data });
+
+  // Omitted scope behaves as "this".
+  expect((await put(1, { status: "maybe" })).status()).toBe(200);
+  expect(await mine()).toEqual([
+    "no_response",
+    "maybe",
+    "no_response",
+    "no_response",
+    "no_response",
+  ]);
+
+  // Cancel the 4th occurrence: scoped writes skip it.
+  await a.api.delete(`${path(3)}?scope=this`);
+
+  const res = await put(2, { status: "going", scope: "this_and_following" });
+  expect(res.status()).toBe(200);
+  expect((await res.json()).myRsvp).toBe("going");
+  expect(await mine()).toEqual([
+    "no_response",
+    "maybe",
+    "going",
+    null,
+    "going",
+  ]);
+
+  expect((await put(4, { status: "not_going", scope: "all" })).status()).toBe(
+    200,
+  );
+  const all = await mine();
+  expect(all).toEqual([
+    "not_going",
+    "not_going",
+    "not_going",
+    null,
+    "not_going",
+  ]);
+
+  // Another member's response is untouched by the caller's scoped writes.
+  await b.api.put(`${path(0)}/rsvp`, { data: { status: "going" } });
+  await put(0, { status: "maybe", scope: "all" });
+  const asB = await Promise.all(
+    [0, 1, 2, 4].map(
+      async (i) => (await (await b.api.get(path(i))).json()).myRsvp,
+    ),
+  );
+  expect(asB).toEqual(["going", "no_response", "no_response", "no_response"]);
+
+  // Validation.
+  expect((await put(0, { status: "going", scope: "bogus" })).status()).toBe(
+    400,
+  );
+  expect((await put(0, { scope: "all" })).status()).toBe(400);
+});
+
+test("rsvp scope is ignored on a non-recurring practice", async ({
+  testApi,
+}) => {
+  const a = await newBand(testApi);
+  const s = await createPractice(a.api, a.bandId, {});
+  const [ev] = await listEvents(a.api, a.bandId);
+  const res = await a.api.put(
+    `${occPath(a.bandId, s.id, ev!.occurrenceKey)}/rsvp`,
+    { data: { status: "going", scope: "all" } },
+  );
+  expect(res.status()).toBe(200);
+  expect((await res.json()).myRsvp).toBe("going");
+});
+
 // ---------------------------------------------------------------- setlists
 
 test("setlist assignment: single beats forward, latest forward wins, conflicts flagged", async ({

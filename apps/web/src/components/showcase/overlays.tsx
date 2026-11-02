@@ -69,7 +69,7 @@ export function DrawersSection() {
     <Section
       id="drawers"
       title="Drawers"
-      description="Bottom drawers are for creating or editing one thing: thumb reachable, drag the handle or tap outside to dismiss."
+      description="Bottom drawers are for creating or editing one thing: thumb reachable, drag the handle, tap the down chevron, or tap outside to dismiss."
     >
       <Demo title="Bottom drawer and stacking" className="flex flex-wrap gap-3">
         <Button onClick={() => setBasic(true)}>Open drawer</Button>

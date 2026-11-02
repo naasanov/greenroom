@@ -502,3 +502,59 @@ test("dragging a tile onto a folder section moves it; a selection moves together
   await drag("u2.png", "Posed");
   await expect(section(page, "Posed").getByTestId("media-tile")).toHaveCount(3);
 });
+
+test("picking files offers Unsorted even when it has no items", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("select-fab").click();
+  for (const n of ["u1.png", "u2.png", "clip.mp4"]) {
+    await tile(page, n).getByTestId("media-open").click();
+  }
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Stage" }).click();
+  await expect(section(page, "Unsorted")).toHaveCount(0);
+  await page.getByTestId("media-file-input").setInputFiles({
+    name: "new.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("new-image"),
+  });
+  await expect(section(page, "Unsorted")).toBeVisible();
+});
+
+test("uploading into an empty gallery shows an Unsorted section", async ({
+  page,
+}) => {
+  await openGallery(page, seed.gigs.pastBar.id);
+  await expect(page.getByTestId("media-empty")).toBeVisible();
+  await page.getByTestId("media-file-input").setInputFiles({
+    name: "first.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("first-image"),
+  });
+  await expect(section(page, "Unsorted")).toBeVisible();
+  await expect(page.getByTestId("upload-tray")).toBeVisible();
+});
+
+test("plus menu options sit above the FAB stack and are tappable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await openGallery(page, m.gigId);
+  await page.getByRole("button", { name: "Add media" }).click();
+  for (const key of ["upload", "new-folder"]) {
+    const option = page.getByTestId(`fab-action-${key}`);
+    await expect(option).toBeVisible();
+    const topmost = await option.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      );
+      return !!hit && el.contains(hit);
+    });
+    expect(topmost).toBe(true);
+  }
+  await page.getByTestId("fab-action-new-folder").click();
+  await expect(page.getByLabel("Folder name")).toBeVisible();
+});
