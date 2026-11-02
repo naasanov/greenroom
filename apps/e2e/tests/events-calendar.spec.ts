@@ -1,6 +1,12 @@
 import type { BandSeedResult } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
-import { AVA, calendar, eventIn, showGigDate } from "./events-helpers.js";
+import {
+  AVA,
+  calendar,
+  eventIn,
+  showGigDate,
+  showWeekOf,
+} from "./events-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -61,7 +67,7 @@ test("a gig with a date but no time sits in the all-day strip", async ({
 }) => {
   const gig = seed.gigs.tentative;
   await showGigDate(page, gig.id, gig.title);
-  await page.getByRole("radio", { name: "Week" }).click();
+  await showWeekOf(page, gig.date);
   const allDay = calendar(page).locator(".fc-timegrid .fc-daygrid-body");
   await expect(
     allDay.locator(".fc-event", { hasText: gig.title }),
@@ -71,7 +77,7 @@ test("a gig with a date but no time sits in the all-day strip", async ({
 test("timed events appear in the week time grid", async ({ page }) => {
   const gig = seed.gigs.upcomingClub;
   await showGigDate(page, gig.id, gig.title);
-  await page.getByRole("radio", { name: "Week" }).click();
+  await showWeekOf(page, gig.date);
   const block = calendar(page).locator(".fc-timegrid-event", {
     hasText: gig.title,
   });

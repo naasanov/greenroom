@@ -180,6 +180,15 @@ test("the delete icon sits at the top left of the drawer and confirms", async ({
   const trash = drawer.getByRole("button", { name: "Delete gig" });
   const title = drawer.locator("[data-slot=drawer-title]");
   await expect(trash).toBeVisible();
+  let last = Number.NaN;
+  await expect
+    .poll(async () => {
+      const y = (await drawer.boundingBox())!.y;
+      const settled = y === last;
+      last = y;
+      return settled;
+    })
+    .toBe(true);
   const t = (await trash.boundingBox())!;
   const d = (await drawer.boundingBox())!;
   const ti = (await title.boundingBox())!;
