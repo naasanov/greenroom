@@ -2,7 +2,13 @@ import type { BandSeedResult } from "@greenroom/db";
 import { SONGS } from "@greenroom/db";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
-import { AVA, isoDay, pickSide } from "./events-helpers.js";
+import {
+  AVA,
+  closeSideDrawer,
+  isoDay,
+  pickSide,
+  sideDrawerOf,
+} from "./events-helpers.js";
 import { apiAs } from "./library-helpers.js";
 
 let seed: BandSeedResult;
@@ -92,7 +98,7 @@ async function addFromLibrary(page: Page, ...titles: string[]) {
   await page.getByRole("button", { name: "Edit setlist" }).click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
   for (const t of titles) await libraryRow(page, t).click();
-  await page.getByRole("button", { name: "Done" }).click();
+  await closeSideDrawer(sideDrawerOf(page.getByTestId("library-picker")));
   await expect(page.getByTestId("library-picker")).toBeHidden();
 }
 
@@ -102,7 +108,7 @@ async function openLibrary(page: Page) {
 }
 
 async function closeLibrary(page: Page) {
-  await page.getByRole("button", { name: "Done" }).click();
+  await closeSideDrawer(sideDrawerOf(page.getByTestId("library-picker")));
   await expect(page.getByTestId("library-picker")).toBeHidden();
 }
 

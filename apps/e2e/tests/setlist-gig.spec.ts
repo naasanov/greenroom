@@ -2,6 +2,7 @@ import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
+import { closeSideDrawer, sideDrawerOf } from "./events-helpers.js";
 import { apiAs, chooseSort } from "./library-helpers.js";
 
 const AVA = USERS.ava.email;
@@ -48,7 +49,7 @@ async function openLibrary(page: Page) {
 }
 
 async function closeLibrary(page: Page) {
-  await page.getByRole("button", { name: "Done" }).click();
+  await closeSideDrawer(sideDrawerOf(page.getByTestId("library-picker")));
   await expect(page.getByTestId("library-picker")).toBeHidden();
 }
 

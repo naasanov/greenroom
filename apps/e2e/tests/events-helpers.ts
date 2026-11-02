@@ -11,6 +11,20 @@ export function isoDay(days = 0): string {
 
 export const AVA = USERS.ava.email;
 
+/** The SideDrawer container (phone dialog or wide aside) holding `inner`. */
+export const sideDrawerOf = (inner: Locator): Locator =>
+  inner.locator("xpath=ancestor::*[@role='dialog' or self::aside][1]");
+
+/**
+ * Closes a SideDrawer within `scope`: phone drawers (under 768px) have a "Close"
+ * chevron, the wide side panel has a "Done" text button.
+ */
+export async function closeSideDrawer(scope: Locator) {
+  const width = scope.page().viewportSize()?.width ?? 1280;
+  const name = width < 768 ? "Close" : "Done";
+  await scope.getByRole("button", { name, exact: true }).click();
+}
+
 export const calendar = (page: Page) => page.getByTestId("calendar");
 
 /** A calendar event chip or block by its title. */

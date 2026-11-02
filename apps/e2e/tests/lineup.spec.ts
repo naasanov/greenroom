@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import { agendaCard, openAgenda } from "./agenda-helpers.js";
-import { AVA } from "./events-helpers.js";
+import { AVA, closeSideDrawer, sideDrawerOf } from "./events-helpers.js";
 import { apiAs } from "./library-helpers.js";
 
 let seed: BandSeedResult;
@@ -85,7 +85,7 @@ test("tapping roster rows adds and removes people with check marks", async ({
   await expect(ben).toHaveAttribute("aria-pressed", "false");
   await expect(rows(page)).toHaveCount(3);
   expect(await names(page)).toEqual([...(await names(page))].sort());
-  await page.getByRole("button", { name: "Done" }).click();
+  await closeSideDrawer(sideDrawerOf(page.getByTestId("roster-picker")));
   await expect(page.getByTestId("roster-picker")).toBeHidden();
   await page.reload();
   await expect(rows(page)).toHaveCount(3);
