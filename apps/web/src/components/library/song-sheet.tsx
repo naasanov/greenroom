@@ -1,7 +1,7 @@
 "use client";
 
 import { gigPath } from "@/lib/gig-path";
-import { Loader2, Music2, Trash2 } from "lucide-react";
+import { Loader2, Music2, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -672,10 +672,11 @@ export function SongSheet({
               {song ? (
                 <Button
                   variant={editing ? "secondary" : "ghost"}
+                  size="icon"
+                  aria-label={editing ? "Cancel" : "Edit"}
                   onClick={() => changeEditing(!editing)}
-                  className="w-[4.5rem]"
                 >
-                  {editing ? "Cancel" : "Edit"}
+                  {editing ? <X /> : <Pencil />}
                 </Button>
               ) : null}
             </div>

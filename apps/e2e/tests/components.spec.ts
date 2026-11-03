@@ -130,7 +130,7 @@ test("side drawer sits beside on desktop and stacks over on mobile", async ({
       expect(s.x + s.width).toBeLessThanOrEqual(m.x + 1);
     }).toPass();
     await side.getByText("Dreams").click();
-    await side.getByRole("button", { name: "Done" }).click();
+    await side.getByRole("button", { name: "Close" }).click();
     await expect(side).toHaveAttribute("data-state", "closed");
   }
   await expect(main).toBeVisible();

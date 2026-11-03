@@ -15,14 +15,9 @@ export const AVA = USERS.ava.email;
 export const sideDrawerOf = (inner: Locator): Locator =>
   inner.locator("xpath=ancestor::*[@role='dialog' or self::aside][1]");
 
-/**
- * Closes a SideDrawer within `scope`: phone drawers (under 768px) have a "Close"
- * chevron, the wide side panel has a "Done" text button.
- */
+/** Closes a SideDrawer within `scope` via its "Close" icon button (chevron on phone, X on wide). */
 export async function closeSideDrawer(scope: Locator) {
-  const width = scope.page().viewportSize()?.width ?? 1280;
-  const name = width < 768 ? "Close" : "Done";
-  await scope.getByRole("button", { name, exact: true }).click();
+  await scope.getByRole("button", { name: "Close", exact: true }).click();
 }
 
 export const calendar = (page: Page) => page.getByTestId("calendar");

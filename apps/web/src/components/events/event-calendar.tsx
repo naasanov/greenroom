@@ -283,14 +283,16 @@ export function EventCalendar({
   return (
     <div data-testid="calendar" data-view={mode} className="gr-cal">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 pb-3">
-        <h2
-          data-testid="calendar-title"
-          aria-live="polite"
-          className="min-w-0 flex-1 basis-44 truncate text-lg font-semibold"
-        >
-          {title}
-        </h2>
-        {headerAction}
+        <div className="flex min-w-0 flex-1 basis-44 items-center gap-1">
+          <h2
+            data-testid="calendar-title"
+            aria-live="polite"
+            className="min-w-0 truncate text-lg font-semibold"
+          >
+            {title}
+          </h2>
+          {headerAction}
+        </div>
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" onClick={() => nav("today")}>
             Today

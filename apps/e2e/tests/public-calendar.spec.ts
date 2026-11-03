@@ -93,7 +93,7 @@ test("gig form toggle is on by default and hides the gig from the public page", 
   await toggle.click();
   await expect(toggle).not.toBeChecked();
   await pane.getByRole("button", { name: "Create gig" }).click();
-  await expect(page).toHaveURL(/\/gigs\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/gigs\/([a-z0-9-]+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 
   const rows = await db
     .select()

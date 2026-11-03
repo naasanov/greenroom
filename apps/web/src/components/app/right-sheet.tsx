@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, X } from "lucide-react";
 import { useEffect, type ReactNode, type Ref } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,7 @@ export function RightSheet({
         placement === "fixed"
           ? "fixed md:top-[calc(env(safe-area-inset-top)+3.5rem+1px)]"
           : "absolute",
-        "inset-y-0 right-0 z-40 flex w-full flex-col bg-card shadow-lift transition-[translate,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:w-[26rem] md:rounded-l-3xl md:border-l",
+        "inset-y-0 right-0 z-40 flex w-full flex-col overflow-hidden bg-card shadow-lift transition-[translate,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:w-[26rem] md:rounded-l-3xl md:border-l",
         open ? "visible translate-x-0" : "invisible translate-x-full",
         className,
       )}
@@ -128,10 +128,12 @@ export function RightSheet({
           (editable ? (
             <Button
               variant={editing ? "secondary" : "ghost"}
+              size="icon"
+              aria-label={editing ? "Cancel" : "Edit"}
               onClick={() => onEditingChange?.(!editing)}
-              className="w-[5.5rem] shrink-0"
+              className="shrink-0"
             >
-              {editing ? "Cancel" : "Edit"}
+              {editing ? <X /> : <Pencil />}
             </Button>
           ) : null)}
       </header>

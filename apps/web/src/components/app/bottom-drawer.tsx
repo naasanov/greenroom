@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -277,28 +277,22 @@ function SideDrawerHeader({
   heading: ReactNode;
   headerAction?: ReactNode;
   onDone: () => void;
-  /** Phone drawers close with the standard chevron; the side panel keeps Done. */
+  /** Phone drawers close with the standard chevron; the side panel uses an X. */
   chevron?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 px-5 pt-3 pb-2">
       {heading}
       {headerAction}
-      {chevron ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          className="text-muted-foreground"
-          onClick={onDone}
-        >
-          <ChevronDown />
-        </Button>
-      ) : (
-        <Button variant="ghost" size="sm" onClick={onDone}>
-          Done
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Close"
+        className="text-muted-foreground"
+        onClick={onDone}
+      >
+        {chevron ? <ChevronDown /> : <X />}
+      </Button>
     </div>
   );
 }

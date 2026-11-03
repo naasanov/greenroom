@@ -256,7 +256,7 @@ test("creating a gig opens its drawer with an empty setlist", async ({
   await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
   await pane.getByRole("button", { name: "Create gig" }).click();
   await expect(page.getByRole("dialog", { name: "Fresh gig" })).toBeVisible();
-  await expect(page).toHaveURL(/\/gigs\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/gigs\/([a-z0-9-]+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   await expect(page.getByTestId("setlist-empty")).toBeVisible();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
 });
