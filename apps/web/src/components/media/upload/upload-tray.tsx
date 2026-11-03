@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UploadEntry } from "./upload-store";
+import { BatchBar, isActive } from "./upload-progress";
 import { UploadTile } from "./upload-tile";
 
 /** Thin bottom tray: batch bar, a Select all button, and one tile per upload. */
@@ -43,18 +44,11 @@ export function UploadTray({
 }) {
   const [confirm, setConfirm] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const active = entries.filter(
-    (e) => e.status === "queued" || e.status === "uploading",
-  );
-  const counted = entries.filter(
-    (e) => e.status !== "readd" && e.status !== "error" && !e.restored,
-  );
-  const total = counted.reduce((n, e) => n + e.totalBytes, 0);
-  const sent = counted.reduce((n, e) => n + e.sent, 0);
-  const batch = total > 0 ? Math.min(1, sent / total) : 0;
-  const hasReadd = entries.some((e) => e.status === "readd");
-  const hasDone = entries.some((e) => e.status === "done");
-  const cancellable = entries.some((e) => e.status !== "done");
+  const visible = entries.filter((e) => !hiddenKeys?.has(e.key));
+  const active = visible.filter(isActive);
+  const hasReadd = visible.some((e) => e.status === "readd");
+  const hasDone = visible.some((e) => e.status === "done");
+  const cancellable = visible.some((e) => e.status !== "done");
 
   useEffect(() => {
     const el = root.current;
@@ -79,20 +73,7 @@ export function UploadTray({
         "animate-in duration-300 slide-in-from-bottom",
       )}
     >
-      <div
-        role="progressbar"
-        aria-label="Batch progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(batch * 100)}
-        data-testid="upload-batch"
-        className="absolute inset-x-0 top-0 h-1 bg-transparent"
-      >
-        <div
-          className="h-full bg-blue-500 transition-[width] duration-300 ease-linear"
-          style={{ width: `${batch * 100}%` }}
-        />
-      </div>
+      <BatchBar entries={entries} className="absolute inset-x-0 top-0" />
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 pt-2.5 pb-1">
         <Button
           variant="outline"
@@ -149,21 +130,19 @@ export function UploadTray({
         data-testid="upload-list"
         className="mx-auto flex max-w-5xl gap-3 overflow-x-auto px-4 pt-2.5 pb-[max(0.25rem,env(safe-area-inset-bottom))]"
       >
-        {entries
-          .filter((e) => !hiddenKeys?.has(e.key))
-          .map((e) => (
-            <UploadTile
-              key={e.key}
-              entry={e}
-              selected={selected.has(e.key)}
-              editing={editingKey === e.key}
-              songTitle={songTitle(e.songId)}
-              onToggle={() => onToggle(e.key)}
-              onStartRename={() => onStartRename(e.key)}
-              onRename={(name) => onRename(e.key, name)}
-              onRetry={() => onRetry(e.key)}
-            />
-          ))}
+        {visible.map((e) => (
+          <UploadTile
+            key={e.key}
+            entry={e}
+            selected={selected.has(e.key)}
+            editing={editingKey === e.key}
+            songTitle={songTitle(e.songId)}
+            onToggle={() => onToggle(e.key)}
+            onStartRename={() => onStartRename(e.key)}
+            onRename={(name) => onRename(e.key, name)}
+            onRetry={() => onRetry(e.key)}
+          />
+        ))}
       </ul>
       <ConfirmDialog
         open={confirm}

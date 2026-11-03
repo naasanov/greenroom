@@ -1,5 +1,6 @@
 "use client";
 
+import { gigPath } from "@/lib/gig-path";
 import { Loader2, Music2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -169,7 +170,7 @@ function SongVideos({
               >
                 <div className="flex items-baseline justify-between gap-3 text-sm">
                   <Link
-                    href={`/gigs/${g.gig.id}`}
+                    href={gigPath(g.gig, "/media")}
                     className="min-w-0 truncate font-medium hover:underline"
                   >
                     {g.gig.title}
@@ -306,7 +307,7 @@ function SongView({
                     {u.kind === "gig" ? (
                       <>
                         <Link
-                          href={`/gigs/${u.gigId}`}
+                          href={gigPath({ id: u.gigId, title: u.title })}
                           className="min-w-0 truncate font-medium hover:underline"
                         >
                           {u.title}

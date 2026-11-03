@@ -1,4 +1,5 @@
 import type { gigs } from "@greenroom/db";
+import { gigSlugId } from "@greenroom/shared";
 import type {
   CalendarEventInput,
   CalendarEventPatch,
@@ -84,7 +85,7 @@ export function gigInput(g: GigRow, webUrl: string): CalendarEventInput {
   const t = gigTimes(g);
   const lines = [g.notes?.trim() || null];
   if (g.loadInAt) lines.push(`Load-in: ${localTime(g.loadInAt, g.timeZone)}`);
-  lines.push(`${webUrl}/gigs/${g.id}`);
+  lines.push(`${webUrl}/gigs/${gigSlugId(g)}`);
   return {
     summary: g.title,
     description: lines.filter((l): l is string => !!l).join("\n\n"),

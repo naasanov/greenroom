@@ -104,7 +104,7 @@ test("setup creates one calendar and shares it with members, and pushes gigs and
   expect(new Date(g.end).toISOString()).toBe(`${gig.date}T23:00:00.000Z`);
   expect(g.description).toContain("Bring cables");
   expect(g.description).toContain("Load-in: 18:30");
-  expect(g.description).toContain(`/gigs/${gig.id}`);
+  expect(g.description).toMatch(new RegExp(`/gigs/[a-z0-9-]*${gig.id}`));
   expect(g).not.toHaveProperty("attendees");
 
   const a = masterOf(events, allDay.id);

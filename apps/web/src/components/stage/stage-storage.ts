@@ -3,6 +3,7 @@ import type { StageSnapshot } from "@/lib/queries/stage";
 const SNAPSHOT_PREFIX = "greenroom.stage.gig.";
 const POSITION_PREFIX = "greenroom.stage.position.";
 
+/** Cache key for a gig's stage page; always the bare-uuid form. */
 export const stageShellPath = (gigId: string) => `/gigs/${gigId}/stage`;
 
 export function readSnapshot(gigId: string): StageSnapshot | null {

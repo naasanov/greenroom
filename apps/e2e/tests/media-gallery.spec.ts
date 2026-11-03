@@ -1,5 +1,6 @@
 import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
+import type { Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
 import { BAND } from "./api-media-helpers.js";
 import {
@@ -557,4 +558,94 @@ test("plus menu options sit above the FAB stack and are tappable", async ({
   }
   await page.getByTestId("fab-action-new-folder").click();
   await expect(page.getByLabel("Folder name")).toBeVisible();
+});
+
+const file = (name: string, seedNo = 1) => ({
+  name,
+  mimeType: "image/png",
+  buffer: Buffer.from(`image-${name}-${seedNo}`),
+});
+
+/** Holds chunk PUTs until released so uploads stay in flight. */
+async function holdChunks(page: Page) {
+  let release!: () => void;
+  const open = new Promise<void>((r) => (release = r));
+  await page.route("**/bands/*/uploads/*", async (route) => {
+    if (route.request().method() === "PUT") await open;
+    await route.continue().catch(() => {});
+  });
+  return release;
+}
+
+test("Move here buttons line up for Unsorted and folders", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("select-fab").click();
+  await tile(page, "u1.png").getByTestId("media-open").click();
+  const right = async (name: string) =>
+    (await section(page, name).getByTestId("move-here").boundingBox())!;
+  const a = await right("Unsorted");
+  const b = await right("Stage");
+  expect(Math.round(a.x + a.width)).toBe(Math.round(b.x + b.width));
+});
+
+test("tray Select all covers only the tray, and the tray hides once everything is placed", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
+  await page
+    .getByTestId("media-file-input")
+    .setInputFiles([file("a.png"), file("b.png", 2)]);
+  await expect(page.getByTestId("upload-tray")).toBeVisible();
+  await page.getByTestId("upload-select-all").click();
+  await expect(page.getByTestId("selection-count")).toHaveText("2");
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Stage" }).click();
+  await expect(page.getByTestId("upload-tray")).toBeHidden();
+  await expect(page.getByTestId("upload-batch")).toBeVisible();
+  release();
+});
+
+test("an upload in flight shows a global indicator off the media page that links back", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
+  await page
+    .getByTestId("media-file-input")
+    .setInputFiles([file("a.png"), file("b.png", 2)]);
+  await expect(page.getByTestId("global-upload-indicator")).toHaveCount(0);
+  await page.getByTestId("media-close").click();
+  const chip = page.getByTestId("global-upload-indicator");
+  await expect(chip).toBeVisible();
+  // Leave the gig drawer first; a modal drawer treats outside taps as dismissals.
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/events/);
+  await expect(page.getByTestId("global-upload-text")).toHaveText(
+    "Uploading 1 of 2",
+  );
+  await chip.click();
+  await expect(page).toHaveURL(new RegExp(`/gigs/${m.gigId}/media$`));
+  await expect(chip).toHaveCount(0);
+  await page.getByTestId("media-close").click();
+  release();
+  await expect(chip).toHaveCount(0);
+});
+
+test("finished and organized uploads do not return to the tray after a reload", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("media-file-input").setInputFiles(file("kept.png"));
+  await expect(page.getByTestId("upload-tile")).toHaveAttribute(
+    "data-status",
+    "done",
+  );
+  await page.getByTestId("upload-select-all").click();
+  await barButton(page, "Move to folder").click();
+  await page.getByRole("button", { name: "Move to Stage" }).click();
+  await page.reload();
+  await expect(page.getByTestId("media-gallery")).toBeVisible();
+  await expect(tile(page, "kept.png")).toBeVisible();
+  await expect(page.getByTestId("upload-tray")).toHaveCount(0);
 });

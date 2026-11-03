@@ -39,7 +39,7 @@ test("opening an event updates the URL without remounting the calendar", async (
     ).__mark = 1;
   });
   await eventIn(page, gig.title).click();
-  await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   const drawer = dialog(page, gig.title);
   await expect(drawer).toContainText("8:00 PM");
   await expect(drawer).toContainText("88 Main St");
@@ -55,6 +55,23 @@ test("opening an event updates the URL without remounting the calendar", async (
       ).__mark,
   );
   expect(mark).toBe(1);
+});
+
+test("opening a gig puts its title slug in the URL and the plain uuid URL still works", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await showGigDate(page, gig.id, gig.title);
+  await eventIn(page, gig.title).click();
+  const slug = gig.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/, "");
+  await expect(page).toHaveURL(new RegExp(`/gigs/${slug}-${gig.id}$`));
+  await page.goto(`/gigs/${gig.id}`);
+  await expect(dialog(page, gig.title)).toBeVisible();
 });
 
 test("gig deep link opens the calendar at the gig's date", async ({ page }) => {
@@ -85,7 +102,7 @@ test("tapping another event while one is open switches to it", async ({
   await eventIn(page, b.title).dispatchEvent("click");
   await expect(dialog(page, b.title)).toBeVisible();
   await expect(dialog(page, a.title)).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${b.id}$`));
 });
 
 test("edit a gig", async ({ page }) => {

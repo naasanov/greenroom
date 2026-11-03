@@ -94,6 +94,7 @@ import { MediaViewer } from "./media-viewer";
 import { useGigUploads } from "./upload/upload-provider";
 import type { UploadEntry } from "./upload/upload-store";
 import { UploadTile } from "./upload/upload-tile";
+import { BatchBar, isActive } from "./upload/upload-progress";
 import { UploadTray } from "./upload/upload-tray";
 
 const isTrayKey = (id: string) => id.startsWith("up-");
@@ -297,7 +298,9 @@ function SectionHeader({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      ) : null}
+      ) : (
+        <span aria-hidden className="size-9 shrink-0" />
+      )}
     </header>
   );
 }
@@ -502,10 +505,15 @@ export function MediaGallery({
   const selectedItems = selectedIds.flatMap((id) => byId.get(id) ?? []);
   const trayKeys = entries.filter((e) => selected.has(e.key)).map((e) => e.key);
   const selectedCount = selectedIds.length + trayKeys.length;
+  // Entries listed in the tray itself; placed uploads render in gallery sections.
+  const trayEntries = entries.filter((e) => !galleryKeys.has(e.key));
+  const traySelected = trayEntries.filter((e) => selected.has(e.key)).length;
   const trayScope =
-    trayKeys.length > 0 || (selectedIds.length === 0 && entries.length > 0);
-  const scopeIds = trayScope ? entries.map((e) => e.key) : all.map((i) => i.id);
-  const scopeSelected = trayScope ? trayKeys.length : selectedIds.length;
+    traySelected > 0 || (selectedIds.length === 0 && trayEntries.length > 0);
+  const scopeIds = trayScope
+    ? trayEntries.map((e) => e.key)
+    : all.map((i) => i.id);
+  const scopeSelected = trayScope ? traySelected : selectedIds.length;
   const allSelected = scopeIds.length > 0 && scopeSelected === scopeIds.length;
   const placing = selecting && selectedCount > 0;
   const trayOnly = trayKeys.length > 0 && selectedIds.length === 0;
@@ -968,8 +976,10 @@ export function MediaGallery({
                 rel="noreferrer"
                 data-testid="open-in-drive"
               >
-                <ExternalLink />{" "}
-                <span className="hidden sm:inline">Open in </span>Drive
+                <ExternalLink />
+                <span>
+                  <span className="hidden sm:inline">Open in </span>Drive
+                </span>
               </a>
             </Button>
           ) : null}
@@ -1121,7 +1131,7 @@ export function MediaGallery({
         </>
       ) : null}
 
-      {ready && entries.length > 0 ? (
+      {ready && trayEntries.length > 0 ? (
         <UploadTray
           entries={entries}
           hiddenKeys={galleryKeys}
@@ -1130,7 +1140,7 @@ export function MediaGallery({
           songTitle={(id) => (id ? (songTitles.get(id) ?? null) : null)}
           onSelectAll={() => {
             setSelecting(true);
-            setSelected(new Set(entries.map((e) => e.key)));
+            setSelected(new Set(trayEntries.map((e) => e.key)));
           }}
           onToggle={toggleTray}
           onStartRename={setEditingKey}
@@ -1145,6 +1155,10 @@ export function MediaGallery({
           onReadd={() => fileInput.current?.click()}
           onHeight={onTrayHeight}
         />
+      ) : null}
+
+      {ready && trayEntries.length === 0 && entries.some(isActive) ? (
+        <BatchBar entries={entries} className="fixed inset-x-0 bottom-0 z-30" />
       ) : null}
 
       {dragging ? (

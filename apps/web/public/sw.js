@@ -1,6 +1,14 @@
 // Greenroom service worker: caches hashed build assets and per-gig stage pages.
 const SHELL_CACHE = "greenroom-shell-v1";
 const STAGE_PAGE = /^\/gigs\/[^/]+\/stage$/;
+const UUID_TAIL =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/stage$)/i;
+
+// Slug and bare-uuid URLs share one cache entry, keyed by the bare uuid.
+function stageKey(pathname) {
+  const id = UUID_TAIL.exec(pathname);
+  return id ? `/gigs/${id[0]}/stage` : pathname;
+}
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -29,10 +37,10 @@ self.addEventListener("fetch", (event) => {
   } else if (!STAGE_PAGE.test(url.pathname)) {
     return;
   } else if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request, url.pathname));
+    event.respondWith(networkFirst(request, stageKey(url.pathname)));
   } else if (url.searchParams.has("_rsc")) {
     // The route payload for runtime params, stored without its changing hash.
-    event.respondWith(networkFirst(request, url.pathname + "?rsc"));
+    event.respondWith(networkFirst(request, stageKey(url.pathname) + "?rsc"));
   }
 });
 

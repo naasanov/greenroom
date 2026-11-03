@@ -176,7 +176,7 @@ test("share button in the drawer copies the canonical link", async ({
   const drawer = page.getByRole("dialog", { name: gig.title });
   await drawer.getByRole("button", { name: "Share link" }).click();
   await expect(page.getByText("Link copied")).toBeAttached();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-    `${WEB_URL}/gigs/${gig.id}`,
-  );
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied.startsWith(`${WEB_URL}/gigs/`)).toBe(true);
+  expect(copied).toMatch(new RegExp(`/gigs/[a-z0-9-]+-${gig.id}$`));
 });

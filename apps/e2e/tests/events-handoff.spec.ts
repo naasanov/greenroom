@@ -87,13 +87,13 @@ test("tapping another gig slides the first drawer down while the second slides u
   // Both drawers exist at once: A closing, B open.
   await sawExiting(page, a.title);
   await expect(live(page, b.title)).toHaveAttribute("data-state", "open");
-  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${b.id}$`));
 
   // A is removed once it has slid away; B is the only drawer left.
   await expect(drawer(page, a.title)).toHaveCount(0);
   await expect(page.locator("[data-vaul-drawer]")).toHaveCount(1);
   await expect(live(page, b.title)).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${b.id}$`));
 });
 
 test("switching from a gig to a practice occurrence overlaps the two drawers", async ({
@@ -157,7 +157,7 @@ test("tapping a gig while the untouched create drawer is open hands off to the g
   await tap(eventIn(page, a.title));
   await sawExiting(page, "New event");
   await expect(live(page, a.title)).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/gigs/${a.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${a.id}$`));
   await expect(drawer(page, "New event")).toHaveCount(0);
 });
 

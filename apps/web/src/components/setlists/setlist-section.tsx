@@ -1,5 +1,6 @@
 "use client";
 
+import { parseGigId } from "@/lib/gig-path";
 import {
   ExternalLink,
   GripVertical,
@@ -34,7 +35,7 @@ function useEventFromUrl(): {
   const [, seg, id] = usePathname().split("/");
   const date = useSearchParams().get("date");
   return {
-    gigId: seg === "gigs" && id ? id : null,
+    gigId: seg === "gigs" && id ? parseGigId(id) : null,
     practiceDate: seg === "practices" ? date : null,
   };
 }

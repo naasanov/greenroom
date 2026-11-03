@@ -1,5 +1,6 @@
 "use client";
 
+import { gigPath } from "@/lib/gig-path";
 import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CreateGig, Gig } from "@greenroom/shared";
@@ -185,7 +186,7 @@ function GigDetails({
         {setlist.setlist?.items.length ? (
           <Button asChild variant="outline">
             {/* A full page load lets the service worker cache the stage route. */}
-            <a href={`/gigs/${gig.id}/stage`}>Stage mode</a>
+            <a href={gigPath(gig, "/stage")}>Stage mode</a>
           </Button>
         ) : null}
         <LineupSection builder={lineup} />
@@ -289,7 +290,12 @@ export function GigDrawer({
           title={title}
           bodyClassName="overflow-x-hidden"
           description={EVENT_TYPES.gig.label}
-          headerAction={<ShareButton path={`/gigs/${gigId}`} title={title} />}
+          headerAction={
+            <ShareButton
+              path={gig ? gigPath(gig) : `/gigs/${gigId}`}
+              title={title}
+            />
+          }
           headerLeading={
             gig ? (
               <Button

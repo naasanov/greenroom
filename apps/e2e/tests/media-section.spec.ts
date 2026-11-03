@@ -24,6 +24,10 @@ test("media section shows the empty state, thumbnails with counts, and missing i
   await expect(drawer.getByTestId("media-empty")).toHaveCount(0);
   await expect(drawer.getByTestId("media-add")).toHaveText("Add media");
   await expect(drawer.getByTestId("media-add")).toHaveClass(/min-h-24/);
+  await expect(drawer.getByTestId("media-add-input")).toHaveCount(0);
+  await drawer.getByTestId("media-add").click();
+  await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}/media$`));
+  await page.goto(`/gigs/${gig.id}`);
 
   // Touching media creates the gig's Drive folder, then files appear via the poller.
   await ava.post(`/bands/${BAND}/gigs/${gig.id}/media/folders`, {
@@ -51,6 +55,8 @@ test("media section shows the empty state, thumbnails with counts, and missing i
     "2 photos, 1 video",
   );
   await expect(drawer.getByTestId("media-strip")).toBeVisible();
+  await expect(drawer.getByTestId("media-add")).toHaveCount(0);
+  await expect(drawer.getByTestId("media-view")).toHaveText("View");
 
   const doomed = (await fake.files()).find((f) => f.name === "a.png")!;
   await fake.external({ action: "delete", fileId: doomed.id });

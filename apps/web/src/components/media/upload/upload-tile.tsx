@@ -70,7 +70,7 @@ function Preview({ entry }: { entry: UploadEntry }) {
           muted
           playsInline
           onError={() => setBroken(true)}
-          className="size-full object-cover"
+          className="absolute inset-0 size-full object-cover"
         />
       );
     }
@@ -81,7 +81,7 @@ function Preview({ entry }: { entry: UploadEntry }) {
         alt=""
         draggable={false}
         onError={() => setBroken(true)}
-        className="size-full object-cover [image-orientation:from-image]"
+        className="absolute inset-0 size-full object-cover [image-orientation:from-image]"
       />
     );
   }
@@ -149,7 +149,7 @@ export function UploadTile({
       >
         <div
           className={cn(
-            "flex size-full items-center justify-center overflow-hidden rounded-2xl bg-muted text-muted-foreground transition-[filter,opacity] duration-500",
+            "relative flex size-full items-center justify-center overflow-hidden rounded-2xl bg-muted text-muted-foreground transition-[filter,opacity] duration-500",
             !done && "opacity-50 grayscale",
           )}
         >

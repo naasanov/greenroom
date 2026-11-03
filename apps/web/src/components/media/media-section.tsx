@@ -1,15 +1,14 @@
 "use client";
 
-import { FileQuestion, FileVideo, ImageIcon, Plus, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { FileQuestion, FileVideo, ImageIcon, Images, Plus } from "lucide-react";
 import type { GigMedia, MediaItem } from "@greenroom/shared";
+import { Button } from "@/components/ui/button";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
 import { useGoogleIntegrations } from "@/lib/queries/google";
 import { useGigMedia } from "@/lib/queries/media";
 import { useRouter } from "next/navigation";
 import { openMediaView } from "./media-gallery-page";
 import { MediaThumb, isVideo } from "./media-tile";
-import { useUploadStore } from "./upload/upload-provider";
 
 const PREVIEW_COUNT = 4;
 
@@ -82,21 +81,11 @@ export function MediaSection({
   gigId: string;
 }) {
   const router = useRouter();
-  const store = useUploadStore();
-  const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
   const media = useGigMedia(bandId, gigId);
   const integrations = useGoogleIntegrations(bandId);
   const data = media.data;
   const drive = integrations.data?.drive;
   const ready = !!data?.driveLinked && !!drive?.folderId;
-
-  // Picked or dropped files start uploading, then the full view shows the tray.
-  const addFiles = (files: File[]) => {
-    if (files.length === 0) return;
-    store.add(bandId, gigId, files);
-    openMediaView(router, gigId);
-  };
 
   let body;
   let empty = false;
@@ -129,7 +118,7 @@ export function MediaSection({
         <button
           type="button"
           data-testid="media-strip"
-          onClick={(e) => openMediaView(router, gigId, e.currentTarget)}
+          onClick={() => openMediaView(router, gigId)}
           className="flex flex-col gap-2 text-left"
         >
           {inner}
@@ -149,49 +138,26 @@ export function MediaSection({
       </h3>
       {body}
       {ready ? (
-        <>
+        empty ? (
           <button
             type="button"
             data-testid="media-add"
-            onClick={() => input.current?.click()}
-            onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes("Files")) return;
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-              if (!e.dataTransfer.types.includes("Files")) return;
-              e.preventDefault();
-              setOver(false);
-              addFiles(Array.from(e.dataTransfer.files));
-            }}
-            className={
-              empty
-                ? `flex min-h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-base font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`
-                : `flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-sm font-medium outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 ${over ? "border-primary bg-primary/10" : ""}`
-            }
+            onClick={() => openMediaView(router, gigId)}
+            className="flex min-h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-base font-medium text-muted-foreground transition-colors outline-none hover:bg-accent/50 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            {empty ? (
-              <Plus className="size-5" />
-            ) : (
-              <Upload className="size-4" />
-            )}{" "}
-            Add media
+            <Plus className="size-5" /> Add media
           </button>
-          <input
-            ref={input}
-            type="file"
-            multiple
-            accept="image/*,video/*,audio/*,application/pdf"
-            hidden
-            data-testid="media-add-input"
-            onChange={(e) => {
-              addFiles(Array.from(e.target.files ?? []));
-              e.target.value = "";
-            }}
-          />
-        </>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="media-view"
+            onClick={() => openMediaView(router, gigId)}
+            className="min-h-11 rounded-2xl"
+          >
+            <Images className="size-4" /> View
+          </Button>
+        )
       ) : null}
     </section>
   );

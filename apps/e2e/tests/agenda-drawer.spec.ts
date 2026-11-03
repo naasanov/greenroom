@@ -22,7 +22,7 @@ test("tapping a card opens the event drawer and updates the URL", async ({
   const card = agendaCard(page, gig.title);
   await card.scrollIntoViewIfNeeded();
   await card.click();
-  await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   const drawer = live(page, gig.title);
   await expect(drawer).toBeVisible();
   await expect(drawer).toContainText("88 Main St");
@@ -93,7 +93,7 @@ test("tapping another card while a drawer is open hands off to it", async ({
   ).toHaveCount(1);
   await expect(live(page, b.title)).toBeVisible();
   await expect(page.locator("[data-vaul-drawer]")).toHaveCount(1);
-  await expect(page).toHaveURL(new RegExp(`/gigs/${b.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${b.id}$`));
   await expect(agendaSheet(page)).toBeVisible();
 });
 

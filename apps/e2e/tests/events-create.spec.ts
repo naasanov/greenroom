@@ -18,7 +18,7 @@ test("FAB creates a gig with just a title and date", async ({ page }) => {
   await pane.getByRole("button", { name: "Create gig" }).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
   await expect(page.getByRole("dialog", { name: "Quick gig" })).toBeVisible();
-  await expect(page).toHaveURL(/\/gigs\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/gigs\/[a-z0-9-]+$/);
   await expect(eventIn(page, "Quick gig")).toBeVisible();
 });
 

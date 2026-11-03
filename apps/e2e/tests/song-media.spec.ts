@@ -76,6 +76,9 @@ test("song sheet lists linked videos by gig (newest first), then photos, and ope
   await expect(groups.nth(0).getByTestId("song-video")).toHaveCount(1);
   await expect(groups.nth(2).getByTestId("song-video")).toHaveCount(1);
   await expect(groups.nth(1)).toContainText("Rusty Anchor");
+  await expect(
+    groups.nth(1).getByRole("link", { name: bar.title }),
+  ).toHaveAttribute("href", new RegExp(`^/gigs/[a-z0-9-]+-${bar.id}/media$`));
 
   await groups.nth(1).getByTestId("song-video").click();
   await expect(page.getByTestId("media-viewer")).toBeVisible();

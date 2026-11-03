@@ -17,7 +17,7 @@ async function openStage(page: Page) {
   const gig = seed.gigs.upcomingClub;
   await page.goto(`/gigs/${gig.id}`);
   await page.getByRole("link", { name: "Stage mode" }).click();
-  await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}/stage$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}/stage$`));
   await expect(title(page)).toHaveText("Skyline Drive");
 }
 

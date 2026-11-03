@@ -13,7 +13,7 @@ A service account cannot invite attendees without Workspace domain-wide delegati
 ## Mapping
 
 - Every event carries `greenroomKind` (`gig` or `practice`) and `greenroomId` as private properties.
-- Gig: summary = title; location = `venue, address`; description = notes, `Load-in: HH:mm`, and `${WEB_URL}/gigs/<id>`; timed when a start exists (end defaults to start + 2h), otherwise all-day on its date; time zone from the gig.
+- Gig: summary = title; location = `venue, address`; description = notes, `Load-in: HH:mm`, and `${WEB_URL}/gigs/<title-slug>-<id>`; timed when a start exists (end defaults to start + 2h), otherwise all-day on its date; time zone from the gig.
 - Practice series: one recurring event (`RRULE` from the series, `timeZone`, start = dtstart, end = start + duration, description link `${WEB_URL}/practices/<seriesId>`). Overrides are instance exceptions with full content; cancellations are cancelled instances.
 
 ## Sharing

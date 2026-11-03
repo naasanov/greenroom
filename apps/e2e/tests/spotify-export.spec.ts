@@ -126,7 +126,7 @@ test("gig setlist export from the drawer", async ({
   await expect(dialog(page).getByTestId("export-skipped")).toHaveText(
     "Skipped 1 without a Spotify link: Midnight Train",
   );
-  await expect(page).toHaveURL(new RegExp(`/gigs/${gig.id}$`));
+  await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   const [playlist] = await testApi.spotifyCreatedPlaylists();
   expect(playlist!.trackIds).toEqual([
     "spotify-track-skyline",

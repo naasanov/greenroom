@@ -64,7 +64,7 @@ export function MediaThumb({
           playsInline
           crossOrigin="use-credentials"
           onError={() => setVideoBroken(true)}
-          className="size-full object-cover"
+          className="absolute inset-0 size-full object-cover"
         />
       ) : item.thumbnailUrl && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -75,7 +75,7 @@ export function MediaThumb({
           loading="lazy"
           draggable={false}
           onError={() => setBroken(true)}
-          className="size-full object-cover [image-orientation:from-image]"
+          className="absolute inset-0 size-full object-cover [image-orientation:from-image]"
         />
       ) : (
         <Icon className="size-6" />

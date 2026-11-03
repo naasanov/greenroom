@@ -184,16 +184,8 @@ export class UploadStore {
       (s) => s.status === "pending" || s.status === "uploading",
     );
     if (unfinished.length === 0) return;
-    const since =
-      Math.min(...unfinished.map((s) => Date.parse(s.createdAt))) - 3600_000;
-    const shown = fresh.filter(
-      (s) =>
-        unfinished.includes(s) ||
-        (s.status === "complete" &&
-          !!s.item &&
-          Date.parse(s.createdAt) >= since),
-    );
-    const added: UploadEntry[] = shown.map((s) => ({
+    // Completed sessions already live in the gallery; only unfinished ones return.
+    const added: UploadEntry[] = unfinished.map((s) => ({
       key: `up-${++this.seq}-${s.id.slice(0, 6)}`,
       bandId,
       gigId,

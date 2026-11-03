@@ -475,15 +475,16 @@ test("dropping files on the gallery uploads them", async ({ page }) => {
   await expect(utile(page, "dropped.png")).toBeVisible();
 });
 
-test("Add media in the gig drawer picks files and opens the full view", async ({
+test("the gallery add control picks files after opening the full view from the drawer", async ({
   page,
 }) => {
   await page.goto(`/gigs/${m.gigId}`);
   const drawer = page.getByRole("dialog", { name: m.gigTitle }).last();
-  await drawer
-    .getByTestId("media-add-input")
-    .setInputFiles(makeFile("d.png", 3000));
+  await drawer.getByTestId("media-view").click();
   await expect(page).toHaveURL(new RegExp(`/gigs/${m.gigId}/media$`));
+  await page
+    .getByTestId("media-file-input")
+    .setInputFiles(makeFile("d.png", 3000));
   await expect(utile(page, "d.png")).toBeVisible();
 });
 

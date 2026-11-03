@@ -1,5 +1,6 @@
 "use client";
 
+import { gigPath, parseGigId } from "@/lib/gig-path";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,7 +47,7 @@ const useCalendarMode = createLocalChoice<CalendarMode>(
 // ---- URL-driven selection ----
 
 type Selection =
-  | { kind: "gig"; gigId: string }
+  | { kind: "gig"; gigId: string; title?: string }
   | { kind: "practice"; seriesId: string; date: string | null };
 
 /**
@@ -88,7 +89,7 @@ function parseSelection(
   const [, seg, id, sub] = pathname.split("/");
   // The full-screen media view (/gigs/:id/media) closes the drawer beneath it.
   if (seg === "gigs" && id && sub !== "media")
-    return { kind: "gig", gigId: id };
+    return { kind: "gig", gigId: parseGigId(id) };
   if (seg === "practices" && id) {
     return { kind: "practice", seriesId: id, date };
   }
@@ -97,7 +98,10 @@ function parseSelection(
 
 function pathOf(sel: Selection | null): string {
   if (!sel) return "/events";
-  if (sel.kind === "gig") return `/gigs/${sel.gigId}`;
+  if (sel.kind === "gig")
+    return sel.title
+      ? gigPath({ id: sel.gigId, title: sel.title })
+      : `/gigs/${sel.gigId}`;
   return `/practices/${sel.seriesId}${sel.date ? `?date=${sel.date}` : ""}`;
 }
 
@@ -314,7 +318,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
     if (!bandId) return;
     if (ev.type === "gig") {
       qc.setQueryData(keys.link("gigs", ev.id), { bandId, gigId: ev.id });
-      go({ kind: "gig", gigId: ev.id }, "push");
+      go({ kind: "gig", gigId: ev.id, title: ev.title }, "push");
     } else {
       qc.setQueryData(keys.link("practices", ev.seriesId, ev.date), {
         bandId,
@@ -348,7 +352,7 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
         gigId: made.id,
       });
       setJumpDate(made.date);
-      go({ kind: "gig", gigId: made.id }, "push");
+      go({ kind: "gig", gigId: made.id, title: made.title }, "push");
     } else {
       const { series } = created;
       setJumpDate(series.startDate);
