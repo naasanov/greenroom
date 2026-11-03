@@ -48,6 +48,8 @@ import { Readable } from "node:stream";
 
 const uuid = () => new ParseUUIDPipe({ errorHttpStatusCode: 404 });
 const PRIVATE_CACHE = "private, max-age=60";
+// Thumbnails are served through the authenticated API, never signed URLs.
+const THUMBNAIL_CACHE = "private, max-age=3600";
 
 @BandMember()
 @Controller("bands/:bandId")
@@ -164,7 +166,7 @@ export class MediaController {
     sendStream(res, Readable.from([buf]), {
       "Content-Type": sniffImageMime(buf),
       "Content-Length": buf.length,
-      "Cache-Control": PRIVATE_CACHE,
+      "Cache-Control": THUMBNAIL_CACHE,
     });
   }
 

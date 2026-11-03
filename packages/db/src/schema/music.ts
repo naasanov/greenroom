@@ -73,6 +73,7 @@ export const setlistItems = pgTable(
   },
   (t) => [
     index("setlist_items_setlist_position_idx").on(t.setlistId, t.position),
+    index("setlist_items_song_id_idx").on(t.songId),
   ],
 );
 
@@ -93,5 +94,6 @@ export const gigSetlists = pgTable(
   (t) => [
     uniqueIndex("gig_setlists_gig_id_idx").on(t.gigId),
     index("gig_setlists_band_id_idx").on(t.bandId),
+    index("gig_setlists_setlist_id_idx").on(t.setlistId),
   ],
 );
