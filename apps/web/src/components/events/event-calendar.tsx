@@ -170,9 +170,25 @@ export function EventCalendar({
 
   useEffect(() => {
     const api = calRef.current?.getApi();
-    if (api && api.view.type !== VIEW_TYPE[mode]) {
-      api.changeView(VIEW_TYPE[mode]);
-    }
+    if (!api || api.view.type === VIEW_TYPE[mode]) return;
+    if (mode === "month")
+      return void api.changeView(VIEW_TYPE[mode], api.getDate());
+    // Week keeps the user's date: selection or focus in range, else the viewed month's start.
+    const { activeStart, activeEnd, currentStart } = api.view;
+    const inRange = (d: Date) => d >= activeStart && d < activeEnd;
+    const picked =
+      events.find((ev) => isSelected(ev, selectedEvent))?.date ?? focusDate;
+    const pickedAt = picked ? new Date(`${picked}T12:00:00`) : null;
+    const now = new Date();
+    const anchor =
+      pickedAt && inRange(pickedAt)
+        ? pickedAt
+        : inRange(now)
+          ? now
+          : currentStart;
+    api.changeView(VIEW_TYPE[mode], anchor);
+    // Runs only on mode switches; selection and focus are read as of that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const gridRef = useRef<HTMLDivElement>(null);

@@ -204,3 +204,23 @@ test("a month chip shows its time range under the title", async ({
   expect(head.y - box.y).toBeLessThan(16);
   expect(details.y).toBeGreaterThanOrEqual(head.y);
 });
+
+test("Month to Week keeps the paged-to month instead of snapping to today", async ({
+  page,
+}) => {
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Next" }).click();
+  const firstDay = calendar(page)
+    .locator("[data-grid] .fc-daygrid-day:not(.fc-day-other)")
+    .first();
+  await expect(firstDay).toHaveAttribute("data-date", /\d{4}-\d{2}-01/);
+  const anchor = (await firstDay.getAttribute("data-date")) ?? "";
+  await page.getByRole("radio", { name: "Week" }).click();
+  await expect(calendar(page)).toHaveAttribute("data-view", "week");
+  await expect(
+    calendar(page).locator(
+      `[data-grid] .fc-col-header-cell[data-date="${anchor}"]`,
+    ),
+  ).toBeVisible();
+  await expect(calendar(page).locator(".fc-day-today")).toHaveCount(0);
+});
