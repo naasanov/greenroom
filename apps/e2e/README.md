@@ -1,13 +1,15 @@
 # @greenroom/e2e
 
 Playwright tests against built servers: API on 4100, web on 3100, `greenroom_test` DB, `INTEGRATIONS_MODE=fake`.
-Projects: `desktop` (Chromium 1280x800) and `mobile` (iPhone 15, WebKit). Tests run serially (one worker, shared DB).
+Projects: `desktop` (Chromium 1280x800) and `mobile` (iPhone 15, WebKit).
+Each worker starts its own API + web servers (`src/servers.ts`) on ports 4100+N / 3100+N and uses DB `greenroom_test` (N=0) or `greenroom_test_wN`.
+`E2E_WORKERS` sets the worker count (default 1; CI uses 2). `API_URL`, `WEB_URL` and `TEST_DATABASE_URL` from `src/env.ts` resolve per worker.
 
 ## Run
 - One-time: `pnpm db:up` (Mac; on the factory Postgres already runs natively, skip it) and `pnpm --filter @greenroom/e2e exec playwright install chromium webkit`.
 - `pnpm test:e2e` from the root builds everything first, then runs.
 - Fast loop after a build: `cd apps/e2e && pnpm exec playwright test --project=desktop -g "name"`.
-- Global setup migrates the test DB. Set `TEST_DATABASE_URL` to override it.
+- Global setup migrates the base test DB; extra worker DBs are created and migrated on first use. Set `TEST_DATABASE_URL` to override it.
 
 ## Write a spec
 Put it in `tests/*.spec.ts` and import from `../src/fixtures.js`:

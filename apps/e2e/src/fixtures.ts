@@ -1,6 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 import { createDb, type Database } from "@greenroom/db";
 import { API_URL, TEST_DATABASE_URL, WEB_URL } from "./env.js";
+import { startWorkerServers } from "./servers.js";
 import { TestApi, type LoginResult } from "./test-api.js";
 
 interface TestFixtures {
@@ -12,20 +13,32 @@ interface TestFixtures {
 }
 
 interface WorkerFixtures {
+  /** Per-worker API + web servers and database (auto-started once per worker). */
+  servers: void;
   /** Direct handle on the test database for assertions. */
   db: Database;
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  db: [
+  servers: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
+      const stop = await startWorkerServers();
+      await use();
+      await stop();
+    },
+    { scope: "worker", auto: true, timeout: 180_000 },
+  ],
+  db: [
+    async ({ servers }, use) => {
+      void servers;
       const handle = createDb(TEST_DATABASE_URL, { max: 2 });
       await use(handle.db);
       await handle.close();
     },
     { scope: "worker" },
   ],
+  baseURL: WEB_URL,
   testApi: async ({ playwright }, use) => {
     const request = await playwright.request.newContext({ baseURL: API_URL });
     await use(new TestApi(request));
