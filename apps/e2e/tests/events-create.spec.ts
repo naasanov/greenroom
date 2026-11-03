@@ -55,14 +55,15 @@ test("an end time before the start time blocks creating the gig", async ({
 
 test("clicking a day pre-fills the date", async ({ page }) => {
   await page.goto("/events");
-  const date = isoDay(0);
-  await calendar(page)
-    .locator(`td[data-date="${date}"]`)
-    .click({
-      position: { x: 10, y: 60 },
-    });
+  await expect(calendar(page).locator(".fc-event").first()).toBeVisible();
+  // An empty cell keeps the click off seeded chips, whatever today's date is.
+  const cell = calendar(page)
+    .locator("td.fc-daygrid-day:not(:has(.fc-event))")
+    .first();
+  const date = await cell.getAttribute("data-date");
+  await cell.click({ position: { x: 10, y: 60 } });
   const pane = await pickSide(page, "gig");
-  await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date);
+  await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date!);
 });
 
 test("clicking the same empty day again closes the create drawer", async ({
