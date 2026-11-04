@@ -637,7 +637,10 @@ test("an upload in flight shows a global indicator off the media page that links
   const chip = page.getByTestId("global-upload-indicator");
   await expect(chip).toBeVisible();
   // Leave the gig drawer first; a modal drawer treats outside taps as dismissals.
-  await page.keyboard.press("Escape");
+  await page
+    .locator("[data-vaul-drawer]")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/events/);
   await expect(page.getByTestId("global-upload-text")).toHaveText(
     "Uploading 1 of 2",
