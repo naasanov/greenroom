@@ -7,12 +7,19 @@ import {
 } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
 import { bands, driveSyncCursors, gigs, type Database } from "@greenroom/db";
-import { MEDIA_ERROR_CODES, type DriveStatus } from "@greenroom/shared";
+import {
+  FILES_ERROR_CODES,
+  MEDIA_ERROR_CODES,
+  type DriveStatus,
+  type SetGigsFolder,
+} from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { GoogleLinksService } from "../google-connect/index.js";
 import {
   DRIVE_FOLDER_MIME,
   GOOGLE_DRIVE,
+  type DriveFile,
+  type DriveFileResult,
   type GoogleDriveAdapter,
 } from "../integrations/index.js";
 import { driveFolderUrl } from "./media-util.js";
@@ -24,6 +31,11 @@ export interface DriveContext {
   gigsFolderId: string;
   photosFolderId: string;
 }
+
+/** Per-request cache of Drive lookups, keyed by file id. */
+export type DriveLookupMemo = Map<string, Promise<DriveFileResult>>;
+
+const MAX_ANCESTRY_DEPTH = 64;
 
 export const NOT_LINKED = {
   code: "GOOGLE_NOT_LINKED",
@@ -117,7 +129,11 @@ export class DriveStructureService {
   }
 
   /** Points the band at a chosen folder and builds or reuses its structure folders. */
-  async setRootFolder(bandId: string, folderId: string): Promise<DriveStatus> {
+  async setRootFolder(
+    bandId: string,
+    folderId: string,
+    gigsFolderId?: string,
+  ): Promise<DriveStatus> {
     const token = await this.links.getAccessToken(bandId, "drive");
     if (!token) throw new ConflictException(NOT_LINKED);
     const found = await this.drive.getFile(token, folderId);
@@ -134,12 +150,18 @@ export class DriveStructureService {
     const children = await this.drive.listChildren(token, folderId);
     const reuse = (name: string) =>
       children.find((c) => c.mimeType === DRIVE_FOLDER_MIME && c.name === name);
-    const gigs_ =
-      reuse("Gigs") ??
-      (await this.drive.createFolder(token, {
-        name: "Gigs",
-        parentId: folderId,
-      }));
+    let gigs_: { id: string };
+    if (gigsFolderId) {
+      await this.requireFolderInside(token, gigsFolderId, folderId);
+      gigs_ = { id: gigsFolderId };
+    } else {
+      gigs_ =
+        reuse("Gigs") ??
+        (await this.drive.createFolder(token, {
+          name: "Gigs",
+          parentId: folderId,
+        }));
+    }
     const photos =
       reuse("Profile photos") ??
       (await this.drive.createFolder(token, {
@@ -173,6 +195,94 @@ export class DriveStructureService {
           set: { pageToken },
         });
     }
+    return this.status(bandId);
+  }
+
+  /**
+   * Chain of files from `fileId` up to and including `rootId` (node first), or
+   * null when the file is missing, trashed, or not under the root.
+   */
+  async ancestry(
+    token: string,
+    fileId: string,
+    rootId: string,
+    memo: DriveLookupMemo = new Map(),
+  ): Promise<DriveFile[] | null> {
+    const chain: DriveFile[] = [];
+    let current: string | null = fileId;
+    while (current && chain.length < MAX_ANCESTRY_DEPTH) {
+      const id: string = current;
+      let pending = memo.get(id);
+      if (!pending) {
+        pending = this.drive
+          .getFile(token, id)
+          .catch(() => ({ status: "not-found" }) as DriveFileResult);
+        memo.set(id, pending);
+      }
+      const found = await pending;
+      if (found.status !== "ok" || found.file.trashed) return null;
+      chain.push(found.file);
+      if (id === rootId) return chain;
+      current = found.file.parentId;
+    }
+    return null;
+  }
+
+  /** Throws unless `folderId` is a live folder strictly inside `rootId`. */
+  private async requireFolderInside(
+    token: string,
+    folderId: string,
+    rootId: string,
+  ): Promise<DriveFile> {
+    const chain = await this.ancestry(token, folderId, rootId);
+    if (!chain) {
+      throw new UnprocessableEntityException({
+        code: FILES_ERROR_CODES.outsideRoot,
+        message: "The folder must be inside the Files root",
+      });
+    }
+    const folder = chain[0]!;
+    if (folder.mimeType !== DRIVE_FOLDER_MIME) {
+      throw new UnprocessableEntityException({
+        code: MEDIA_ERROR_CODES.notAFolder,
+        message: "The chosen item is not a folder in Drive",
+      });
+    }
+    if (folder.id === rootId) {
+      throw new UnprocessableEntityException({
+        code: FILES_ERROR_CODES.outsideRoot,
+        message: "The folder must be inside the Files root, not the root",
+      });
+    }
+    return folder;
+  }
+
+  /** Changes only where new gig folders are created; existing gig folders stay put. */
+  async setGigsFolder(
+    bandId: string,
+    body: SetGigsFolder,
+  ): Promise<DriveStatus> {
+    const ctx = await this.requireContext(bandId);
+    let folderId: string;
+    if ("create" in body) {
+      const created = await this.drive.createFolder(ctx.token, {
+        name: body.name ?? "Gigs",
+        parentId: ctx.rootFolderId,
+      });
+      folderId = created.id;
+    } else {
+      folderId = (
+        await this.requireFolderInside(
+          ctx.token,
+          body.folderId,
+          ctx.rootFolderId,
+        )
+      ).id;
+    }
+    await this.db
+      .update(bands)
+      .set({ driveGigsFolderId: folderId })
+      .where(eq(bands.id, bandId));
     return this.status(bandId);
   }
 

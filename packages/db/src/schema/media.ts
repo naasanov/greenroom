@@ -170,3 +170,32 @@ export const uploadSessions = pgTable(
     index("upload_sessions_gig_status_idx").on(t.gigId, t.status),
   ],
 );
+
+// Many-to-many link from any Drive file or folder id to a library song, per band.
+// name, mime_type and is_folder are snapshots refreshed when the link set is written.
+export const driveFileSongLinks = pgTable(
+  "drive_file_song_links",
+  {
+    id: id(),
+    bandId: uuid("band_id")
+      .notNull()
+      .references(() => bands.id, { onDelete: "cascade" }),
+    songId: uuid("song_id")
+      .notNull()
+      .references(() => songs.id, { onDelete: "cascade" }),
+    driveFileId: text("drive_file_id").notNull(),
+    name: text("name").notNull(),
+    mimeType: text("mime_type"),
+    isFolder: boolean("is_folder").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("drive_file_song_links_band_song_file_idx").on(
+      t.bandId,
+      t.songId,
+      t.driveFileId,
+    ),
+    index("drive_file_song_links_song_id_idx").on(t.songId),
+    index("drive_file_song_links_band_file_idx").on(t.bandId, t.driveFileId),
+  ],
+);

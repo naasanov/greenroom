@@ -10,10 +10,12 @@ import {
 import {
   createDriveFolderSchema,
   setDriveFolderSchema,
+  setGigsFolderSchema,
   type CreateDriveFolder,
   type DriveStatus,
   type FakePicker,
   type SetDriveFolder,
+  type SetGigsFolder,
 } from "@greenroom/shared";
 import { BandMember } from "../bands/index.js";
 import { ZodPipe } from "../common/zod.pipe.js";
@@ -45,7 +47,20 @@ export class DriveController {
     @Param("bandId") bandId: string,
     @Body(new ZodPipe(setDriveFolderSchema)) body: SetDriveFolder,
   ): Promise<DriveStatus> {
-    return this.structure.setRootFolder(bandId, body.folderId);
+    return this.structure.setRootFolder(
+      bandId,
+      body.folderId,
+      body.gigsFolderId,
+    );
+  }
+
+  @Post("gigs-folder")
+  @HttpCode(200)
+  setGigsFolder(
+    @Param("bandId") bandId: string,
+    @Body(new ZodPipe(setGigsFolderSchema)) body: SetGigsFolder,
+  ): Promise<DriveStatus> {
+    return this.structure.setGigsFolder(bandId, body);
   }
 
   @Post("folders")

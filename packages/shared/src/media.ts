@@ -23,6 +23,8 @@ export type DriveStatus = z.infer<typeof driveStatusSchema>;
 
 export const setDriveFolderSchema = z.object({
   folderId: z.string().trim().min(1).max(200),
+  /** Optional folder inside the chosen one to use as the gigs root. */
+  gigsFolderId: z.string().trim().min(1).max(200).optional(),
 });
 export type SetDriveFolder = z.infer<typeof setDriveFolderSchema>;
 

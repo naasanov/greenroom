@@ -37,19 +37,13 @@ import { ZodPipe } from "../common/zod.pipe.js";
 import { MediaService } from "./media.service.js";
 import { MediaZipService } from "./media-zip.service.js";
 import {
-  contentDisposition,
-  inlineSafe,
   parseRange,
-  readAll,
-  sendStream,
-  sniffImageMime,
+  sendContent,
+  sendThumbnail,
+  sendUnsatisfiable,
 } from "./media-util.js";
-import { Readable } from "node:stream";
 
 const uuid = () => new ParseUUIDPipe({ errorHttpStatusCode: 404 });
-const PRIVATE_CACHE = "private, max-age=60";
-// Thumbnails are served through the authenticated API, never signed URLs.
-const THUMBNAIL_CACHE = "private, max-age=3600";
 
 @BandMember()
 @Controller("bands/:bandId")
@@ -162,12 +156,7 @@ export class MediaController {
     @Res() res: Response,
   ): Promise<void> {
     const { result } = await this.media.openItem(bandId, itemId, "thumbnail");
-    const buf = await readAll(result.stream);
-    sendStream(res, Readable.from([buf]), {
-      "Content-Type": sniffImageMime(buf),
-      "Content-Length": buf.length,
-      "Cache-Control": THUMBNAIL_CACHE,
-    });
+    await sendThumbnail(res, result);
   }
 
   @Get("media/:itemId/content")
@@ -181,10 +170,7 @@ export class MediaController {
     const item0 = await this.media.getItemRow(bandId, itemId);
     const parsed = parseRange(req.headers.range, item0.sizeBytes);
     if (parsed === "unsatisfiable") {
-      res
-        .status(416)
-        .setHeader("Content-Range", `bytes */${item0.sizeBytes ?? 0}`)
-        .end();
+      sendUnsatisfiable(res, item0.sizeBytes);
       return;
     }
     const { item, result } = await this.media.openItem(
@@ -193,25 +179,10 @@ export class MediaController {
       "content",
       parsed ?? undefined,
     );
-    const mime = item.mimeType ?? "application/octet-stream";
-    const attachment = download === "1" || !inlineSafe(mime);
-    const partial = result.partial;
-    if (partial) {
-      res.status(206);
-      res.setHeader(
-        "Content-Range",
-        `bytes ${partial.start}-${partial.end}/${partial.total}`,
-      );
-    }
-    sendStream(res, result.stream, {
-      "Content-Type": mime,
-      "Content-Length": partial ? partial.end - partial.start + 1 : result.size,
-      "Accept-Ranges": "bytes",
-      "Content-Disposition": contentDisposition(
-        attachment ? "attachment" : "inline",
-        item.name,
-      ),
-      "Cache-Control": PRIVATE_CACHE,
+    sendContent(res, result, {
+      mimeType: item.mimeType,
+      name: item.name,
+      download: download === "1",
     });
   }
 }

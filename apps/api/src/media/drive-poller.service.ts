@@ -15,6 +15,7 @@ import {
   type GoogleDriveAdapter,
 } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
+import { insertSubfolder, upsertDriveItem } from "./media-ingest.js";
 import { FOLDER_MIME } from "./media-util.js";
 
 export const DRIVE_POLL_QUEUE = "drive-changes-poll";
@@ -175,23 +176,7 @@ export class DrivePollerService implements OnModuleInit {
         }
         return;
       }
-      const [{ next }] = await tx
-        .select({
-          next: sql<number>`coalesce(max(${mediaFolders.position}), -1) + 1`,
-        })
-        .from(mediaFolders)
-        .where(eq(mediaFolders.gigId, parentGig));
-      const [row] = await tx
-        .insert(mediaFolders)
-        .values({
-          bandId,
-          gigId: parentGig,
-          name: f.name,
-          driveFolderId: f.id,
-          position: Number(next),
-        })
-        .onConflictDoNothing()
-        .returning();
+      const row = await insertSubfolder(tx, bandId, parentGig, f);
       if (row) subByDriveId.set(f.id, row);
       return;
     }
@@ -226,38 +211,7 @@ export class DrivePollerService implements OnModuleInit {
           .where(eq(mediaItems.id, existing.id));
       return;
     }
-    await tx
-      .insert(mediaItems)
-      .values({
-        bandId,
-        gigId: target.gigId,
-        folderId: target.folderId,
-        driveFileId: f.id,
-        name: f.name,
-        mimeType: f.mimeType,
-        sizeBytes: f.size,
-        thumbnailUrl: f.thumbnailLink,
-        createdAt: new Date(f.createdTime),
-      })
-      .onConflictDoUpdate({
-        target: [mediaItems.bandId, mediaItems.driveFileId],
-        set: {
-          gigId: target.gigId,
-          folderId: target.folderId,
-          name: f.name,
-          // A rename seen in Drive stops song-title auto-renames.
-          nameCustomized: existing
-            ? existing.nameCustomized || existing.name !== f.name
-            : false,
-          mimeType: f.mimeType,
-          sizeBytes: f.size,
-          thumbnailUrl: f.thumbnailLink,
-          missing: false,
-          trashedAt: null,
-          deletedAt: null,
-          updatedAt: now,
-        },
-      });
+    await upsertDriveItem(tx, bandId, target, f, existing);
   }
 
   /** Removes a subfolder row; its items are hidden according to why it went. */

@@ -1,5 +1,6 @@
 import { Readable } from "node:stream";
 import type { Response } from "express";
+import type { DriveDownloadResult } from "../integrations/index.js";
 import type { MediaItem } from "@greenroom/shared";
 import type { mediaItems } from "@greenroom/db";
 import { apiPublicUrl } from "../auth/auth.constants.js";
@@ -118,4 +119,57 @@ export function parseRange(
   if (end !== undefined && end < start) return null;
   if (size !== null && start >= size) return "unsatisfiable";
   return { start, end };
+}
+
+export type OkDownload = Extract<DriveDownloadResult, { status: "ok" }>;
+
+const PRIVATE_CACHE = "private, max-age=60";
+// Thumbnails are served through the authenticated API, never signed URLs.
+const THUMBNAIL_CACHE = "private, max-age=3600";
+
+export async function sendThumbnail(
+  res: Response,
+  result: OkDownload,
+): Promise<void> {
+  const buf = await readAll(result.stream);
+  sendStream(res, Readable.from([buf]), {
+    "Content-Type": sniffImageMime(buf),
+    "Content-Length": buf.length,
+    "Cache-Control": THUMBNAIL_CACHE,
+  });
+}
+
+export function sendUnsatisfiable(res: Response, size: number | null): void {
+  res
+    .status(416)
+    .setHeader("Content-Range", `bytes */${size ?? 0}`)
+    .end();
+}
+
+/** Streams file content, as 206 when the download is a partial range. */
+export function sendContent(
+  res: Response,
+  result: OkDownload,
+  file: { mimeType: string | null; name: string; download: boolean },
+): void {
+  const mime = file.mimeType ?? "application/octet-stream";
+  const attachment = file.download || !inlineSafe(mime);
+  const partial = result.partial;
+  if (partial) {
+    res.status(206);
+    res.setHeader(
+      "Content-Range",
+      `bytes ${partial.start}-${partial.end}/${partial.total}`,
+    );
+  }
+  sendStream(res, result.stream, {
+    "Content-Type": mime,
+    "Content-Length": partial ? partial.end - partial.start + 1 : result.size,
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": contentDisposition(
+      attachment ? "attachment" : "inline",
+      file.name,
+    ),
+    "Cache-Control": PRIVATE_CACHE,
+  });
 }

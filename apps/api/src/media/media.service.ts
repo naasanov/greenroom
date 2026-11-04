@@ -22,10 +22,7 @@ import {
   type SongMediaGroup,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
-import type {
-  DriveByteRange,
-  DriveDownloadResult,
-} from "../integrations/index.js";
+import type { DriveByteRange } from "../integrations/index.js";
 import {
   DriveStructureService,
   type DriveContext,
@@ -35,6 +32,7 @@ import {
   mediaCategory,
   toItemDto,
   type MediaItemRow,
+  type OkDownload,
 } from "./media-util.js";
 
 type FolderRow = typeof mediaFolders.$inferSelect;
@@ -485,8 +483,6 @@ export class MediaService {
     return { item, result };
   }
 }
-
-type OkDownload = Extract<DriveDownloadResult, { status: "ok" }>;
 
 const byCreated = (a: MediaItemRow, b: MediaItemRow): number =>
   a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);

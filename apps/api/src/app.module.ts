@@ -10,6 +10,7 @@ import { HealthController } from "./health.controller.js";
 import { IntegrationsModule } from "./integrations/index.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { LineupsModule } from "./lineups/lineups.module.js";
+import { FilesModule } from "./files/files.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { LinksModule } from "./links/links.module.js";
 import { PublicCalendarModule } from "./public-calendar/public-calendar.module.js";
@@ -37,6 +38,7 @@ import { TestingModule } from "./testing/testing.module.js";
     LineupsModule,
     LinksModule,
     MediaModule,
+    FilesModule,
     PublicCalendarModule,
     FeedbackModule,
     // The test-control API is only registered with fakes outside production.
