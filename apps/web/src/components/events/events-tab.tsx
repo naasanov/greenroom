@@ -2,6 +2,7 @@
 
 import { gigPath, parseGigId } from "@/lib/gig-path";
 import { useQueryClient } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -12,19 +13,14 @@ import type {
 } from "@greenroom/shared";
 import { Fab } from "@/components/app/fab";
 import { AgendaButton, AgendaSheet } from "@/components/events/agenda-sheet";
-import {
-  CreateEventDrawer,
-  type CreatedEvent,
-} from "@/components/events/create-drawer";
+import type { CreatedEvent } from "@/components/events/create-drawer";
 import {
   EventCalendar,
   type CalendarMode,
 } from "@/components/events/event-calendar";
 import { CalendarBanner } from "@/components/google/calendar-banner";
 import { GoogleLinkReturn } from "@/components/google/google-link-return";
-import { GigDrawer } from "@/components/events/gig-drawer";
 import { PublicCalendarExport } from "@/components/events/public-calendar-export";
-import { PracticeDrawer } from "@/components/events/practice-drawer";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
 import { cn } from "@/lib/utils";
 import { useCurrentBand } from "@/lib/current-band";
@@ -37,6 +33,23 @@ import {
   useGigLinkFor,
   usePracticeLinkFor,
 } from "@/lib/queries/events";
+
+// Drawers (forms, setlist builder, media) load on first use; `preloadDrawers` warms them at idle.
+const loadGigDrawer = () =>
+  import("@/components/events/gig-drawer").then((m) => m.GigDrawer);
+const loadPracticeDrawer = () =>
+  import("@/components/events/practice-drawer").then((m) => m.PracticeDrawer);
+const loadCreateDrawer = () =>
+  import("@/components/events/create-drawer").then((m) => m.CreateEventDrawer);
+const GigDrawer = dynamic(loadGigDrawer, { ssr: false });
+const PracticeDrawer = dynamic(loadPracticeDrawer, { ssr: false });
+const CreateEventDrawer = dynamic(loadCreateDrawer, { ssr: false });
+
+function preloadDrawers() {
+  void loadGigDrawer();
+  void loadPracticeDrawer();
+  void loadCreateDrawer();
+}
 
 const useCalendarMode = createLocalChoice<CalendarMode>(
   "greenroom:calendar-mode",
@@ -128,7 +141,14 @@ interface EventDrawerData {
  * mirrors the URL (`/gigs/:id`, `/practices/:id?date=`), but opening and closing
  * update local state first so the drawer never waits on a navigation.
  */
-export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
+export function EventsTab({
+  focusDate: focusProp,
+  active = true,
+}: {
+  focusDate?: string;
+  /** False while the tab is kept mounted but hidden behind another tab. */
+  active?: boolean;
+}) {
   const tabRef = useRef<HTMLDivElement>(null);
   useDrawerTopVar(tabRef);
   const router = useRouter();
@@ -138,6 +158,19 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
   const { currentBand, setCurrentBandId } = useCurrentBand();
   const bandId = currentBand?.id;
   const [mode, setMode] = useCalendarMode();
+
+  useEffect(() => {
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (!w.requestIdleCallback) {
+      const t = window.setTimeout(preloadDrawers, 1500);
+      return () => window.clearTimeout(t);
+    }
+    const id = w.requestIdleCallback(preloadDrawers);
+    return () => w.cancelIdleCallback?.(id);
+  }, []);
 
   // Selection: local state mirrors the URL; `pending` holds a navigation we started.
   const urlSelection = parseSelection(pathname, search.get("date"));
@@ -236,6 +269,8 @@ export function EventsTab({ focusDate: focusProp }: { focusDate?: string }) {
   // Create drawer.
   const [create, setCreate] = useState({ open: false, date: "", nonce: 0 });
   const lastClosed = useRef<number | null>(null);
+  // The create drawer is portaled to body, so it closes when another tab takes over.
+  if (!active && create.open) setCreate({ ...create, open: false });
   const openCreate = (date: string) => {
     // The outside pointerdown already closed (or guarded) the drawer for the
     // day it shows, so the click that follows must not reopen it.

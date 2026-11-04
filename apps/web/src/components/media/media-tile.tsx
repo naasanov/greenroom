@@ -207,7 +207,7 @@ export interface TileProps {
   selecting: boolean;
   songTitle: string | null;
   editing: boolean;
-  onActivate: () => void;
+  onActivate: (opts: { shift: boolean }) => void;
   onLongPress: () => void;
   onStartRename: () => void;
   onRename: (name: string | null) => void;
@@ -230,9 +230,9 @@ export function MediaTile(props: TileProps) {
     onMouseDown: drag.listeners?.onMouseDown as
       ((e: React.MouseEvent) => void) | undefined,
   };
-  const activate = () => {
+  const activate = (e: React.MouseEvent) => {
     if (press.consumeLongPress()) return;
-    props.onActivate();
+    props.onActivate({ shift: e.shiftKey });
   };
 
   if (density === "names") {
@@ -267,9 +267,9 @@ export function MediaTile(props: TileProps) {
           <button
             type="button"
             data-testid="media-name"
-            onClick={() => {
+            onClick={(e) => {
               if (press.consumeLongPress()) return;
-              if (selecting) props.onActivate();
+              if (selecting) props.onActivate({ shift: e.shiftKey });
               else props.onStartRename();
             }}
             {...press.handlers}

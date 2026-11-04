@@ -12,7 +12,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const me = useMe();
-  const bands = useBands(!!me.data);
+  const bands = useBands();
   const signedOut = me.isSuccess && !me.data;
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!me.data || !bands.data) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        {me.isError || bands.isError ? (
+        {me.isError || (me.data && bands.isError) ? (
           <p role="alert" className="text-sm text-destructive">
             Something went wrong. Please reload.
           </p>

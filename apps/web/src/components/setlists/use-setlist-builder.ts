@@ -15,7 +15,7 @@ import {
   type SetlistSong,
 } from "@/lib/queries/setlists";
 import { loadSort } from "@/components/library/song-utils";
-import { useSongs } from "@/lib/queries/songs";
+import { useSongPool } from "@/lib/queries/songs";
 import { useMediaQuery } from "@/lib/use-media-query";
 
 /** RightSheet's slide-out time; the sheet unmounts after it. */
@@ -103,7 +103,7 @@ export function useSetlistBuilder({
     setSortReady(true);
     setSort(loadSort());
   }
-  const songsQuery = useSongs(bandId, { q: "", sort }, sortReady);
+  const songsQuery = useSongPool(bandId, sort, sortReady);
   const copyMutation = useCopySetlist(bandId, setlistId);
   const [libraryOpen, setLibraryOpenState] = useState(false);
   const [historyOpen, setHistoryOpenState] = useState(false);

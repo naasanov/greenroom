@@ -33,10 +33,10 @@ export function GlobalUploadIndicator() {
     <Link
       href={mediaHref(first.gigId)}
       data-testid="global-upload-indicator"
-      className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] pointer-events-auto z-[60] block border-t bg-background shadow-lift md:bottom-0"
+      className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] pointer-events-auto z-[35] block border-t bg-background shadow-lift md:bottom-0"
     >
       <BatchBar entries={entries} className="absolute inset-x-0 top-0" />
-      <span className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-2.5 text-sm">
+      <span className="flex items-center gap-2 px-4 py-2.5 text-sm">
         <Loader2 className="size-4 shrink-0 animate-spin text-blue-500" />
         <span data-testid="global-upload-text" className="font-medium">
           Uploading {Math.min(finished + 1, counted.length)} of {counted.length}

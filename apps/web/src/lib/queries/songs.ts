@@ -71,6 +71,70 @@ export function useSongs(
   });
 }
 
+const byTitleThenId = (a: SongSummary, b: SongSummary) => {
+  const x = a.title.toLowerCase();
+  const y = b.title.toLowerCase();
+  return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+};
+
+/** Orders a full song list the way the API's `sort` parameter does. */
+export function sortSongs(list: SongSummary[], sort: SongSort): SongSummary[] {
+  const out = [...list];
+  switch (sort) {
+    case "recent":
+      return out.sort(
+        (a, b) =>
+          (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0) ||
+          (a.id < b.id ? 1 : -1),
+      );
+    case "title":
+      return out.sort(byTitleThenId);
+    case "artist":
+      return out.sort((a, b) => {
+        if (!a.artist !== !b.artist) return a.artist ? -1 : 1;
+        const x = a.artist?.toLowerCase() ?? "";
+        const y = b.artist?.toLowerCase() ?? "";
+        return x < y ? -1 : x > y ? 1 : byTitleThenId(a, b);
+      });
+    case "lastPlayed":
+      return out.sort((a, b) => {
+        if (!a.lastPlayedDate !== !b.lastPlayedDate)
+          return a.lastPlayedDate ? -1 : 1;
+        const x = a.lastPlayedDate ?? "";
+        const y = b.lastPlayedDate ?? "";
+        return x < y ? 1 : x > y ? -1 : byTitleThenId(a, b);
+      });
+    case "mostPlayed":
+      return out.sort(
+        (a, b) => b.setlistCount - a.setlistCount || byTitleThenId(a, b),
+      );
+  }
+}
+
+/**
+ * The whole song list for pickers. Every sort shares one cached fetch and is
+ * applied locally, so the gig drawer, setlist builder and media page reuse it.
+ */
+export function useSongPool(
+  bandId: string | undefined,
+  sort: SongSort,
+  enabled = true,
+) {
+  const select = useCallback(
+    (list: SongSummary[]) => sortSongs(list, sort),
+    [sort],
+  );
+  return useQuery({
+    queryKey: songKeys.list(bandId ?? "", "", "recent"),
+    queryFn: () =>
+      api(`/bands/${bandId}/songs?${new URLSearchParams({ sort: "recent" })}`, {
+        schema: typed<SongSummary[]>(),
+      }),
+    select,
+    enabled: !!bandId && enabled,
+  });
+}
+
 const DETAIL_STALE_MS = 30_000;
 
 const songDetailOptions = (bandId: string, songId: string) =>

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { useSetlist } from "@/lib/queries/setlists";
-import { useSongs } from "@/lib/queries/songs";
+import { useSongPool } from "@/lib/queries/songs";
 import { pathWithout } from "@/lib/queries/spotify";
 import {
   connectSpotifyForExport,
@@ -176,9 +176,9 @@ function CopyListButton({ lines }: { lines: string[] }) {
 }
 
 function useCopyLines(bandId: string, target: ExportTarget): string[] {
-  const library = useSongs(
+  const library = useSongPool(
     bandId,
-    { q: "", sort: target.kind === "library" ? target.sort : "recent" },
+    target.kind === "library" ? target.sort : "recent",
     target.kind === "library",
   );
   const setlist = useSetlist(

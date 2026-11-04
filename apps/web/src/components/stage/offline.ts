@@ -62,7 +62,10 @@ export async function isShellCached(gigId: string): Promise<boolean> {
 }
 
 /** Quietly stores setlists, song notes and the stage page for upcoming gigs. */
-export async function syncUpcomingStageData(bandId: string): Promise<void> {
+export async function syncUpcomingStageData(
+  bandId: string,
+  waitForIdle: () => Promise<void> = async () => {},
+): Promise<void> {
   try {
     const now = new Date();
     const to = new Date(now.getTime() + HORIZON_DAYS * 86_400_000);
@@ -73,7 +76,9 @@ export async function syncUpcomingStageData(bandId: string): Promise<void> {
     const gigs = events.filter((e) => e.type === "gig").slice(0, MAX_GIGS);
     const songCache = new Map<string, Promise<SongDetail>>();
     const kept = new Set<string>();
+    // One gig at a time, each waiting for an idle moment so taps are never starved.
     for (const gig of gigs) {
+      await waitForIdle();
       try {
         const snap = await fetchStageSnapshot(bandId, gig.id, {
           gigTitle: gig.title,

@@ -38,22 +38,38 @@ const expiryText = (iso: string | null) =>
 export function UploadLinkButton({
   bandId,
   gigId,
+  compact = false,
 }: {
   bandId: string;
   gigId: string;
+  /** Icon-only trigger for toolbars. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button
-        variant="outline"
-        className="self-start"
-        data-testid="share-upload-link"
-        onClick={() => setOpen(true)}
-      >
-        <Link2 />
-        Share upload link
-      </Button>
+      {compact ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Share upload link"
+          title="Share upload link"
+          data-testid="media-share-upload-link"
+          onClick={() => setOpen(true)}
+        >
+          <Link2 />
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          className="self-start"
+          data-testid="share-upload-link"
+          onClick={() => setOpen(true)}
+        >
+          <Link2 />
+          Share upload link
+        </Button>
+      )}
       <UploadLinkDialog
         bandId={bandId}
         gigId={gigId}

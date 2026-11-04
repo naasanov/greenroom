@@ -78,7 +78,7 @@ import {
   useTrashMediaItems,
 } from "@/lib/queries/media";
 import { useGigSetlist, useSetlist } from "@/lib/queries/setlists";
-import { useSongs } from "@/lib/queries/songs";
+import { useSongPool } from "@/lib/queries/songs";
 import { useMyUploads } from "@/lib/queries/uploads";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,7 @@ import {
 } from "./media-download";
 import { MediaTile, type Density } from "./media-tile";
 import { MediaViewer } from "./media-viewer";
+import { UploadLinkButton } from "./upload-link-dialog";
 import { useGigUploads } from "./upload/upload-provider";
 import type { UploadEntry } from "./upload/upload-store";
 import { UploadTile } from "./upload/upload-tile";
@@ -353,7 +354,7 @@ export function MediaGallery({
   const integrations = useGoogleIntegrations(bandId);
   const gigSetlist = useGigSetlist(bandId, gigId);
   const setlist = useSetlist(bandId, gigSetlist.data?.id);
-  const songs = useSongs(bandId, { q: "", sort: "title" });
+  const songs = useSongPool(bandId, "title");
   const [density, setDensity] = useDensity();
 
   const move = useMoveMediaItems(bandId, gigId);
@@ -770,9 +771,23 @@ export function MediaGallery({
 
   const viewerIndex = viewerId ? all.findIndex((i) => i.id === viewerId) : -1;
 
-  function open(item: MediaItem) {
-    if (selecting) toggle(item.id);
-    else setViewerId(item.id);
+  const anchorId = useRef<string | null>(null);
+  function open(item: MediaItem, shift: boolean, siblings: MediaItem[]) {
+    if (!selecting) {
+      setViewerId(item.id);
+      return;
+    }
+    const from = siblings.findIndex((i) => i.id === anchorId.current);
+    if (shift && from >= 0) {
+      const to = siblings.findIndex((i) => i.id === item.id);
+      const ids = siblings
+        .slice(Math.min(from, to), Math.max(from, to) + 1)
+        .map((i) => i.id);
+      setSelected((prev) => new Set([...prev, ...ids]));
+    } else {
+      toggle(item.id);
+    }
+    anchorId.current = item.id;
   }
 
   const plural = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
@@ -893,7 +908,7 @@ export function MediaGallery({
                       selecting={selecting}
                       songTitle={songTitle(item)}
                       editing={editingId === item.id}
-                      onActivate={() => open(item)}
+                      onActivate={({ shift }) => open(item, shift, section.items)}
                       onLongPress={() => startWith(item.id)}
                       onStartRename={() => setEditingId(item.id)}
                       onRename={(name) => commitRename(item, name)}
@@ -983,6 +998,7 @@ export function MediaGallery({
               </a>
             </Button>
           ) : null}
+          <UploadLinkButton compact bandId={bandId} gigId={gigId} />
         </div>
         {ready ? (
           <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 pb-2">

@@ -82,6 +82,8 @@ export function useBands(enabled = true) {
   return useQuery({
     queryKey: keys.bands,
     queryFn: () => api("/bands", { schema: z.array(bandSummarySchema) }),
+    // A signed-out 401 is final; the auth gate redirects to sign-in.
+    retry: (count, e) => !isApiError(e, 401) && count < 3,
     enabled,
   });
 }

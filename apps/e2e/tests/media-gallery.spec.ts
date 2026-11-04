@@ -95,6 +95,24 @@ test("empty Unsorted is hidden when folders exist", async ({ page }) => {
   await expect(section(page, "Stage").getByTestId("media-tile")).toHaveCount(4);
 });
 
+test("shift-click selects a range within a section", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  await page.getByTestId("select-fab").click();
+  const unsorted = section(page, "Unsorted");
+  const names = await unsorted
+    .getByTestId("media-tile")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-name")!));
+  expect(names).toHaveLength(3);
+  await tile(page, names[0]!).getByTestId("media-open").click();
+  await tile(page, names[2]!)
+    .getByTestId("media-open")
+    .click({ modifiers: ["Shift"] });
+  for (const n of names) {
+    await expect(tile(page, n)).toHaveAttribute("data-selected", "true");
+  }
+  await expect(tile(page, "s1.png")).toHaveAttribute("data-selected", "false");
+});
+
 test("collapse, expand and jump between sections", async ({ page }) => {
   await openGallery(page, m.gigId);
   const unsorted = section(page, "Unsorted");

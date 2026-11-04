@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Suspense,
@@ -16,11 +17,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EventsTab } from "@/components/events/events-tab";
 import { CreateBandForm } from "@/components/onboarding/create-band-form";
 import { StartScreen } from "@/components/onboarding/start-screen";
 import { useCurrentBand } from "@/lib/current-band";
 import { useMe, useSignOut } from "@/lib/queries";
+
+/** Calendar-shaped placeholder that holds the Events tab's space while its code loads. */
+function EventsSkeleton() {
+  return (
+    <div aria-hidden="true" className="mx-auto w-full max-w-5xl px-3 py-4 pb-28">
+      <div className="mb-3 h-9 w-48 animate-pulse rounded-xl bg-muted" />
+      <div className="h-[34rem] animate-pulse rounded-2xl bg-muted/60" />
+    </div>
+  );
+}
+
+const EventsTab = dynamic(
+  () => import("@/components/events/events-tab").then((m) => m.EventsTab),
+  { ssr: false, loading: () => <EventsSkeleton /> },
+);
 
 export function tabPath(tab: TabKey): string {
   return `/${tab}`;
@@ -52,8 +67,11 @@ export function RoutedShell({ children }: { children: ReactNode }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [lastTab, setLastTab] = useState<TabKey | null>(null);
   const activeTab = tabFromPath(pathname);
-  // Event deep links share one mounted Events tab so the calendar never remounts.
+  // Event deep links share one Events tab; once visited it stays mounted (hidden
+  // off-tab) so returning never rebuilds the calendar.
   const showEvents = activeTab === "events";
+  const [eventsVisited, setEventsVisited] = useState(false);
+  if (showEvents && !eventsVisited) setEventsVisited(true);
   if (activeTab && activeTab !== lastTab) setLastTab(activeTab);
 
   if (!currentBand || !me) {
@@ -83,10 +101,12 @@ export function RoutedShell({ children }: { children: ReactNode }) {
         profile={{ name: me.displayName, imageUrl: me.avatarUrl }}
         onProfileClick={() => router.push("/settings")}
       >
-        {showEvents ? (
-          <Suspense>
-            <EventsTab />
-          </Suspense>
+        {eventsVisited ? (
+          <div hidden={!showEvents}>
+            <Suspense>
+              <EventsTab active={showEvents} />
+            </Suspense>
+          </div>
         ) : null}
         {children}
       </AppShell>

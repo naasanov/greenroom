@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import { takeEarlyResponse } from "@/lib/early-fetch";
 
 /** Resolves the API origin in the browser; `NEXT_PUBLIC_API_URL` wins when set. */
 export function getApiUrl(): string {
@@ -41,13 +42,17 @@ export async function api<T = void>(
   path: string,
   { method = "GET", body, schema }: RequestOptions<T> = {},
 ): Promise<T> {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    method,
-    credentials: "include",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const send = () =>
+    fetch(`${getApiUrl()}${path}`, {
+      method,
+      credentials: "include",
+      headers:
+        body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  // A response the head script already started replaces the first GET; failures fall back to a fresh request.
+  const early = method === "GET" ? takeEarlyResponse(path) : undefined;
+  const res = early ? await early.catch(send) : await send();
   if (!res.ok) {
     let message = res.statusText || "Request failed";
     let code: string | undefined;

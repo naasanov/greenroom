@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSongs } from "@/lib/queries/songs";
+import { useSongPool } from "@/lib/queries/songs";
 import {
   useSetlist,
   useSetlistHistory,
@@ -660,7 +660,7 @@ export function SongPickerDrawer({
   /** Adds a "No song" row that calls this. */
   onClear?: () => void;
 }) {
-  const songsQuery = useSongs(bandId, { q: "", sort: "title" }, open);
+  const songsQuery = useSongPool(bandId, "title", open);
   const songs = songsQuery.data;
   const [search, setSearch] = useState("");
   const [sheet, setSheet] = useState<SetlistBuilder["sheet"]>(null);

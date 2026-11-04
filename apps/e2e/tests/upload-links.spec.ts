@@ -181,3 +181,30 @@ test("an expired link shows a friendly page", async ({
   );
   await anon.close();
 });
+
+test("admin opens the upload link dialog from the media page", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  const seed = await testApi.seed("band");
+  const ava = await clientFor(testApi, USERS.ava.email);
+  await setupDrive(ava);
+  await loginAs(USERS.ava.email);
+
+  await page.goto(`/gigs/${seed.gigs.upcomingClub.id}/media`);
+  await expect(page.getByTestId("media-gallery")).toBeVisible();
+  for (const size of [
+    { width: 390, height: 844 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect(page.getByTestId("media-share-upload-link")).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Share upload link" }).click();
+  const dialog = page.getByTestId("upload-link-dialog");
+  await dialog.getByTestId("create-upload-link").click();
+  await expect(dialog.getByTestId("upload-link-url")).toHaveValue(
+    /\/u\/[\w-]{43}$/,
+  );
+});

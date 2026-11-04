@@ -74,7 +74,7 @@ export function UploadTray({
       )}
     >
       <BatchBar entries={entries} className="absolute inset-x-0 top-0" />
-      <div className="mx-auto flex max-w-5xl items-center gap-2 px-3 pt-2.5 pb-1">
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <Button
           variant="outline"
           size="sm"
@@ -121,14 +121,14 @@ export function UploadTray({
       {active.length > 0 ? (
         <p
           data-testid="upload-keep-open"
-          className="mx-auto max-w-5xl px-3 text-xs text-muted-foreground"
+          className="px-3 text-xs text-muted-foreground"
         >
           Keep this page open until uploads finish
         </p>
       ) : null}
       <ul
         data-testid="upload-list"
-        className="mx-auto flex max-w-5xl gap-3 overflow-x-auto px-4 pt-2.5 pb-[max(0.25rem,env(safe-area-inset-bottom))]"
+        className="flex gap-3 overflow-x-auto px-4 pt-2.5 pb-[max(0.25rem,env(safe-area-inset-bottom))]"
       >
         {visible.map((e) => (
           <UploadTile
