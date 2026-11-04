@@ -34,6 +34,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
+      - name: Verify e2e shard plan covers every spec
+        run: node apps/e2e/scripts/run-shard.mjs --verify
 
   e2e:
     name: e2e (${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.total }})
@@ -44,15 +46,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Mobile (WebKit) is slower per test, so it gets more shards.
+        # Mobile (WebKit) is slower per test, so it gets more shards. Counts must
+        # match apps/e2e/shard-plan.json (checked by run-shard.mjs --verify).
         include:
           - { project: desktop, shard: 1, total: 3 }
           - { project: desktop, shard: 2, total: 3 }
           - { project: desktop, shard: 3, total: 3 }
-          - { project: mobile, shard: 1, total: 4 }
-          - { project: mobile, shard: 2, total: 4 }
-          - { project: mobile, shard: 3, total: 4 }
-          - { project: mobile, shard: 4, total: 4 }
+          - { project: mobile, shard: 1, total: 5 }
+          - { project: mobile, shard: 2, total: 5 }
+          - { project: mobile, shard: 3, total: 5 }
+          - { project: mobile, shard: 4, total: 5 }
+          - { project: mobile, shard: 5, total: 5 }
     services:
       postgres:
         image: postgres:17
@@ -76,7 +80,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.total }} --reporter=github,html,json
+      - name: Run e2e shard
+        run: |
+          FILES=$(node apps/e2e/scripts/run-shard.mjs --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.total }})
+          if [ -z "$FILES" ]; then echo "No spec files in this shard"; exit 0; fi
+          pnpm test:e2e -- --project=${{ matrix.project }} $FILES --reporter=github,html,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/timings.json
       - uses: actions/upload-artifact@v4
@@ -84,6 +92,7 @@ jobs:
         with:
           name: timings-${{ matrix.project }}-${{ matrix.shard }}
           path: timings.json
+          if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@v4
         if: failure()

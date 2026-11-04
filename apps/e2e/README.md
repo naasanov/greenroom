@@ -26,3 +26,11 @@ Put it in `tests/*.spec.ts` and import from `../src/fixtures.js`:
 The `/__test__` routes exist only when `INTEGRATIONS_MODE=fake` and `NODE_ENV` is not production.
 
 Note: `NEXT_PUBLIC_*` vars are inlined at web build time, so the web build reads the API URL from the build environment.
+
+## CI sharding
+CI splits specs into duration-balanced shards (not Playwright's count-based `--shard`) using `shard-plan.json`.
+`scripts/run-shard.mjs --project=X --shard=i/n` prints the `tests/*.spec.ts` filters for a shard; `--verify` (run in the `checks` job) fails unless every shard set covers each spec exactly once.
+Specs missing from the plan go to the lightest shard by the project's median file time; planned files that no longer exist are ignored.
+
+Refresh the plan from a recent run: `gh run download <run> -p 'timings-*' -D /tmp/timings`, then `node apps/e2e/scripts/shard-plan.mjs /tmp/timings --shards desktop=3,mobile=5` (add `--check` alone to print predicted per-shard seconds).
+If you change shard counts, update the `e2e` matrix in `.github/workflows/ci.yml` to match.
