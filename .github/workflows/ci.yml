@@ -3,17 +3,17 @@ name: CI
 on:
   pull_request:
     paths-ignore:
-      - 'docs/**'
-      - 'memory/**'
-      - 'CLAUDE.md'
-      - '**/*.md'
+      - "docs/**"
+      - "memory/**"
+      - "CLAUDE.md"
+      - "**/*.md"
   push:
     branches: [main]
     paths-ignore:
-      - 'docs/**'
-      - 'memory/**'
-      - 'CLAUDE.md'
-      - '**/*.md'
+      - "docs/**"
+      - "memory/**"
+      - "CLAUDE.md"
+      - "**/*.md"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -36,7 +36,7 @@ jobs:
       - run: pnpm build
 
   e2e:
-    name: e2e (${{ matrix.shard }}/4)
+    name: e2e (${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     # Image tag must match the installed @playwright/test version.
     container: mcr.microsoft.com/playwright:v1.64.1-noble
@@ -44,7 +44,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        # Mobile (WebKit) is slower per test, so it gets more shards.
+        include:
+          - { project: desktop, shard: 1, total: 3 }
+          - { project: desktop, shard: 2, total: 3 }
+          - { project: desktop, shard: 3, total: 3 }
+          - { project: mobile, shard: 1, total: 4 }
+          - { project: mobile, shard: 2, total: 4 }
+          - { project: mobile, shard: 3, total: 4 }
+          - { project: mobile, shard: 4, total: 4 }
     services:
       postgres:
         image: postgres:17
@@ -59,6 +67,7 @@ jobs:
           --health-retries 20
     env:
       TEST_DATABASE_URL: postgres://greenroom:greenroom@postgres:5432/greenroom_test
+      E2E_WORKERS: 2
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -67,11 +76,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:e2e -- --shard=${{ matrix.shard }}/4
+      - run: pnpm test:e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.total }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report-${{ matrix.shard }}
+          name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
           path: |
             apps/e2e/playwright-report
             apps/e2e/test-results
