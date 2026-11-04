@@ -1,19 +1,23 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
+import { useFilesUploads } from "@/components/media/upload/upload-provider";
 
 /**
- * Upload entry point for the Files tab. Currently a stub: it opens the file
- * picker and reports that folder uploads are not available yet.
+ * Upload entry point for the Files tab. Files go through the shared upload
+ * store; `folderId` is a Drive folder id or "root". `entries` are the
+ * Files-tab queue entries (active, failed).
  */
-export function useFilesUpload() {
-  const [notice, setNotice] = useState<string | null>(null);
+export function useFilesUpload(bandId: string) {
+  const { store, entries } = useFilesUploads();
 
-  const startUpload = useCallback((files: File[], folderId: string) => {
-    void folderId;
-    if (files.length === 0) return;
-    setNotice("Uploads to folders are coming soon");
-  }, []);
+  const startUpload = useCallback(
+    (files: File[], folderId: string) => {
+      if (files.length === 0) return;
+      store.addToFolder(bandId, folderId, files);
+    },
+    [store, bandId],
+  );
 
   const openPicker = useCallback(
     (folderId: string) => {
@@ -27,7 +31,11 @@ export function useFilesUpload() {
     [startUpload],
   );
 
-  const dismissNotice = useCallback(() => setNotice(null), []);
+  const failed = entries.filter(
+    (e) => e.bandId === bandId && e.status === "error",
+  );
+  const retry = useCallback((key: string) => store.retry(key), [store]);
+  const discard = useCallback((key: string) => store.cancel([key]), [store]);
 
-  return { startUpload, openPicker, notice, dismissNotice };
+  return { startUpload, openPicker, failed, retry, discard };
 }

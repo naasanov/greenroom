@@ -16,7 +16,7 @@ let notesId: string;
 const nav = (page: Page, isMobile: boolean) =>
   page.getByTestId(isMobile ? "bottom-tab-bar" : "top-tabs");
 const row = (page: Page, name: string) =>
-  page.locator(`[data-testid="file-row"][data-name="${name}"]`);
+  page.locator(`[data-testid="file-row"][data-name="${name}"]:visible`);
 
 async function openMenu(page: Page, name: string) {
   await page.getByRole("button", { name: `Actions for ${name}` }).click();
@@ -134,23 +134,90 @@ test("creates a folder from the New menu", async ({ page, isMobile }) => {
   });
 });
 
-test("Upload opens the picker stub and says uploads are coming", async ({
+const textFile = (name: string, body = "hello") => ({
+  name,
+  mimeType: "text/plain",
+  buffer: Buffer.from(body),
+});
+
+async function pickFiles(
+  page: Page,
+  isMobile: boolean,
+  files: ReturnType<typeof textFile>[],
+) {
+  const chooser = page.waitForEvent("filechooser");
+  await newAction(page, isMobile, "upload");
+  await (await chooser).setFiles(files);
+}
+
+test("uploads several files into the root from the picker", async ({
   page,
   isMobile,
 }) => {
   await page.goto("/files");
-  const chooser = page.waitForEvent("filechooser");
-  await newAction(page, !!isMobile, "upload");
-  await (
-    await chooser
-  ).setFiles({
-    name: "a.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("a"),
+  await expect(row(page, "chart.txt")).toBeVisible();
+  await pickFiles(page, !!isMobile, [
+    textFile("riff-one.txt"),
+    textFile("riff-two.txt", "two"),
+  ]);
+  await expect(row(page, "riff-one.txt")).toBeVisible();
+  await expect(row(page, "riff-two.txt")).toBeVisible();
+  expect(await m.fake.byName("riff-one.txt")).toMatchObject({
+    parentId: rootId,
   });
-  await expect(page.getByTestId("files-toast")).toHaveText(
-    "Uploads to folders are coming soon",
-  );
+});
+
+test("uploads into a nested folder and the file appears in its listing", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto("/files");
+  await page.getByRole("link", { name: "Open Rehearsal Notes" }).click();
+  await expect(page).toHaveURL(new RegExp(`/files/${notesId}$`));
+  await pickFiles(page, !!isMobile, [textFile("nested-take.txt")]);
+  await expect(row(page, "nested-take.txt")).toBeVisible();
+  expect(await m.fake.byName("nested-take.txt")).toMatchObject({
+    parentId: notesId,
+  });
+});
+
+test("dropping files on a folder row uploads into that folder", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!!isMobile, "Drag and drop is desktop only");
+  await page.goto("/files");
+  const dataTransfer = await page.evaluateHandle(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["drop"], "dropped.txt", { type: "text/plain" }));
+    return dt;
+  });
+  await row(page, "Rehearsal Notes").dispatchEvent("dragover", {
+    dataTransfer,
+  });
+  await row(page, "Rehearsal Notes").dispatchEvent("drop", { dataTransfer });
+  await expect
+    .poll(async () => (await m.fake.byName("dropped.txt"))?.parentId)
+    .toBe(notesId);
+  await expect(row(page, "dropped.txt")).toHaveCount(0);
+});
+
+test("uploading into a gig folder is not offered and the server refusal shows", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto(`/files/${rootId}`);
+  await page.getByRole("link", { name: "Open Gigs" }).click();
+  // The gig folder row is not a drop target.
+  await expect(row(page, m.gigTitle)).toBeVisible();
+  await expect(row(page, m.gigTitle)).not.toHaveAttribute("data-drop-folder");
+
+  await page.goto(`/files/${m.gigFolderId}`);
+  await pickFiles(page, !!isMobile, [textFile("nope.txt")]);
+  const alert = page.getByTestId("files-upload-errors").getByRole("alert");
+  await expect(alert).toContainText("Upload gig files from the gig");
+  await alert.getByRole("button", { name: /Dismiss upload/ }).click();
+  await expect(alert).toHaveCount(0);
 });
 
 test("renames an item", async ({ page }) => {
@@ -185,6 +252,7 @@ test("moves an item to trash after confirming", async ({ page }) => {
 });
 
 test("selection mode trashes several items", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/files");
   await page.getByRole("button", { name: "Select items" }).click();
   await page.getByRole("button", { name: "Select chart.txt" }).click();

@@ -20,6 +20,8 @@ export interface EntryProps {
   entry: FileEntry;
   selecting: boolean;
   selected: boolean;
+  /** A file drag is hovering this folder. */
+  dropActive: boolean;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
   onToggle: () => void;
@@ -28,6 +30,12 @@ export interface EntryProps {
 }
 
 const displayName = (e: FileEntry) => e.gig?.title ?? e.name;
+
+/** Folders that accept dropped uploads; gig folders take media on the gig page. */
+const dropProps = (e: FileEntry, active: boolean) =>
+  e.kind === "folder" && !e.gig
+    ? { "data-drop-folder": e.id, "data-drop-active": active }
+    : {};
 
 /** The tappable part of an entry: toggles in selection mode, else navigates or opens. */
 function Activator({
@@ -159,6 +167,7 @@ export function FileRow(props: EntryProps) {
   return (
     <li
       data-testid="file-row"
+      {...dropProps(entry, props.dropActive)}
       data-name={displayName(entry)}
       data-kind={entry.kind}
       data-selected={selected}
@@ -170,6 +179,7 @@ export function FileRow(props: EntryProps) {
       className={cn(
         "grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b px-2 py-1 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_8rem_5rem_2.75rem] md:px-3",
         selected && "bg-primary/10",
+        props.dropActive && "bg-primary/15 ring-2 ring-primary ring-inset",
       )}
     >
       <Activator
@@ -218,6 +228,7 @@ export function FileTile(props: EntryProps) {
   return (
     <li
       data-testid="file-tile"
+      {...dropProps(entry, props.dropActive)}
       data-name={displayName(entry)}
       data-kind={entry.kind}
       data-selected={selected}
@@ -228,7 +239,7 @@ export function FileTile(props: EntryProps) {
       }}
       className={cn(
         "flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card",
-        selected && "border-primary ring-2 ring-primary",
+        (selected || props.dropActive) && "border-primary ring-2 ring-primary",
       )}
     >
       <Activator

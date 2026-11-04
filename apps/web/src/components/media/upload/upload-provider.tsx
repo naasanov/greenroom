@@ -45,6 +45,18 @@ export function useGigUploads(gigId: string) {
   return { store, entries };
 }
 
+/** The shared store plus the Files-tab entries (those without a gig). */
+export function useFilesUploads() {
+  const store = useContext(UploadContext);
+  if (!store) throw new Error("UploadProvider is missing");
+  const all = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    () => EMPTY,
+  );
+  return { store, entries: all.filter((e) => e.gigId === null) };
+}
+
 export function useUploadStore(): UploadStore {
   const store = useContext(UploadContext);
   if (!store) throw new Error("UploadProvider is missing");

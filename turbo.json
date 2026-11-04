@@ -25,7 +25,8 @@
         "CI",
         "DEBUG",
         "PWDEBUG",
-        "PLAYWRIGHT_BROWSERS_PATH"
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "PLAYWRIGHT_JSON_OUTPUT_NAME"
       ]
     }
   }

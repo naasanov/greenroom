@@ -4,11 +4,13 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
+import type { UploadEntry } from "./upload-store";
 import { useUploadStore } from "./upload-provider";
 import { BatchBar, batchFraction, isActive } from "./upload-progress";
 
 /** Single place that builds the link back to a gig's media page. */
-const mediaHref = (gigId: string) => `/gigs/${gigId}/media`;
+const uploadHref = (e: UploadEntry) =>
+  e.gigId === null ? "/files" : `/gigs/${e.gigId}/media`;
 
 const onMediaPage = (pathname: string) =>
   /^\/gigs\/[^/]+\/media\/?$/.test(pathname);
@@ -22,16 +24,16 @@ export function GlobalUploadIndicator() {
     store.getSnapshot,
     () => [],
   );
-  const live = entries.filter(isActive);
-  const first = live[0];
-  if (!first || onMediaPage(pathname)) return null;
+  const media = onMediaPage(pathname);
+  const first = entries.find((e) => isActive(e) && !(media && e.gigId));
+  if (!first) return null;
 
   const counted = entries.filter((e) => e.status !== "readd" && !e.restored);
   const finished = counted.filter((e) => e.status === "done").length;
   const percent = Math.round(batchFraction(entries) * 100);
   return (
     <Link
-      href={mediaHref(first.gigId)}
+      href={uploadHref(first)}
       data-testid="global-upload-indicator"
       className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] pointer-events-auto z-[35] block border-t bg-background shadow-lift md:bottom-0"
     >

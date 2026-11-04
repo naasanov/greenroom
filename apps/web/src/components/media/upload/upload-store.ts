@@ -1,14 +1,17 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  FILES_ERROR_CODES,
   UPLOAD_ERROR_CODES,
   type MediaItem,
   type UploadSession,
 } from "@greenroom/shared";
 import { ApiError } from "@/lib/api";
+import { filesKeys } from "@/lib/queries/files";
 import { googleKeys } from "@/lib/queries/google";
 import {
   bulkPatchUploads,
   cancelUpload,
+  filesUploadEndpoints,
   memberUploadEndpoints,
   patchUpload,
 } from "@/lib/queries/uploads";
@@ -19,7 +22,10 @@ export type EntryStatus = "queued" | "uploading" | "done" | "error" | "readd";
 export interface UploadEntry {
   key: string;
   bandId: string;
-  gigId: string;
+  /** Null for a Files-tab upload, which targets `filesFolderId` instead. */
+  gigId: string | null;
+  /** Drive folder id (or "root") of a Files-tab upload; null for gig uploads. */
+  filesFolderId: string | null;
   /** Null after a reload: the browser lost the file, so the user must re-add it. */
   file: File | null;
   fileName: string;
@@ -57,7 +63,16 @@ function describeError(e: unknown): { message: string; retryable: boolean } {
       return { message: "This file type is not supported", retryable: false };
     }
     if (e.code === UPLOAD_ERROR_CODES.tooLarge) {
-      return { message: "This file is too large", retryable: false };
+      return {
+        message: "This file is too large (10 GB maximum)",
+        retryable: false,
+      };
+    }
+    if (e.code === FILES_ERROR_CODES.useGigMedia) {
+      return {
+        message: "Upload gig files from the gig's media page",
+        retryable: false,
+      };
     }
     if (e.code === "GOOGLE_NOT_LINKED") {
       return { message: "Google Drive is not linked", retryable: false };
@@ -117,6 +132,20 @@ export class UploadStore {
   }
 
   add(bandId: string, gigId: string, files: File[]) {
+    this.enqueue(bandId, { gigId, filesFolderId: null }, files);
+  }
+
+  /** Queues Files-tab uploads into a Drive folder id (or "root"). */
+  addToFolder(bandId: string, folderId: string, files: File[]) {
+    this.enqueue(bandId, { gigId: null, filesFolderId: folderId }, files);
+  }
+
+  private enqueue(
+    bandId: string,
+    target: { gigId: string | null; filesFolderId: string | null },
+    files: File[],
+  ) {
+    const { gigId, filesFolderId } = target;
     for (const file of files) {
       const fingerprint = fileFingerprint(file);
       const previewUrl =
@@ -124,7 +153,10 @@ export class UploadStore {
           ? URL.createObjectURL(file)
           : null;
       const same = this.entries.find(
-        (e) => e.gigId === gigId && e.fingerprint === fingerprint,
+        (e) =>
+          e.gigId === gigId &&
+          e.filesFolderId === filesFolderId &&
+          e.fingerprint === fingerprint,
       );
       if (same && (same.status === "queued" || same.status === "uploading")) {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -145,6 +177,7 @@ export class UploadStore {
         key: `up-${++this.seq}-${Math.random().toString(36).slice(2, 8)}`,
         bandId,
         gigId,
+        filesFolderId,
         file,
         fileName: file.name,
         mimeType: file.type || "application/octet-stream",
@@ -189,6 +222,7 @@ export class UploadStore {
       key: `up-${++this.seq}-${s.id.slice(0, 6)}`,
       bandId,
       gigId,
+      filesFolderId: null,
       file: null,
       fileName: s.item?.name ?? s.fileName,
       mimeType: s.mimeType ?? "application/octet-stream",
@@ -303,6 +337,15 @@ export class UploadStore {
     this.pump();
   }
 
+  /** Files uploads have no tray to place them in; drop finished ones once the batch settles. */
+  private dismissFinishedFiles() {
+    const files = this.entries.filter((e) => e.gigId === null);
+    if (files.some((e) => e.status === "queued" || e.status === "uploading")) {
+      return;
+    }
+    this.remove(files.filter((e) => e.status === "done").map((e) => e.key));
+  }
+
   private pump() {
     while (this.controllers.size < CONCURRENCY) {
       const next = this.entries.find(
@@ -318,10 +361,13 @@ export class UploadStore {
     const controller = new AbortController();
     this.controllers.set(key, controller);
     this.update(key, (e) => ({ ...e, status: "uploading", error: null }));
-    const endpoints = memberUploadEndpoints(entry.bandId, entry.gigId, () => {
-      const e = this.current(key);
-      return { folderId: e?.folderId ?? null, songId: e?.songId ?? null };
-    });
+    const endpoints =
+      entry.gigId === null
+        ? filesUploadEndpoints(entry.bandId, entry.filesFolderId ?? "root")
+        : memberUploadEndpoints(entry.bandId, entry.gigId, () => {
+            const e = this.current(key);
+            return { folderId: e?.folderId ?? null, songId: e?.songId ?? null };
+          });
     try {
       const session = await uploadFile(entry.file!, endpoints, {
         signal: controller.signal,
@@ -350,6 +396,13 @@ export class UploadStore {
         item: session.item,
         fileName: session.item?.name ?? e.fileName,
       }));
+      if (entry.gigId === null) {
+        void this.qc.invalidateQueries({
+          queryKey: filesKeys.all(entry.bandId),
+        });
+        this.dismissFinishedFiles();
+        return;
+      }
       void this.qc.invalidateQueries({
         queryKey: googleKeys.media(entry.bandId),
       });

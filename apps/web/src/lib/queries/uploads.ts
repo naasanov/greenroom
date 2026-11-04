@@ -88,6 +88,30 @@ export function memberUploadEndpoints(
   };
 }
 
+/** Files-tab upload endpoints for one Drive folder id (or "root"). */
+export function filesUploadEndpoints(
+  bandId: string,
+  folderId: string,
+): UploadEndpoints {
+  return {
+    create: (input) =>
+      api(`/bands/${bandId}/files/uploads`, {
+        method: "POST",
+        body: { ...input, folderId },
+        schema: uploadSessionSchema,
+      }),
+    chunk: (sessionId, start, end, total, body, signal) =>
+      sendChunk(
+        `${getApiUrl()}/bands/${bandId}/uploads/${sessionId}`,
+        start,
+        end,
+        total,
+        body,
+        signal,
+      ),
+  };
+}
+
 export type { UploadSession };
 
 /** Media linked to a song across gigs, grouped by gig (newest first). */

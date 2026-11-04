@@ -70,6 +70,7 @@ test("sections list Unsorted first, then folders, with a play badge and counts",
   page,
 }) => {
   await openGallery(page, m.gigId);
+  await expect(page.getByTestId("media-section")).toHaveCount(3);
   const names = await page
     .getByTestId("media-section")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));

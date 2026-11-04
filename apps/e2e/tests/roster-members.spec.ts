@@ -301,7 +301,7 @@ test("invite page offers to claim a roster-only member", async ({
   await expect(entry).toHaveCount(1);
   await expect(entry).toContainText("Pat Placeholder");
   await entry.getByRole("button", { name: /That's me/ }).click();
-  await expect(page).not.toHaveURL(/\/invite\//);
+  await expect(page).toHaveURL(/\/events/);
 
   await page.goto("/roster");
   await expect(page.getByTestId("member-card")).toHaveCount(5);

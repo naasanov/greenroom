@@ -102,7 +102,8 @@ export function FilesView({
   const driveReady = drive ? drive.linked && !!drive.folderId : undefined;
   const listing = useFilesFolder(bandId, folderId, driveReady !== false);
   const [view, setView] = useViewChoice();
-  const upload = useFilesUpload();
+  const upload = useFilesUpload(bandId);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const createFolder = useCreateFilesFolder(bandId);
   const rename = useRenameFile(bandId);
@@ -122,10 +123,14 @@ export function FilesView({
 
   const data = listing.data;
   const items = data?.items ?? [];
-  const toastText = toast ?? upload.notice;
-  const dismissToast = () => {
-    setToast(null);
-    upload.dismissNotice();
+
+  const dropFolder = (e: React.DragEvent): string | null => {
+    const hasFiles = Array.from(e.dataTransfer.types).includes("Files");
+    if (!hasFiles || !data) return null;
+    const row = (e.target as HTMLElement).closest<HTMLElement>(
+      "[data-drop-folder]",
+    );
+    return row?.dataset.dropFolder ?? folderId;
   };
 
   const toggle = (entry: FileEntry) => {
@@ -246,6 +251,7 @@ export function FilesView({
       entry,
       selecting,
       selected: selected.has(entry.id),
+      dropActive: dropTarget === entry.id,
       menuOpen: menuId === entry.id,
       onMenuOpenChange: (open) => setMenuId(open ? entry.id : null),
       onToggle: () => toggle(entry),
@@ -295,7 +301,28 @@ export function FilesView({
   const selectedEntries = items.filter((i) => selected.has(i.id));
 
   return (
-    <div data-testid="files-tab" className="pb-28">
+    <div
+      data-testid="files-tab"
+      className="pb-28"
+      onDragOver={(e) => {
+        const target = dropFolder(e);
+        if (target === null) return;
+        e.preventDefault();
+        setDropTarget(target);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropTarget(null);
+        }
+      }}
+      onDrop={(e) => {
+        const target = dropFolder(e);
+        setDropTarget(null);
+        if (target === null) return;
+        e.preventDefault();
+        upload.startUpload(Array.from(e.dataTransfer.files), target);
+      }}
+    >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 p-3 md:p-4">
         <h1 className="sr-only">Files</h1>
         <div className="flex items-center gap-1">
@@ -343,7 +370,7 @@ export function FilesView({
                     <FolderPlus /> New folder
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => upload.openPicker(data.folder.id)}
+                    onSelect={() => upload.openPicker(folderId)}
                   >
                     <Upload /> Upload files
                   </DropdownMenuItem>
@@ -352,7 +379,54 @@ export function FilesView({
             </div>
           ) : null}
         </div>
-        {body}
+        {upload.failed.length > 0 ? (
+          <ul data-testid="files-upload-errors" className="flex flex-col gap-2">
+            {upload.failed.map((f) => (
+              <li
+                key={f.key}
+                role="alert"
+                className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {f.fileName}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {f.error}
+                  </span>
+                </span>
+                {f.retryable ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label={`Retry upload of ${f.fileName}`}
+                    onClick={() => upload.retry(f.key)}
+                  >
+                    Retry
+                  </Button>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Dismiss upload of ${f.fileName}`}
+                  onClick={() => upload.discard(f.key)}
+                >
+                  Dismiss
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div
+          data-testid="files-drop-zone"
+          data-dragging={dropTarget === folderId}
+          className={cn(
+            "rounded-2xl",
+            dropTarget === folderId && "ring-2 ring-primary ring-offset-2",
+          )}
+        >
+          {body}
+        </div>
       </div>
 
       {canAct && !selecting ? (
@@ -370,7 +444,7 @@ export function FilesView({
               key: "upload",
               label: "Upload files",
               icon: <Upload />,
-              onSelect: () => upload.openPicker(data.folder.id),
+              onSelect: () => upload.openPicker(folderId),
             },
           ]}
         />
@@ -378,6 +452,7 @@ export function FilesView({
 
       <SelectionBar
         count={selecting ? selected.size : 0}
+        className="bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+0.75rem)] md:bottom-[calc(env(safe-area-inset-bottom)+0.75rem)]"
         onClear={stopSelecting}
         actions={[
           {
@@ -433,7 +508,7 @@ export function FilesView({
           onClose={() => setViewer(null)}
         />
       ) : null}
-      {toastText ? <Toast text={toastText} onDismiss={dismissToast} /> : null}
+      {toast ? <Toast text={toast} onDismiss={() => setToast(null)} /> : null}
     </div>
   );
 }
