@@ -97,11 +97,11 @@ Parallel group 7A
 🛑 **GATE 6: Final sign-off.** Status: Not started
 
 # Phase 9: Files tab + Drive import (added 2026-11-04, design.md "Files tab")
-- **9.1 Backend:** schema (file song links), shared DTOs, Drive browse/create/rename/trash endpoints with root containment, gigs-root change, link existing folder to gig with backfill, fake Drive extended. Status: In progress
-- **9.2 Files tab UI:** fourth tab, routes, list/grid, gig badges and routing, dialogs. Status: Not started
-- **9.3 Import flow + link-folder-to-gig UI.** Status: Not started
-- **9.4 Uploads into any folder.** Status: Not started
-- **9.5 Song links UI (Files tab + song detail Files section).** Status: Not started
+- **9.1 Backend:** schema (file song links), shared DTOs, Drive browse/create/rename/trash endpoints with root containment, gigs-root change, link existing folder to gig with backfill, fake Drive extended. Status: Done (2026-11-04)
+- **9.2 Files tab UI:** fourth tab, routes, list/grid, gig badges and routing, dialogs. Status: Done (2026-11-04)
+- **9.3 Import flow + link-folder-to-gig UI.** Status: Done (2026-11-04)
+- **9.4 Uploads into any folder.** Status: In progress (API done; Files tab upload wiring pending)
+- **9.5 Song links UI (Files tab + song detail Files section).** Status: Done (2026-11-04)
 - **9.6 E2E specs + docs.** Status: Not started
 
 # Open questions

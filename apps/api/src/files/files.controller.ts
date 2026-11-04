@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -138,6 +139,16 @@ export class FilesController {
     @Param("songId", uuid()) songId: string,
   ): Promise<SongFile[]> {
     return this.files.songFiles(bandId, songId);
+  }
+
+  @Delete("songs/:songId/files/:fileId")
+  @HttpCode(204)
+  unlinkSongFile(
+    @Param("bandId") bandId: string,
+    @Param("songId", uuid()) songId: string,
+    @Param("fileId") fileId: string,
+  ): Promise<void> {
+    return this.files.unlinkSongFile(bandId, songId, fileId);
   }
 
   @Post("gigs/:gigId/media/link-folder")

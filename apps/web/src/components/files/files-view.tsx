@@ -1,0 +1,439 @@
+"use client";
+
+import {
+  CheckSquare,
+  FolderOpen,
+  FolderPlus,
+  LayoutGrid,
+  List,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { FileEntry } from "@greenroom/shared";
+import { FILES_ERROR_CODES } from "@greenroom/shared";
+import { ConfirmDialog } from "@/components/app/confirm-dialogs";
+import { EmptyState } from "@/components/app/empty-state";
+import { Fab } from "@/components/app/fab";
+import { SelectionBar } from "@/components/app/selection-bar";
+import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
+import { startDownload } from "@/components/media/media-download";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { isApiError } from "@/lib/api";
+import {
+  filesContentUrl,
+  useCreateFilesFolder,
+  useFilesFolder,
+  useRenameFile,
+  useSetFileSongs,
+  useTrashFiles,
+} from "@/lib/queries/files";
+import { useGoogleIntegrations } from "@/lib/queries/google";
+import { createLocalChoice } from "@/lib/use-local-choice";
+import { cn } from "@/lib/utils";
+import { Breadcrumbs } from "./breadcrumbs";
+import { FileRow, FileTile, type EntryProps } from "./file-entry";
+import { FileViewer } from "./file-viewer";
+import { entryHref, isProtected } from "./file-utils";
+import type { EntryActions } from "./item-menu";
+import { LinkSongsDrawer } from "./link-songs-drawer";
+import { NameDialog, type NameDialogState } from "./name-dialog";
+import { useFilesUpload } from "./use-files-upload";
+
+const useViewChoice = createLocalChoice<"list" | "grid">(
+  "gr-files-view",
+  ["list", "grid"],
+  "list",
+);
+
+const PROTECTED_HINT = "Delete the gig to remove its folder";
+
+function Toast({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(t);
+  }, [text, onDismiss]);
+  return (
+    <div
+      role="status"
+      data-testid="files-toast"
+      onClick={onDismiss}
+      className="fixed inset-x-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+5rem)] z-40 mx-auto w-fit max-w-sm rounded-2xl bg-foreground px-4 py-3 text-sm text-background shadow-lift md:bottom-6"
+    >
+      {text}
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div
+      aria-hidden
+      data-testid="files-skeleton"
+      className="flex flex-col gap-2"
+    >
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="h-14 animate-pulse rounded-xl bg-muted/60" />
+      ))}
+    </div>
+  );
+}
+
+/** Folder browser: breadcrumbs, list or grid, and the New, rename, trash and song-link flows. */
+export function FilesView({
+  bandId,
+  folderId,
+}: {
+  bandId: string;
+  folderId: string;
+}) {
+  const router = useRouter();
+  const integrations = useGoogleIntegrations(bandId);
+  const drive = integrations.data?.drive;
+  const driveReady = drive ? drive.linked && !!drive.folderId : undefined;
+  const listing = useFilesFolder(bandId, folderId, driveReady !== false);
+  const [view, setView] = useViewChoice();
+  const upload = useFilesUpload();
+
+  const createFolder = useCreateFilesFolder(bandId);
+  const rename = useRenameFile(bandId);
+  const trash = useTrashFiles(bandId);
+  const setSongs = useSetFileSongs(bandId);
+
+  const [toast, setToast] = useState<string | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<FileEntry | null>(null);
+  const [linkTarget, setLinkTarget] = useState<FileEntry | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [trashTargets, setTrashTargets] = useState<FileEntry[]>([]);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const data = listing.data;
+  const items = data?.items ?? [];
+  const toastText = toast ?? upload.notice;
+  const dismissToast = () => {
+    setToast(null);
+    upload.dismissNotice();
+  };
+
+  const toggle = (entry: FileEntry) => {
+    if (isProtected(entry)) {
+      setToast(PROTECTED_HINT);
+      return;
+    }
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(entry.id)) next.add(entry.id);
+      return next;
+    });
+  };
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const actions: EntryActions = {
+    onOpen: (e) => {
+      const href = entryHref(e);
+      if (href) router.push(href);
+      else setViewer(e);
+    },
+    onRename: (e) => {
+      setNameError(null);
+      setNameDialog({ kind: "rename", fileId: e.id, name: e.name });
+    },
+    onDownload: (e) =>
+      startDownload(filesContentUrl(bandId, e.id, true), e.name),
+    onLinkSongs: (e) => {
+      setLinkError(null);
+      setLinkTarget(e);
+    },
+    onTrash: (e) => setTrashTargets([e]),
+  };
+
+  function submitName(name: string) {
+    if (!nameDialog || !data) return;
+    const done = {
+      onSuccess: () => setNameDialog(null),
+      onError: () => setNameError("Could not save that name."),
+    };
+    if (nameDialog.kind === "create") {
+      createFolder.mutate({ parentId: data.folder.id, name }, done);
+    } else {
+      rename.mutate({ fileId: nameDialog.fileId, name }, done);
+    }
+  }
+
+  function confirmTrash() {
+    const ids = trashTargets.map((t) => t.id);
+    trash.mutate(ids, {
+      onSuccess: () => {
+        stopSelecting();
+        setToast(
+          ids.length === 1 ? "Moved to trash" : `Moved ${ids.length} to trash`,
+        );
+      },
+      onError: (e) =>
+        setToast(
+          isApiError(e, 409) && e.code === FILES_ERROR_CODES.gigFolderProtected
+            ? PROTECTED_HINT
+            : "Could not move to trash.",
+        ),
+    });
+  }
+
+  function newFolder() {
+    setNameError(null);
+    setNameDialog({ kind: "create" });
+  }
+
+  const unlinked = driveReady === false || isApiError(listing.error, 409);
+
+  let body;
+  if (unlinked) {
+    body = <DriveLinkPrompt bandId={bandId} />;
+  } else if (isApiError(listing.error, 404)) {
+    body = (
+      <EmptyState
+        icon={FolderOpen}
+        title="Folder not found"
+        description="It may have been moved or deleted."
+        action={
+          <Button asChild variant="outline">
+            <Link href="/files">Back to Files</Link>
+          </Button>
+        }
+      />
+    );
+  } else if (listing.isError) {
+    body = (
+      <EmptyState
+        icon={FolderOpen}
+        title="Could not load files"
+        description="Check your connection and try again."
+        action={
+          <Button variant="outline" onClick={() => void listing.refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
+  } else if (!data) {
+    body = <ListSkeleton />;
+  } else if (items.length === 0) {
+    body = (
+      <EmptyState
+        icon={FolderOpen}
+        title="This folder is empty"
+        description="Create a folder or upload files to get started."
+      />
+    );
+  } else {
+    const rowProps = (entry: FileEntry): EntryProps => ({
+      bandId,
+      entry,
+      selecting,
+      selected: selected.has(entry.id),
+      menuOpen: menuId === entry.id,
+      onMenuOpenChange: (open) => setMenuId(open ? entry.id : null),
+      onToggle: () => toggle(entry),
+      onOpenFile: setViewer,
+      actions,
+    });
+    body = (
+      <>
+        {view === "grid" ? (
+          <ul
+            data-testid="files-grid"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+          >
+            {items.map((e) => (
+              <FileTile key={e.id} {...rowProps(e)} />
+            ))}
+          </ul>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border bg-card">
+            <div
+              aria-hidden
+              className="hidden grid-cols-[minmax(0,1fr)_minmax(0,14rem)_8rem_5rem_2.75rem] gap-x-3 border-b px-3 py-2 text-xs font-medium text-muted-foreground md:grid"
+            >
+              <span>Name</span>
+              <span>Songs</span>
+              <span>Modified</span>
+              <span>Size</span>
+              <span />
+            </div>
+            <ul data-testid="files-list">
+              {items.map((e) => (
+                <FileRow key={e.id} {...rowProps(e)} />
+              ))}
+            </ul>
+          </div>
+        )}
+        {data.truncated ? (
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Showing the first 1000 items.
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  const canAct = !!data && !unlinked;
+  const selectedEntries = items.filter((i) => selected.has(i.id));
+
+  return (
+    <div data-testid="files-tab" className="pb-28">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 p-3 md:p-4">
+        <h1 className="sr-only">Files</h1>
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            {data ? <Breadcrumbs crumbs={data.breadcrumbs} /> : null}
+          </div>
+          {canAct ? (
+            <div className="flex shrink-0 items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  view === "list"
+                    ? "Switch to grid view"
+                    : "Switch to list view"
+                }
+                onClick={() => setView(view === "list" ? "grid" : "list")}
+                className="text-muted-foreground"
+              >
+                {view === "list" ? <LayoutGrid /> : <List />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Select items"
+                aria-pressed={selecting}
+                onClick={() =>
+                  selecting ? stopSelecting() : setSelecting(true)
+                }
+                className={cn(
+                  "text-muted-foreground",
+                  selecting && "bg-gig-soft text-gig-soft-foreground",
+                )}
+              >
+                <CheckSquare />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="ml-1 hidden md:inline-flex">
+                    <Plus /> New
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={newFolder}>
+                    <FolderPlus /> New folder
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => upload.openPicker(data.folder.id)}
+                  >
+                    <Upload /> Upload files
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : null}
+        </div>
+        {body}
+      </div>
+
+      {canAct && !selecting ? (
+        <Fab
+          label="New"
+          className="md:hidden"
+          actions={[
+            {
+              key: "new-folder",
+              label: "New folder",
+              icon: <FolderPlus />,
+              onSelect: newFolder,
+            },
+            {
+              key: "upload",
+              label: "Upload files",
+              icon: <Upload />,
+              onSelect: () => upload.openPicker(data.folder.id),
+            },
+          ]}
+        />
+      ) : null}
+
+      <SelectionBar
+        count={selecting ? selected.size : 0}
+        onClear={stopSelecting}
+        actions={[
+          {
+            key: "trash",
+            label: "Move to trash",
+            icon: <Trash2 />,
+            destructive: true,
+            onSelect: () => setTrashTargets(selectedEntries),
+          },
+        ]}
+      />
+
+      <NameDialog
+        state={nameDialog}
+        pending={createFolder.isPending || rename.isPending}
+        error={nameError}
+        onSubmit={submitName}
+        onClose={() => setNameDialog(null)}
+      />
+      <ConfirmDialog
+        open={trashTargets.length > 0}
+        onOpenChange={(o) => !o && setTrashTargets([])}
+        title="Move to trash?"
+        description={
+          trashTargets.length === 1
+            ? `"${trashTargets[0]!.name}" will move to the Google Drive trash, where it can be restored.`
+            : `${trashTargets.length} items will move to the Google Drive trash, where they can be restored.`
+        }
+        confirmLabel="Move to trash"
+        destructive
+        onConfirm={confirmTrash}
+      />
+      <LinkSongsDrawer
+        bandId={bandId}
+        entry={linkTarget}
+        saving={setSongs.isPending}
+        error={linkError}
+        onClose={() => setLinkTarget(null)}
+        onSave={(songIds) =>
+          setSongs.mutate(
+            { fileId: linkTarget!.id, songIds },
+            {
+              onSuccess: () => setLinkTarget(null),
+              onError: () => setLinkError("Could not save the song links."),
+            },
+          )
+        }
+      />
+      {viewer ? (
+        <FileViewer
+          bandId={bandId}
+          entry={viewer}
+          onClose={() => setViewer(null)}
+        />
+      ) : null}
+      {toastText ? <Toast text={toastText} onDismiss={dismissToast} /> : null}
+    </div>
+  );
+}

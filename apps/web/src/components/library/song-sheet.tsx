@@ -35,6 +35,7 @@ import {
   useSongSummary,
   useUpdateSong,
 } from "@/lib/queries/songs";
+import { SongFiles } from "./song-files";
 import { SmartInput } from "./smart-input";
 import { SongForm } from "./song-form";
 import {
@@ -337,6 +338,7 @@ function SongView({
             ) : null}
           </Section>
           <SongVideos bandId={bandId} songId={song.id} songTitle={song.title} />
+          <SongFiles bandId={bandId} songId={song.id} />
         </>
       ) : (
         <DetailSkeleton error={detailError} />

@@ -61,8 +61,12 @@ Browser sends chunks to the API, the API relays them to a Drive resumable sessio
 | `PATCH /bands/:id/uploads` `{ ids, folderId?, songId? }` | Bulk version for the tray pickers; returns `UploadSession[]`; 404 if any id is not yours. |
 | `DELETE /bands/:id/uploads/:sessionId` | Cancels (returns the session with `status: "cancelled"`); 409 `UPLOAD_NOT_ACTIVE` when already complete. The Drive session is dropped locally and left to expire. |
 | `GET /bands/:id/gigs/:gigId/uploads?mine=1` | The caller's sessions from the last 7 days, not cancelled, newest first. |
+| `POST /bands/:id/files/uploads` `{ fileName, mimeType, totalBytes, fingerprint, folderId: driveFolderId\|"root" }` | Files-tab upload into the Files root or any descendant folder; returns `UploadSession` with `gigId: null`. Any mime type, 10 GB cap (422 `UPLOAD_TOO_LARGE`), 409 `GOOGLE_NOT_LINKED`. 404 for a folder outside the root, trashed, or not a folder; 422 `FILES_USE_GIG_MEDIA` for a gig folder or anything beneath one. |
+| `GET /bands/:id/files/uploads?mine=1` | The caller's non-gig sessions from the last 7 days, not cancelled, newest first. |
 
-`UploadSession { id, gigId, status: pending|uploading|complete|failed|cancelled, bytesReceived, totalBytes, chunkSize (8 MiB), fileName, mimeType, fingerprint, folderId, songId, createdAt, item: MediaItem | null }`.
+`UploadSession { id, gigId (null for Files uploads), status: pending|uploading|complete|failed|cancelled, bytesReceived, totalBytes, chunkSize (8 MiB), fileName, mimeType, fingerprint, folderId, songId, createdAt, item: MediaItem | null, file?: { id, name, mimeType, sizeBytes } | null }`.
+
+Files uploads (`upload_sessions.gig_id` null, `target_drive_folder_id` set) share the chunk, GET, DELETE, resume and cleanup paths. They never create a `media_item`: on completion `item` stays null and `file` carries the Drive file. Resume is keyed by band + target folder + fingerprint + user; a completed session whose Drive file was trashed starts fresh. PATCH accepts only `fileName` (renames the Drive file after completion); `folderId` or `songId` is 422 `FILES_USE_GIG_MEDIA`. The changes poller ignores these files because their parent is not a gig folder or gig subfolder.
 
 - Chunks: every chunk except the last must be a multiple of 256 KiB (else 422 `UPLOAD_BAD_CHUNK`, as is a body length or total that disagrees with the header). Send `chunkSize` bytes at a time starting at `bytesReceived`. Concurrent chunks for one session are serialised in-process.
 - `409 { code: "UPLOAD_OFFSET_MISMATCH", bytesReceived }`: the start offset is not what Drive holds (or the Drive session expired, then `bytesReceived` is 0 and a fresh Drive session was started). Seek to `bytesReceived` and continue.

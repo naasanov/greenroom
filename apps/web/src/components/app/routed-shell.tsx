@@ -25,7 +25,10 @@ import { useMe, useSignOut } from "@/lib/queries";
 /** Calendar-shaped placeholder that holds the Events tab's space while its code loads. */
 function EventsSkeleton() {
   return (
-    <div aria-hidden="true" className="mx-auto w-full max-w-5xl px-3 py-4 pb-28">
+    <div
+      aria-hidden="true"
+      className="mx-auto w-full max-w-5xl px-3 py-4 pb-28"
+    >
       <div className="mb-3 h-9 w-48 animate-pulse rounded-xl bg-muted" />
       <div className="h-[34rem] animate-pulse rounded-2xl bg-muted/60" />
     </div>
@@ -43,7 +46,13 @@ export function tabPath(tab: TabKey): string {
 
 function tabFromPath(pathname: string): TabKey | null {
   const seg = pathname.split("/")[1];
-  if (seg === "events" || seg === "library" || seg === "roster") return seg;
+  if (
+    seg === "events" ||
+    seg === "library" ||
+    seg === "files" ||
+    seg === "roster"
+  )
+    return seg;
   // Deep links highlight the tab their resource lives in.
   if (seg === "gigs" || seg === "practices") return "events";
   if (seg === "songs") return "library";

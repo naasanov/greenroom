@@ -2,6 +2,7 @@
 
 import {
   Calendar,
+  FolderOpen,
   ListMusic,
   UserRound,
   Users,
@@ -15,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Placement, ShellLayout } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
 
-export type TabKey = "events" | "library" | "roster";
+export type TabKey = "events" | "library" | "files" | "roster";
 
 /** When set, tabs render as links to this href instead of buttons. */
 export type TabHref = (tab: TabKey) => string;
@@ -23,6 +24,7 @@ export type TabHref = (tab: TabKey) => string;
 export const NAV_TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "events", label: "Events", icon: Calendar },
   { key: "library", label: "Music Library", icon: ListMusic },
+  { key: "files", label: "Files", icon: FolderOpen },
   { key: "roster", label: "Roster", icon: Users },
 ];
 
@@ -90,7 +92,7 @@ export function BottomTabBar({
         className,
       )}
     >
-      <ul className="mx-auto grid h-[var(--tabbar-h)] max-w-lg grid-cols-3">
+      <ul className="mx-auto grid h-[var(--tabbar-h)] max-w-lg grid-cols-4">
         {NAV_TABS.map((t) => {
           const isActive = t.key === active;
           return (

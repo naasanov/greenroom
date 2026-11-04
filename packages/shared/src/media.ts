@@ -177,6 +177,16 @@ export const createUploadSchema = z.object({
 });
 export type CreateUpload = z.infer<typeof createUploadSchema>;
 
+export const createFilesUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(200),
+  totalBytes: z.number().int().min(1),
+  fingerprint: z.string().trim().min(1).max(500),
+  /** Drive folder id under the Files root, or "root". */
+  folderId: z.string().trim().min(1).max(200),
+});
+export type CreateFilesUpload = z.infer<typeof createFilesUploadSchema>;
+
 export const patchUploadSchema = z
   .object({
     folderId: z.string().uuid().nullable().optional(),
@@ -205,7 +215,8 @@ export type BulkPatchUploads = z.infer<typeof bulkPatchUploadsSchema>;
 
 export const uploadSessionSchema = z.object({
   id: z.string().uuid(),
-  gigId: z.string().uuid(),
+  /** Null for Files-tab uploads. */
+  gigId: z.string().uuid().nullable(),
   status: uploadStatusSchema,
   bytesReceived: z.number().int(),
   totalBytes: z.number().int(),
@@ -218,6 +229,16 @@ export const uploadSessionSchema = z.object({
   createdAt: z.string(),
   /** Set once the upload is complete. */
   item: mediaItemSchema.nullable(),
+  /** Set once a Files-tab upload (no gig) is complete. */
+  file: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      mimeType: z.string().nullable(),
+      sizeBytes: z.number().nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 export type UploadSession = z.infer<typeof uploadSessionSchema>;
 

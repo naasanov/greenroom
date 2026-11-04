@@ -4,7 +4,9 @@ import { useState, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { CalendarSetupDialog } from "@/components/google/calendar-setup-dialog";
 import { DriveFolderPicker } from "@/components/google/drive-folder-picker";
+import { GigsRootDialog } from "@/components/google/gigs-root-step";
 import { Button } from "@/components/ui/button";
+import { useFolderListing } from "@/lib/queries/drive-browse";
 import {
   connectGoogle,
   useCalendarSync,
@@ -60,6 +62,36 @@ function Row({
   );
 }
 
+function GigsFolderLine({
+  bandId,
+  gigsFolderId,
+}: {
+  bandId: string;
+  gigsFolderId: string;
+}) {
+  const listing = useFolderListing(bandId, gigsFolderId);
+  const [changing, setChanging] = useState(false);
+  return (
+    <div
+      data-testid="settings-google-gigs-folder"
+      className="flex w-full flex-wrap items-center gap-2"
+    >
+      <span className="min-w-0 break-words text-sm text-muted-foreground">
+        Gigs folder: {listing.data ? listing.data.folder.name : "..."}
+      </span>
+      <Button variant="outline" size="sm" onClick={() => setChanging(true)}>
+        Change
+      </Button>
+      <GigsRootDialog
+        bandId={bandId}
+        currentId={gigsFolderId}
+        open={changing}
+        onOpenChange={setChanging}
+      />
+    </div>
+  );
+}
+
 function DriveRow({ bandId }: { bandId: string }) {
   const integrations = useGoogleIntegrations(bandId);
   const drive = integrations.data?.drive;
@@ -103,6 +135,12 @@ function DriveRow({ bandId }: { bandId: string }) {
           <Button variant="outline" onClick={() => setPicking(true)}>
             {folderSet ? "Change folder" : "Choose folder"}
           </Button>
+          {folderSet && status.data?.gigsFolderId ? (
+            <GigsFolderLine
+              bandId={bandId}
+              gigsFolderId={status.data.gigsFolderId}
+            />
+          ) : null}
           {folderSet && status.data?.folderUrl ? (
             <Button variant="outline" asChild>
               <a href={status.data.folderUrl} target="_blank" rel="noreferrer">

@@ -125,9 +125,10 @@ export const uploadSessions = pgTable(
     bandId: uuid("band_id")
       .notNull()
       .references(() => bands.id, { onDelete: "cascade" }),
-    gigId: uuid("gig_id")
-      .notNull()
-      .references(() => gigs.id, { onDelete: "cascade" }),
+    // Null for Files-tab uploads, which target a Drive folder instead of a gig.
+    gigId: uuid("gig_id").references(() => gigs.id, { onDelete: "cascade" }),
+    // Drive folder id for Files-tab uploads (gig_id null).
+    targetDriveFolderId: text("target_drive_folder_id"),
     folderId: uuid("folder_id").references(() => mediaFolders.id, {
       onDelete: "set null",
     }),
@@ -168,6 +169,11 @@ export const uploadSessions = pgTable(
     index("upload_sessions_band_id_idx").on(t.bandId),
     index("upload_sessions_gig_fingerprint_idx").on(t.gigId, t.fileFingerprint),
     index("upload_sessions_gig_status_idx").on(t.gigId, t.status),
+    index("upload_sessions_target_folder_idx").on(
+      t.bandId,
+      t.targetDriveFolderId,
+      t.fileFingerprint,
+    ),
   ],
 );
 

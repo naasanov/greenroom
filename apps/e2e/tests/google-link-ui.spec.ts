@@ -116,6 +116,7 @@ test("create a new Drive folder named after the band and see its name in setting
   await expect(input).toHaveValue("The Night Owls");
   await input.fill("Gig photos");
   await picker.getByRole("button", { name: "Create" }).click();
+  await picker.getByRole("button", { name: "Keep Gigs" }).click();
   await expect(picker).toBeHidden();
 
   await page.goto("/settings");
@@ -145,6 +146,7 @@ test("link Drive from a gig drawer, pick a folder, manage it in settings", async
     picker.getByRole("button", { name: "Greenroom demo" }),
   ).toBeVisible();
   await picker.getByRole("button", { name: "Band stuff" }).click();
+  await picker.getByRole("button", { name: "Keep Gigs" }).click();
   await expect(picker).toBeHidden();
   await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   await expect(drawer.getByTestId("media-add")).toHaveText("Add media");

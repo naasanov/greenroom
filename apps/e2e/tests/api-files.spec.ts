@@ -498,6 +498,26 @@ test("song links: set, list, unavailable after trash, cascade on song delete", a
     .where(eq(driveFileSongLinks.songId, SONGS.skyline.id));
   expect(rows).toHaveLength(3);
 
+  // Unlink works for unavailable files; 404 for repeats, unknown and foreign songs.
+  const unlinkUrl = (song: string, id: string) =>
+    `/bands/${BAND}/songs/${song}/files/${id}`;
+  expect((await ben.delete(unlinkUrl(SONGS.skyline.id, doc.id))).status()).toBe(
+    204,
+  );
+  expect((await ben.delete(unlinkUrl(SONGS.skyline.id, doc.id))).status()).toBe(
+    404,
+  );
+  expect(
+    (await ben.delete(unlinkUrl(SONGS.sideProjectSong.id, doc.id))).status(),
+  ).toBe(404);
+  const left = await (
+    await ben.get(`/bands/${BAND}/songs/${SONGS.skyline.id}/files`)
+  ).json();
+  expect(left.map((f: { driveFileId: string }) => f.driveFileId)).not.toContain(
+    doc.id,
+  );
+  expect(left).toHaveLength(2);
+
   expect(
     (
       await ben.get(`/bands/${BAND}/songs/${SONGS.sideProjectSong.id}/files`)

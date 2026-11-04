@@ -6,6 +6,7 @@ export const FILES_ERROR_CODES = {
   outsideRoot: "FILES_OUTSIDE_ROOT",
   gigAlreadyHasFolder: "GIG_ALREADY_HAS_FOLDER",
   folderAlreadyLinked: "FILES_FOLDER_ALREADY_LINKED",
+  useGigMedia: "FILES_USE_GIG_MEDIA",
 } as const;
 
 /** Most entries one folder listing returns; `truncated` is set beyond it. */

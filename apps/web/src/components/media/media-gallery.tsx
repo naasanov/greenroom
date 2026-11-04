@@ -47,6 +47,7 @@ import {
   type SelectionAction,
 } from "@/components/app/selection-bar";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
+import { LinkFolderDialog } from "@/components/media/link-folder-dialog";
 import { SongPickerDrawer } from "@/components/setlists/setlist-aside";
 import { Button } from "@/components/ui/button";
 import {
@@ -376,6 +377,7 @@ export function MediaGallery({
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null);
   const [folderDialog, setFolderDialog] = useState<FolderDialog | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkingFolder, setLinkingFolder] = useState(false);
   const shareSheet = useShareSheet("touch");
   const fileInput = useRef<HTMLInputElement>(null);
   const { store, entries } = useGigUploads(gigId);
@@ -829,7 +831,7 @@ export function MediaGallery({
     body = (
       <>
         {all.length === 0 && entries.length === 0 ? (
-          <div className="flex justify-center py-12">
+          <div className="flex flex-col items-center gap-3 py-12">
             <Button
               size="lg"
               data-testid="media-empty"
@@ -837,6 +839,13 @@ export function MediaGallery({
               className="h-20 gap-3 rounded-3xl px-10 text-lg"
             >
               <Upload className="size-6" /> Upload photos and videos
+            </Button>
+            <Button
+              variant="outline"
+              data-testid="media-link-folder"
+              onClick={() => setLinkingFolder(true)}
+            >
+              <FolderInput /> Link an existing Drive folder
             </Button>
           </div>
         ) : null}
@@ -908,7 +917,9 @@ export function MediaGallery({
                       selecting={selecting}
                       songTitle={songTitle(item)}
                       editing={editingId === item.id}
-                      onActivate={({ shift }) => open(item, shift, section.items)}
+                      onActivate={({ shift }) =>
+                        open(item, shift, section.items)
+                      }
                       onLongPress={() => startWith(item.id)}
                       onStartRename={() => setEditingId(item.id)}
                       onRename={(name) => commitRename(item, name)}
@@ -1062,6 +1073,15 @@ export function MediaGallery({
           </DragOverlay>
         </DndContext>
       </main>
+
+      {ready ? (
+        <LinkFolderDialog
+          bandId={bandId}
+          gigId={gigId}
+          open={linkingFolder}
+          onOpenChange={setLinkingFolder}
+        />
+      ) : null}
 
       {ready ? (
         <>

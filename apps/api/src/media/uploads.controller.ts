@@ -16,9 +16,11 @@ import {
 import type { Request } from "express";
 import {
   bulkPatchUploadsSchema,
+  createFilesUploadSchema,
   createUploadSchema,
   patchUploadSchema,
   type BulkPatchUploads,
+  type CreateFilesUpload,
   type CreateUpload,
   type PatchUpload,
   type UploadSession,
@@ -56,6 +58,24 @@ export class UploadsController {
   ): Promise<UploadSession[]> {
     // Only the caller's own sessions are ever listed.
     return this.uploads.listMine(bandId, gigId, user.id);
+  }
+
+  @Post("files/uploads")
+  @HttpCode(200)
+  createInFolder(
+    @Param("bandId") bandId: string,
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(createFilesUploadSchema)) body: CreateFilesUpload,
+  ): Promise<UploadSession> {
+    return this.uploads.createInFolder(bandId, user.id, body);
+  }
+
+  @Get("files/uploads")
+  listFiles(
+    @Param("bandId") bandId: string,
+    @CurrentUser() user: User,
+  ): Promise<UploadSession[]> {
+    return this.uploads.listMineFiles(bandId, user.id);
   }
 
   @Patch("uploads")

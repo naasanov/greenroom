@@ -1,7 +1,7 @@
 "use client";
 
 import { Folder, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,12 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { GigsRootStep } from "@/components/google/gigs-root-step";
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { useBands } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   fetchPickerConfig,
   useCreateDriveFolder,
+  googleKeys,
   useFakePicker,
   useSetDriveFolder,
 } from "@/lib/queries/google";
@@ -96,6 +99,7 @@ export function DriveFolderPicker({
 }) {
   const setFolder = useSetDriveFolder(bandId);
   const createFolder = useCreateDriveFolder(bandId);
+  const qc = useQueryClient();
   const bands = useBands();
   const bandName = bands.data?.find((b) => b.id === bandId)?.name ?? "";
   const [mode, setMode] = useState<"loading" | "fake" | "real" | "error">(
@@ -103,11 +107,11 @@ export function DriveFolderPicker({
   );
   const [config, setConfig] = useState<GooglePickerConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set once a folder is chosen: step 2 asks where gigs go.
+  const [gigsStep, setGigsStep] = useState<{
+    gigsFolderId: string | null;
+  } | null>(null);
   const { mutate } = setFolder;
-  const closeRef = useRef(onOpenChange);
-  useEffect(() => {
-    closeRef.current = onOpenChange;
-  });
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +119,7 @@ export function DriveFolderPicker({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMode("loading");
     setError(null);
+    setGigsStep(null);
     fetchPickerConfig(bandId)
       .then((c) => {
         if (cancelled) return;
@@ -130,6 +135,14 @@ export function DriveFolderPicker({
       cancelled = true;
     };
   }, [open, bandId]);
+
+  // Status queries refresh only when the flow ends so parents that swap on
+  // "folder set" do not unmount this dialog between the two steps.
+  function finish() {
+    void qc.invalidateQueries({ queryKey: googleKeys.all(bandId) });
+    void qc.invalidateQueries({ queryKey: googleKeys.media(bandId) });
+    onOpenChange(false);
+  }
 
   async function openPicker() {
     if (!config) return;
@@ -149,7 +162,7 @@ export function DriveFolderPicker({
         .setCallback((r) => {
           if (r.action === picker.Action.PICKED && r.docs?.[0]) {
             mutate(r.docs[0].id, {
-              onSuccess: () => closeRef.current(false),
+              onSuccess: (s) => setGigsStep({ gigsFolderId: s.gigsFolderId }),
               onError: (e) => setError(errorText(e)),
             });
           }
@@ -165,13 +178,16 @@ export function DriveFolderPicker({
   function create(name: string) {
     setError(null);
     createFolder.mutate(name, {
-      onSuccess: () => onOpenChange(false),
+      onSuccess: (s) => setGigsStep({ gigsFolderId: s.gigsFolderId }),
       onError: () => setError("We could not create that folder. Try again."),
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => (o || !gigsStep ? onOpenChange(o) : finish())}
+    >
       <DialogContent
         data-testid="drive-picker"
         className="z-[60] pointer-events-auto!"
@@ -180,13 +196,24 @@ export function DriveFolderPicker({
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            Choose your band&apos;s Drive folder
+            {gigsStep
+              ? "Where do your gigs go?"
+              : "Choose your band's Drive folder"}
           </DialogTitle>
           <DialogDescription>
-            Gig photos and videos are kept in this folder.
+            {gigsStep
+              ? "Pick the folder that holds your gig folders, or keep the default."
+              : "Gig photos and videos are kept in this folder."}
           </DialogDescription>
         </DialogHeader>
-        {mode === "fake" ? (
+        {gigsStep ? (
+          <GigsRootStep
+            bandId={bandId}
+            currentId={gigsStep.gigsFolderId}
+            skipLabel="Keep Gigs"
+            onDone={finish}
+          />
+        ) : mode === "fake" ? (
           <FakeFolderList
             bandId={bandId}
             pending={setFolder.isPending || createFolder.isPending}
@@ -196,7 +223,7 @@ export function DriveFolderPicker({
             onPick={(id) => {
               setError(null);
               mutate(id, {
-                onSuccess: () => onOpenChange(false),
+                onSuccess: (s) => setGigsStep({ gigsFolderId: s.gigsFolderId }),
                 onError: (e) => setError(errorText(e)),
               });
             }}

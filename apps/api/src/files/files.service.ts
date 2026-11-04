@@ -376,6 +376,30 @@ export class FilesService {
     return { songLinks: links ?? [] };
   }
 
+  /** Removes one song link by Drive id, with no Drive call, so unavailable files unlink too. */
+  async unlinkSongFile(
+    bandId: string,
+    songId: string,
+    fileId: string,
+  ): Promise<void> {
+    const [song] = await this.db
+      .select({ id: songs.id })
+      .from(songs)
+      .where(and(eq(songs.id, songId), eq(songs.bandId, bandId)));
+    if (!song) throw new NotFoundException("Song not found");
+    const removed = await this.db
+      .delete(driveFileSongLinks)
+      .where(
+        and(
+          eq(driveFileSongLinks.bandId, bandId),
+          eq(driveFileSongLinks.songId, songId),
+          eq(driveFileSongLinks.driveFileId, fileId),
+        ),
+      )
+      .returning({ id: driveFileSongLinks.id });
+    if (removed.length === 0) throw new NotFoundException("Link not found");
+  }
+
   /** Linked files for a song; unavailable ones stay listed with `available: false`. */
   async songFiles(bandId: string, songId: string): Promise<SongFile[]> {
     const [song] = await this.db

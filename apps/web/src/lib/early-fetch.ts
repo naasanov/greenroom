@@ -1,5 +1,5 @@
 /** Paths whose first load kicks off the session requests before React boots. */
-const APP_PATHS = "events|library|roster|settings|gigs|practices|songs";
+const APP_PATHS = "events|library|files|roster|settings|gigs|practices|songs";
 const EARLY_PATHS = ["/auth/me", "/bands"];
 const MAX_AGE_MS = 10_000;
 

@@ -8,8 +8,19 @@ import {
   UnprocessableEntityException,
   type OnModuleInit,
 } from "@nestjs/common";
-import { and, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  type SQL,
+} from "drizzle-orm";
+import {
+  gigs,
   mediaFolders,
   mediaItems,
   songs,
@@ -17,17 +28,19 @@ import {
   type Database,
 } from "@greenroom/db";
 import {
+  FILES_ERROR_CODES,
   MAX_UPLOAD_FILE_BYTES,
   UPLOAD_CHUNK_BYTES,
   UPLOAD_ERROR_CODES,
   memberUploadTypeAllowed,
+  type CreateFilesUpload,
   type CreateUpload,
   type MediaItem,
   type PatchUpload,
   type UploadSession,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
-import type { DriveFile } from "../integrations/index.js";
+import { DRIVE_FOLDER_MIME, type DriveFile } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
 import {
   DriveStructureService,
@@ -178,16 +191,116 @@ export class UploadsService implements OnModuleInit {
     });
   }
 
+  /** Starts or resumes an upload into a Drive folder under the Files root (no gig). */
+  async createInFolder(
+    bandId: string,
+    userId: string,
+    input: CreateFilesUpload,
+  ): Promise<UploadSession> {
+    if (input.totalBytes > MAX_UPLOAD_FILE_BYTES) {
+      throw new UnprocessableEntityException({
+        code: UPLOAD_ERROR_CODES.tooLarge,
+        message: "File is too large",
+      });
+    }
+    const ctx = await this.structure.requireContext(bandId);
+    const target = await this.requireFilesTarget(ctx, input.folderId);
+    const actor: UploadOwner = { userId };
+    const key = `create:files:${target}:${userId}:${input.fingerprint}`;
+    return this.locked(key, async () => {
+      const existing = await this.findByScope(
+        actor,
+        input.fingerprint,
+        and(
+          eq(uploadSessions.bandId, bandId),
+          isNull(uploadSessions.gigId),
+          eq(uploadSessions.targetDriveFolderId, target),
+        )!,
+      );
+      if (existing) {
+        const resumed = await this.locked(existing.id, () =>
+          this.resume(existing, ctx),
+        );
+        if (resumed) return resumed;
+      }
+      const { sessionUri } = await this.structure.drive.startResumableUpload(
+        ctx.token,
+        {
+          name: input.fileName,
+          parentId: target,
+          mimeType: input.mimeType,
+          totalSize: input.totalBytes,
+        },
+      );
+      const [row] = await this.db
+        .insert(uploadSessions)
+        .values({
+          bandId,
+          gigId: null,
+          targetDriveFolderId: target,
+          uploadedByUserId: userId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          fileFingerprint: input.fingerprint,
+          driveSessionUrl: sessionUri,
+          driveParentId: target,
+          totalBytes: input.totalBytes,
+          status: "pending",
+        })
+        .returning();
+      return this.dto(row!);
+    });
+  }
+
+  /** Resolves the Drive folder id: 404 outside the Files root, 422 at or under a gig folder. */
+  private async requireFilesTarget(
+    ctx: DriveContext,
+    folderId: string,
+  ): Promise<string> {
+    const id = folderId === "root" ? ctx.rootFolderId : folderId;
+    const chain = await this.structure.ancestry(
+      ctx.token,
+      id,
+      ctx.rootFolderId,
+    );
+    if (!chain || chain[0]!.mimeType !== DRIVE_FOLDER_MIME)
+      throw new NotFoundException("Folder not found");
+    const rows = await this.db
+      .select({ folder: gigs.driveFolderId })
+      .from(gigs)
+      .where(and(eq(gigs.bandId, ctx.bandId), isNull(gigs.deletedAt)));
+    const gigFolders = new Set(rows.map((r) => r.folder));
+    if (chain.some((f) => gigFolders.has(f.id))) {
+      throw new UnprocessableEntityException({
+        code: FILES_ERROR_CODES.useGigMedia,
+        message: "Upload into a gig folder from the gig's media page",
+      });
+    }
+    return id;
+  }
+
   private async findExisting(
     actor: UploadActor,
     fingerprint: string,
+  ): Promise<SessionRow | null> {
+    return this.findByScope(
+      actor,
+      fingerprint,
+      eq(uploadSessions.gigId, actor.gigId),
+    );
+  }
+
+  private async findByScope(
+    actor: UploadOwner,
+    fingerprint: string,
+    scope: SQL,
   ): Promise<SessionRow | null> {
     const [row] = await this.db
       .select()
       .from(uploadSessions)
       .where(
         and(
-          eq(uploadSessions.gigId, actor.gigId),
+          scope,
           eq(uploadSessions.fileFingerprint, fingerprint),
           ne(uploadSessions.status, "cancelled"),
           actor.userId
@@ -205,17 +318,38 @@ export class UploadsService implements OnModuleInit {
     row: SessionRow,
     ctx: DriveContext,
   ): Promise<UploadSession | null> {
+    if (row.status === "complete" && !row.gigId) {
+      if (await this.liveDriveFile(row, ctx)) return this.dto(row);
+      await this.cancelRow(row.id);
+      return null;
+    }
     if (row.status === "complete") {
       const item = await this.liveItem(row);
       if (item) return this.dto(row, toItemDto(item));
-      await this.db
-        .update(uploadSessions)
-        .set({ status: "cancelled" })
-        .where(eq(uploadSessions.id, row.id));
+      await this.cancelRow(row.id);
       return null;
     }
     const synced = await this.reconcile(row, ctx);
     return this.dto(synced.row, synced.item);
+  }
+
+  private async cancelRow(id: string): Promise<void> {
+    await this.db
+      .update(uploadSessions)
+      .set({ status: "cancelled" })
+      .where(eq(uploadSessions.id, id));
+  }
+
+  /** True while the completed Files upload's Drive file exists and is not trashed. */
+  private async liveDriveFile(
+    row: SessionRow,
+    ctx: DriveContext,
+  ): Promise<boolean> {
+    if (!row.driveFileId) return false;
+    const res = await this.structure.drive
+      .getFile(ctx.token, row.driveFileId)
+      .catch(() => null);
+    return res?.status === "ok" && !res.file.trashed;
   }
 
   private async liveItem(row: SessionRow) {
@@ -258,7 +392,7 @@ export class UploadsService implements OnModuleInit {
     row: SessionRow,
     ctx: DriveContext,
   ): Promise<SessionRow> {
-    const parent = await this.parentFor(ctx, row.gigId, row.folderId);
+    const parent = await this.parentOf(ctx, row);
     const { sessionUri } = await this.structure.drive.startResumableUpload(
       ctx.token,
       {
@@ -396,7 +530,8 @@ export class UploadsService implements OnModuleInit {
     start: SessionRow,
     ctx: DriveContext,
     file: DriveFile,
-  ): Promise<{ row: SessionRow; item: MediaItem }> {
+  ): Promise<{ row: SessionRow; item?: MediaItem }> {
+    if (!start.gigId) return this.finalizeFile(start, ctx, file);
     const [row] = await this.db
       .select()
       .from(uploadSessions)
@@ -407,7 +542,7 @@ export class UploadsService implements OnModuleInit {
       if (existing) return { row: s, item: toItemDto(existing) };
     }
     const drive = this.structure.drive;
-    const parent = await this.parentFor(ctx, s.gigId, s.folderId);
+    const parent = await this.parentOf(ctx, s);
     if (file.parentId !== parent) await drive.move(ctx.token, file.id, parent);
     if (file.name !== s.fileName)
       await drive.rename(ctx.token, file.id, s.fileName);
@@ -421,7 +556,7 @@ export class UploadsService implements OnModuleInit {
     }
     const values = {
       bandId: s.bandId,
-      gigId: s.gigId,
+      gigId: s.gigId!,
       folderId: s.folderId,
       driveFileId: file.id,
       name: s.fileName,
@@ -468,6 +603,36 @@ export class UploadsService implements OnModuleInit {
     return { row: done!, item };
   }
 
+  /** Completes a Files upload: the Drive file is the result, no media item exists. */
+  private async finalizeFile(
+    start: SessionRow,
+    ctx: DriveContext,
+    file: DriveFile,
+  ): Promise<{ row: SessionRow }> {
+    const [current] = await this.db
+      .select()
+      .from(uploadSessions)
+      .where(eq(uploadSessions.id, start.id));
+    const s = current!;
+    if (s.status === "complete") return { row: s };
+    const drive = this.structure.drive;
+    if (file.parentId !== s.targetDriveFolderId)
+      await drive.move(ctx.token, file.id, s.targetDriveFolderId!);
+    if (file.name !== s.fileName)
+      await drive.rename(ctx.token, file.id, s.fileName);
+    const [done] = await this.db
+      .update(uploadSessions)
+      .set({
+        status: "complete",
+        bytesReceived: s.totalBytes,
+        driveFileId: file.id,
+        mimeType: file.mimeType,
+      })
+      .where(eq(uploadSessions.id, s.id))
+      .returning();
+    return { row: done! };
+  }
+
   // ---- reads and edits ----
 
   async get(
@@ -491,6 +656,26 @@ export class UploadsService implements OnModuleInit {
         and(
           eq(uploadSessions.bandId, bandId),
           eq(uploadSessions.gigId, gigId),
+          eq(uploadSessions.uploadedByUserId, userId),
+          ne(uploadSessions.status, "cancelled"),
+          gt(uploadSessions.createdAt, new Date(Date.now() - STALE_MS)),
+        ),
+      )
+      .orderBy(desc(uploadSessions.createdAt), desc(uploadSessions.id));
+    return this.dtos(rows);
+  }
+
+  async listMineFiles(
+    bandId: string,
+    userId: string,
+  ): Promise<UploadSession[]> {
+    const rows = await this.db
+      .select()
+      .from(uploadSessions)
+      .where(
+        and(
+          eq(uploadSessions.bandId, bandId),
+          isNull(uploadSessions.gigId),
           eq(uploadSessions.uploadedByUserId, userId),
           ne(uploadSessions.status, "cancelled"),
           gt(uploadSessions.createdAt, new Date(Date.now() - STALE_MS)),
@@ -543,6 +728,7 @@ export class UploadsService implements OnModuleInit {
     patch: PatchUpload,
   ): Promise<SessionRow> {
     if (row.status === "cancelled") throw this.notActive();
+    if (!row.gigId) return this.applyFilesPatch(row, patch);
     if (patch.folderId)
       await this.requireFolder(row.bandId, row.gigId, patch.folderId);
     if (patch.songId) await this.requireSong(row.bandId, patch.songId);
@@ -565,6 +751,34 @@ export class UploadsService implements OnModuleInit {
     const [updated] = await this.db
       .update(uploadSessions)
       .set(set)
+      .where(eq(uploadSessions.id, row.id))
+      .returning();
+    return updated!;
+  }
+
+  /** Files uploads only support renaming; folder and song choices are gig media concepts. */
+  private async applyFilesPatch(
+    row: SessionRow,
+    patch: PatchUpload,
+  ): Promise<SessionRow> {
+    if (patch.folderId !== undefined || patch.songId !== undefined) {
+      throw new UnprocessableEntityException({
+        code: FILES_ERROR_CODES.useGigMedia,
+        message: "Files uploads can only be renamed",
+      });
+    }
+    if (patch.fileName === undefined) return row;
+    if (row.status === "complete" && row.driveFileId) {
+      const ctx = await this.structure.requireContext(row.bandId);
+      await this.structure.drive.rename(
+        ctx.token,
+        row.driveFileId,
+        patch.fileName,
+      );
+    }
+    const [updated] = await this.db
+      .update(uploadSessions)
+      .set({ fileName: patch.fileName, nameCustomized: true })
       .where(eq(uploadSessions.id, row.id))
       .returning();
     return updated!;
@@ -638,6 +852,11 @@ export class UploadsService implements OnModuleInit {
     if (!s) throw new UnprocessableEntityException("Song not found");
   }
 
+  private parentOf(ctx: DriveContext, row: SessionRow): Promise<string> {
+    if (!row.gigId) return Promise.resolve(row.targetDriveFolderId!);
+    return this.parentFor(ctx, row.gigId, row.folderId);
+  }
+
   /** Drive parent for a folder choice; a deleted folder falls back to the gig folder. */
   private async parentFor(
     ctx: DriveContext,
@@ -656,6 +875,7 @@ export class UploadsService implements OnModuleInit {
 
   private async dto(row: SessionRow, item?: MediaItem): Promise<UploadSession> {
     if (item) return toDto(row, item);
+    if (!row.gigId) return toDto(row, null);
     const live = row.mediaItemId ? await this.itemById(row.mediaItemId) : null;
     return toDto(row, live ? toItemDto(live) : null);
   }
@@ -711,5 +931,16 @@ function toDto(row: SessionRow, item: MediaItem | null): UploadSession {
     songId: row.songId,
     createdAt: row.createdAt.toISOString(),
     item,
+    ...(row.gigId ? {} : { file: fileOf(row) }),
+  };
+}
+
+function fileOf(row: SessionRow): UploadSession["file"] {
+  if (row.status !== "complete" || !row.driveFileId) return null;
+  return {
+    id: row.driveFileId,
+    name: row.fileName,
+    mimeType: row.mimeType,
+    sizeBytes: row.totalBytes,
   };
 }

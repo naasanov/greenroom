@@ -108,7 +108,6 @@ export function useFakePicker(bandId: string, enabled: boolean) {
 }
 
 export function useSetDriveFolder(bandId: string) {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (folderId: string) =>
       api(`${base(bandId)}/drive/folder`, {
@@ -116,15 +115,10 @@ export function useSetDriveFolder(bandId: string) {
         body: { folderId },
         schema: driveStatusSchema,
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: googleKeys.all(bandId) });
-      void qc.invalidateQueries({ queryKey: googleKeys.media(bandId) });
-    },
   });
 }
 
 export function useCreateDriveFolder(bandId: string) {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (name: string) =>
       api(`${base(bandId)}/drive/folders`, {
@@ -132,9 +126,5 @@ export function useCreateDriveFolder(bandId: string) {
         body: { name },
         schema: driveStatusSchema,
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: googleKeys.all(bandId) });
-      void qc.invalidateQueries({ queryKey: googleKeys.media(bandId) });
-    },
   });
 }
