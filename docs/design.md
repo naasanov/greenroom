@@ -383,6 +383,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - A user can belong to multiple bands. A **band switcher** (band name + photo) sits at the top of the screen next to the profile icon, on both desktop and mobile (mobile tabs are in the bottom bar). Deep links automatically switch to the band the linked resource belongs to.
 - **Leaving:** "Leave band" button in settings. Past lineups keep the person's name so the band's history stays intact.
 - **Last admin:** can't leave until they promote someone else to admin. If they're the only member left, leaving means deleting the band.
+- **Delete account (decided 2026-11-05):** a "Delete account" button in personal settings (type-to-confirm). It leaves every band, and deletes any band where the user is the only active member (roster-only members don't count). If the user is the last admin of a band that has other active members, deletion is blocked and lists those bands (promote someone or remove the members first). Drive files and the band's Google Calendar are never deleted. Past lineups keep the person's name. The user's sessions, Google/Spotify links, profile photo, and personal data are removed.
 
 ## Tech Stack: Libraries
 Principle: if a well-maintained library already does it, use it rather than building from scratch.
