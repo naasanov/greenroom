@@ -18,6 +18,7 @@ import {
 import { songArt } from "@/components/library/song-utils";
 import { Button } from "@/components/ui/button";
 import { useCurrentBand } from "@/lib/current-band";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { exportDateLabel, useGigForExport } from "@/lib/queries/spotify-export";
 import { OpenReferencesDialog } from "./open-references-dialog";
@@ -60,6 +61,8 @@ export function SetlistSection({
   const items = setlist?.items;
   const ids = useMemo(() => items?.map((i) => i.songId) ?? [], [items]);
   const setOrder = editor.setOrder;
+  // The full summary copy only fits beside the heading from the sm breakpoint up.
+  const wideSummary = useMediaQuery("(min-width: 640px)");
 
   const { currentBand } = useCurrentBand();
   const bandName = currentBand?.name ?? "Band";
@@ -109,19 +112,20 @@ export function SetlistSection({
       className="flex flex-col gap-3"
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-3">
+        <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
           <h3 id="setlist-heading" className="text-base font-semibold">
             Setlist
           </h3>
           {setlist && setlist.songCount > 0 ? (
             <p
               data-testid="setlist-total"
-              className="text-sm text-muted-foreground tabular-nums"
+              className="truncate text-sm text-muted-foreground tabular-nums"
             >
               {setlistSummary(
                 setlist.songCount,
                 setlist.totalDurationSeconds,
                 setlist.unknownDurationCount,
+                !wideSummary,
               )}
             </p>
           ) : null}

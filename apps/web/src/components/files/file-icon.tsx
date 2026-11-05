@@ -8,8 +8,8 @@ import {
   FileText,
   FileVideo,
   Folder,
-  FolderClock,
   ImageIcon,
+  Music,
 } from "lucide-react";
 import { useState } from "react";
 import type { FileEntry } from "@greenroom/shared";
@@ -49,11 +49,16 @@ export function FolderGlyph({
 }) {
   if (entry.isGigsRoot) {
     return (
-      <FolderClock
+      <span
         aria-hidden
         data-testid="gigs-root-icon"
-        className={cn("fill-primary/25 text-primary", className)}
-      />
+        className={cn("relative inline-flex", className)}
+      >
+        <Folder className="size-full fill-primary/25 text-primary" />
+        <span className="absolute -right-0.5 -bottom-0.5 flex size-[45%] items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
+          <Music className="size-[65%]" />
+        </span>
+      </span>
     );
   }
   if (entry.gig) {
@@ -132,13 +137,15 @@ export function EntryVisual({
 }: {
   bandId: string;
   entry: FileEntry;
-  size: "row" | "tile";
+  size: "row" | "tile" | "compact";
 }) {
   if (entry.kind === "folder") {
     return (
       <FolderGlyph
         entry={entry}
-        className={size === "row" ? "size-9" : "size-16"}
+        className={
+          size === "row" ? "size-9" : size === "compact" ? "size-10" : "size-16"
+        }
       />
     );
   }
@@ -147,7 +154,9 @@ export function EntryVisual({
       bandId={bandId}
       entry={entry}
       className={size === "row" ? "size-9 rounded-lg" : "size-full"}
-      iconClassName={size === "row" ? "size-5" : "size-10"}
+      iconClassName={
+        size === "row" ? "size-5" : size === "compact" ? "size-6" : "size-10"
+      }
     />
   );
 }

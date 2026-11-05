@@ -6,6 +6,8 @@ import { GITHUB } from "./github/github.adapter.js";
 import { RealGithubAdapter } from "./github/github.real.js";
 import { GOOGLE_CALENDAR } from "./google-calendar/google-calendar.adapter.js";
 import { RealGoogleCalendarAdapter } from "./google-calendar/google-calendar.real.js";
+import { DriveAncestryCache } from "./google-drive/drive-ancestry-cache.js";
+import { withAncestryInvalidation } from "./google-drive/google-drive.invalidating.js";
 import { GOOGLE_DRIVE } from "./google-drive/google-drive.adapter.js";
 import { RealGoogleDriveAdapter } from "./google-drive/google-drive.real.js";
 import { GOOGLE_OAUTH } from "./google-oauth/google-oauth.adapter.js";
@@ -38,7 +40,16 @@ function bind(
 const providers: Provider[] = [
   FakeIntegrationsRegistry,
   bind(GOOGLE_OAUTH, (r) => r.googleOAuth, RealGoogleOAuthAdapter),
-  bind(GOOGLE_DRIVE, (r) => r.googleDrive, RealGoogleDriveAdapter),
+  DriveAncestryCache,
+  {
+    provide: GOOGLE_DRIVE,
+    inject: [FakeIntegrationsRegistry, DriveAncestryCache],
+    useFactory: (r: FakeIntegrationsRegistry, cache: DriveAncestryCache) =>
+      withAncestryInvalidation(
+        isFake() ? r.googleDrive : new RealGoogleDriveAdapter(),
+        cache,
+      ),
+  },
   bind(GOOGLE_CALENDAR, (r) => r.googleCalendar, RealGoogleCalendarAdapter),
   bind(GOOGLE_PLACES, (r) => r.googlePlaces, RealGooglePlacesAdapter),
   bind(SPOTIFY, (r) => r.spotify, RealSpotifyAdapter),
@@ -53,6 +64,7 @@ const providers: Provider[] = [
   providers,
   exports: [
     FakeIntegrationsRegistry,
+    DriveAncestryCache,
     GOOGLE_OAUTH,
     GOOGLE_DRIVE,
     GOOGLE_CALENDAR,

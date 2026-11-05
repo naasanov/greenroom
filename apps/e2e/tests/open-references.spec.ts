@@ -67,10 +67,11 @@ test("tag chips show counts and the preview follows setlist order", async ({
 }) => {
   await openDialog(page);
   const bass = dialog(page).getByRole("radio", { name: /^Bass tab/ });
-  await expect(bass).toHaveText("Bass tab (2 of 3 songs)");
-  await expect(dialog(page).getByRole("radio", { name: /^Lyrics/ })).toHaveText(
-    "Lyrics (1 of 3 songs)",
-  );
+  await expect(bass).toContainText("Bass tab");
+  await expect(bass).toContainText("2/3 songs");
+  await expect(
+    dialog(page).getByRole("radio", { name: /^Lyrics/ }),
+  ).toContainText("1/3 songs");
   await bass.click();
   const items = dialog(page).getByTestId("reference-preview").locator("li");
   await expect(items).toHaveCount(3);
@@ -121,4 +122,43 @@ test("the references button is hidden for an empty setlist", async ({
   await expect(
     page.getByRole("button", { name: "Open references" }),
   ).toHaveCount(0);
+});
+
+test.describe("phone width", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test("tags sit in two equal columns and preview rows share one height", async ({
+    page,
+  }) => {
+    await openDialog(page);
+    const radios = dialog(page).getByRole("radio");
+    const count = await radios.count();
+    expect(count).toBeGreaterThan(1);
+    await expect(async () => {
+      const boxes = [];
+      for (let i = 0; i < count; i++)
+        boxes.push((await radios.nth(i).boundingBox())!);
+      expect(new Set(boxes.map((b) => Math.round(b.width))).size).toBe(1);
+      expect(new Set(boxes.map((b) => Math.round(b.height))).size).toBe(1);
+      expect(Math.abs(boxes[0]!.y - boxes[1]!.y)).toBeLessThan(2);
+    }).toPass();
+
+    await dialog(page)
+      .getByRole("radio", { name: /^Bass tab/ })
+      .click();
+    const items = dialog(page).getByTestId("reference-preview").locator("li");
+    await expect(items).toHaveCount(3);
+    const heights = [];
+    for (let i = 0; i < 3; i++)
+      heights.push((await items.nth(i).boundingBox())!.height);
+    // Rows with an Open button and the row saying "No link" are equally tall.
+    expect(new Set(heights.map(Math.round)).size).toBe(1);
+    const open = items.nth(0).getByRole("button", { name: /^Open / });
+    const bg = await open.evaluate(
+      (el) => getComputedStyle(el).backgroundColor,
+    );
+    expect(bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+    expect((await open.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await page.screenshot({ path: "test-results/references-390.png" });
+  });
 });

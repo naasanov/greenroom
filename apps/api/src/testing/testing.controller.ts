@@ -25,6 +25,7 @@ import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { CalendarSyncService } from "../calendar-sync/calendar-sync.service.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
+  DriveAncestryCache,
   FakeIntegrationsRegistry,
   type CalendarAclRule,
   type CalendarEvent,
@@ -45,6 +46,7 @@ export class TestingController {
     private readonly sessions: SessionService,
     private readonly calendarSync: CalendarSyncService,
     private readonly calendarQueue: CalendarSyncQueue,
+    private readonly driveCache: DriveAncestryCache,
   ) {}
 
   @Post("reset")
@@ -52,6 +54,7 @@ export class TestingController {
   async reset(): Promise<{ ok: true }> {
     await resetDatabase(this.db);
     this.registry.resetAll();
+    this.driveCache.clear();
     this.calendarQueue.reset();
     return { ok: true };
   }
@@ -65,6 +68,7 @@ export class TestingController {
       );
     }
     this.registry.resetAll();
+    this.driveCache.clear();
     this.calendarQueue.reset();
     return seedScenario(this.db, body.scenario);
   }

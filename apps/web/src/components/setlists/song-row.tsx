@@ -70,11 +70,15 @@ export function SongOverlay({
   );
 }
 
-/** "12 songs · 47 min" plus a note for songs without a length. */
+/**
+ * "12 songs · 47 min" plus a note for songs without a length; `compact`
+ * shortens that note for narrow screens.
+ */
 export function setlistSummary(
   songCount: number,
   totalDurationSeconds: number,
   unknownDurationCount: number,
+  compact = false,
 ): string {
   const minutes = Math.round(totalDurationSeconds / 60);
   const time =
@@ -84,7 +88,9 @@ export function setlistSummary(
   const parts = [`${songCount} ${songCount === 1 ? "song" : "songs"}`];
   if (totalDurationSeconds > 0) parts.push(time);
   if (unknownDurationCount > 0) {
-    parts.push(`${unknownDurationCount} without a length`);
+    parts.push(
+      `${unknownDurationCount} ${compact ? "no length" : "without a length"}`,
+    );
   }
   return parts.join(" · ");
 }

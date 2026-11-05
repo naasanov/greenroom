@@ -17,6 +17,7 @@ import { DRIZZLE } from "../db/db.constants.js";
 import { GoogleLinksService } from "../google-connect/index.js";
 import {
   DRIVE_FOLDER_MIME,
+  DriveAncestryCache,
   GOOGLE_DRIVE,
   type DriveFile,
   type DriveFileResult,
@@ -51,22 +52,22 @@ export class DriveStructureService {
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(GOOGLE_DRIVE) readonly drive: GoogleDriveAdapter,
     private readonly links: GoogleLinksService,
+    readonly ancestryCache: DriveAncestryCache,
   ) {}
 
   /** Null when Drive is unlinked, revoked, or no folder has been chosen. */
   async context(bandId: string): Promise<DriveContext | null> {
-    const [band] = await this.db
-      .select()
-      .from(bands)
-      .where(eq(bands.id, bandId));
+    const [[band], token] = await Promise.all([
+      this.db.select().from(bands).where(eq(bands.id, bandId)),
+      this.links.getAccessToken(bandId, "drive"),
+    ]);
     if (
       !band?.driveRootFolderId ||
       !band.driveGigsFolderId ||
-      !band.drivePhotosFolderId
+      !band.drivePhotosFolderId ||
+      !token
     )
       return null;
-    const token = await this.links.getAccessToken(bandId, "drive");
-    if (!token) return null;
     return {
       token,
       bandId,
@@ -208,10 +209,18 @@ export class DriveStructureService {
     rootId: string,
     memo: DriveLookupMemo = new Map(),
   ): Promise<DriveFile[] | null> {
+    const cache = this.ancestryCache;
+    const epoch = cache.epoch();
     const chain: DriveFile[] = [];
     let current: string | null = fileId;
     while (current && chain.length < MAX_ANCESTRY_DEPTH) {
       const id: string = current;
+      const cached = cache.get(token, rootId, id);
+      if (cached) {
+        chain.push(...cached);
+        this.rememberFolders(token, rootId, chain, epoch);
+        return chain;
+      }
       let pending = memo.get(id);
       if (!pending) {
         pending = this.drive
@@ -222,10 +231,39 @@ export class DriveStructureService {
       const found = await pending;
       if (found.status !== "ok" || found.file.trashed) return null;
       chain.push(found.file);
-      if (id === rootId) return chain;
+      if (id === rootId) {
+        this.rememberFolders(token, rootId, chain, epoch);
+        return chain;
+      }
       current = found.file.parentId;
     }
     return null;
+  }
+
+  /** Caches each folder's own chain (node first) from a verified chain. */
+  private rememberFolders(
+    token: string,
+    rootId: string,
+    chain: DriveFile[],
+    epoch: number,
+  ): void {
+    chain.forEach((f, i) => {
+      if (f.mimeType === DRIVE_FOLDER_MIME)
+        this.ancestryCache.set(token, rootId, chain.slice(i), epoch);
+    });
+  }
+
+  /** Records listed child folders as verified descendants of `parentChain`'s root. */
+  rememberChildren(
+    token: string,
+    rootId: string,
+    parentChain: DriveFile[],
+    children: DriveFile[],
+    epoch: number,
+  ): void {
+    for (const c of children)
+      if (c.mimeType === DRIVE_FOLDER_MIME && !c.trashed)
+        this.ancestryCache.set(token, rootId, [c, ...parentChain], epoch);
   }
 
   /** Throws unless `folderId` is a live folder strictly inside `rootId`. */

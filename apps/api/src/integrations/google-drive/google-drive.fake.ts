@@ -46,6 +46,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     input: { name: string; parentId: string },
   ): Promise<DriveFile> {
     this.lastAccessToken = accessToken;
+    await this.latency("createFolder");
     return this.insert(
       input.name,
       DRIVE_FOLDER_MIME,
@@ -59,6 +60,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     folderId: string,
   ): Promise<DriveFile[]> {
     this.lastAccessToken = accessToken;
+    await this.latency("listChildren");
     return [...this.files.values()]
       .filter((f) => f.parentId === folderId && !f.trashed)
       .map((f) => ({ ...f }));
@@ -66,6 +68,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
 
   async getFile(accessToken: string, fileId: string): Promise<DriveFileResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("getFile");
     return this.result(fileId);
   }
 
@@ -75,6 +78,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     name: string,
   ): Promise<DriveFileResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("rename");
     return this.mutate(fileId, (f) => void (f.name = name));
   }
 
@@ -84,11 +88,13 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     newParentId: string,
   ): Promise<DriveFileResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("move");
     return this.mutate(fileId, (f) => void (f.parentId = newParentId));
   }
 
   async trash(accessToken: string, fileId: string): Promise<DriveFileResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("trash");
     return this.mutate(fileId, (f) => void (f.trashed = true));
   }
 
@@ -179,6 +185,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     range?: DriveByteRange,
   ): Promise<DriveDownloadResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("download");
     const f = this.files.get(fileId);
     const data = this.contents.get(fileId);
     if (!f || !data || f.mimeType === DRIVE_FOLDER_MIME)
@@ -208,6 +215,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     fileId: string,
   ): Promise<DriveDownloadResult> {
     this.lastAccessToken = accessToken;
+    await this.latency("getThumbnail");
     const f = this.files.get(fileId);
     if (!f || f.thumbnailLink === null) return { status: "not-found" };
     const svg = Buffer.from(placeholderSvg(f.name));
@@ -220,6 +228,16 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
   }
 
   // ---- test controls ----
+
+  /** Names of adapter calls made since the last reset, in order. */
+  callLog: string[] = [];
+
+  /** Records the call and waits FAKE_DRIVE_LATENCY_MS (default 0) like a network round trip. */
+  private async latency(call: string): Promise<void> {
+    this.callLog.push(call);
+    const ms = Number(process.env.FAKE_DRIVE_LATENCY_MS ?? 0);
+    if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+  }
 
   /** Access token passed to the most recent adapter call. */
   lastAccessToken: string | null = null;
@@ -296,6 +314,7 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     this.sessionCounter = 0;
     this.clock = 0;
     this.lastAccessToken = null;
+    this.callLog = [];
     this.files.set(FAKE_DRIVE_ROOT_ID, {
       id: FAKE_DRIVE_ROOT_ID,
       name: "My Drive",

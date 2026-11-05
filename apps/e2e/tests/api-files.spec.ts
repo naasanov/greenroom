@@ -859,3 +859,79 @@ test("link an existing folder to a gig: backfill, idempotence, and 409s", async 
     GIG_IDS.pastBar,
   );
 });
+
+test("ancestry cache: warm listings skip Drive lookups and our mutations invalidate at once", async ({
+  testApi,
+}) => {
+  await testApi.seed("band");
+  const ava = await clientFor(testApi, USERS.ava.email);
+  const fake = await FakeDrive.create();
+  const status = await setupDrive(ava);
+  const root = status.folderId as string;
+  const a = await fake.external({
+    action: "folder",
+    name: "A",
+    parentId: root,
+  });
+  const b = await fake.external({
+    action: "folder",
+    name: "B",
+    parentId: a.id,
+  });
+  const c = await fake.external({
+    action: "folder",
+    name: "C",
+    parentId: b.id,
+  });
+  await fake.external({ action: "add", name: "f.txt", parentId: c.id });
+
+  // Cold: the walk fetches every ancestor. Warm: no getFile at all.
+  await fake.calls(true);
+  const cold = await listing(ava, c.id);
+  expect(cold.breadcrumbs.map((x) => x.name)).toEqual([
+    "Band stuff",
+    "A",
+    "B",
+    "C",
+  ]);
+  expect((await fake.calls(true)).filter((n) => n === "getFile")).toHaveLength(
+    4,
+  );
+  await listing(ava, c.id);
+  expect((await fake.calls(true)).filter((n) => n === "getFile")).toHaveLength(
+    0,
+  );
+  // Child folders seen in a listing are already verified.
+  await listing(ava);
+  await fake.calls(true);
+  await listing(ava, a.id);
+  expect((await fake.calls(true)).filter((n) => n === "getFile")).toHaveLength(
+    0,
+  );
+
+  // Rename an ancestor: deep breadcrumbs show the new name immediately.
+  expect(
+    (await ava.patch(itemUrl(b.id), { data: { name: "B renamed" } })).status(),
+  ).toBe(200);
+  expect((await listing(ava, c.id)).breadcrumbs.map((x) => x.name)).toEqual([
+    "Band stuff",
+    "A",
+    "B renamed",
+    "C",
+  ]);
+
+  // Trash an ancestor: the cached descendants stop authorizing at once.
+  expect((await ava.post(trashUrl, { data: { ids: [b.id] } })).status()).toBe(
+    200,
+  );
+  expect((await ava.get(folderUrl(b.id))).status()).toBe(404);
+  expect((await ava.get(folderUrl(c.id))).status()).toBe(404);
+  expect((await listing(ava, a.id)).items).toEqual([]);
+
+  // A folder created through the API is listable and its children authorize.
+  const made = await (
+    await ava.post(`${FILES}/folders`, { data: { parentId: a.id, name: "N" } })
+  ).json();
+  expect((await listing(ava, a.id)).items.map((i) => i.name)).toEqual(["N"]);
+  expect((await listing(ava, made.id)).breadcrumbs.at(-1)?.name).toBe("N");
+});

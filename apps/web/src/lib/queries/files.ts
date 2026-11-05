@@ -29,22 +29,24 @@ export const filesContentUrl = (
     download ? "?download=1" : ""
   }`;
 
+/** Shared by the Files view and idle/intent prefetch so both fill the same cache entry. */
+export const filesFolderQuery = (bandId: string, folderId: string) => ({
+  queryKey: filesKeys.folder(bandId, folderId),
+  retry: (count: number, e: unknown) =>
+    !(isApiError(e, 404) || isApiError(e, 409)) && count < 2,
+  queryFn: () =>
+    api(`${base(bandId)}/folder/${encodeURIComponent(folderId)}`, {
+      schema: filesFolderListingSchema,
+    }),
+});
+
 /** One folder of the band's Files tree; `folderId` is a Drive id or "root". */
 export function useFilesFolder(
   bandId: string,
   folderId: string,
   enabled = true,
 ) {
-  return useQuery({
-    queryKey: filesKeys.folder(bandId, folderId),
-    enabled,
-    retry: (count, e) =>
-      !(isApiError(e, 404) || isApiError(e, 409)) && count < 2,
-    queryFn: () =>
-      api(`${base(bandId)}/folder/${encodeURIComponent(folderId)}`, {
-        schema: filesFolderListingSchema,
-      }),
-  });
+  return useQuery({ ...filesFolderQuery(bandId, folderId), enabled });
 }
 
 function useInvalidateFiles(bandId: string) {

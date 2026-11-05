@@ -42,4 +42,7 @@ Drive-controller additions (`media/`):
 | 422 `DRIVE_NOT_A_FOLDER` | Target exists inside the root but is a file. |
 
 ## Tests
-`apps/e2e/tests/api-files.spec.ts` drives the fake Drive with the existing `/__test__/media/external` actions (`folder` with `parentId` builds nested trees). `api-files-uploads.spec.ts` covers Files uploads. No fake adapter changes were needed.
+`apps/e2e/tests/api-files.spec.ts` drives the fake Drive with the existing `/__test__/media/external` actions (`folder` with `parentId` builds nested trees). `api-files-uploads.spec.ts` covers Files uploads. The fake adapter also records its calls (`GET /__test__/media/calls`) and honors `FAKE_DRIVE_LATENCY_MS`.
+
+## Ancestry cache
+`DriveAncestryCache` (60s TTL) holds verified folder chains up to the Files root, so a listing skips the per-ancestor `getFile` walk. Listed child folders are cached as verified, and the GOOGLE_DRIVE adapter is wrapped to clear the cache after createFolder, rename, move, and trash. Edits made directly in Drive show up when the TTL lapses. The folder listing runs concurrently with the authorization walk and is discarded if the walk fails.

@@ -1,11 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Suspense,
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -20,6 +23,7 @@ import {
 import { CreateBandForm } from "@/components/onboarding/create-band-form";
 import { StartScreen } from "@/components/onboarding/start-screen";
 import { useCurrentBand } from "@/lib/current-band";
+import { prefetchFiles } from "@/lib/files-prefetch";
 import { useMe, useSignOut } from "@/lib/queries";
 
 /** Calendar-shaped placeholder that holds the Events tab's space while its code loads. */
@@ -75,6 +79,27 @@ export function RoutedShell({ children }: { children: ReactNode }) {
   const signOut = useSignOut();
   const [createOpen, setCreateOpen] = useState(false);
   const [lastTab, setLastTab] = useState<TabKey | null>(null);
+  const qc = useQueryClient();
+  const bandId = currentBand?.id;
+  const warmFiles = useCallback(() => {
+    if (!bandId) return;
+    prefetchFiles(qc, bandId);
+    router.prefetch("/files");
+  }, [qc, bandId, router]);
+  // Files chunk and root listing load at idle so the first visit opens warm.
+  useEffect(() => {
+    if (!bandId) return;
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (!w.requestIdleCallback) {
+      const t = window.setTimeout(warmFiles, 2000);
+      return () => window.clearTimeout(t);
+    }
+    const id = w.requestIdleCallback(warmFiles);
+    return () => w.cancelIdleCallback?.(id);
+  }, [bandId, warmFiles]);
   const activeTab = tabFromPath(pathname);
   // Event deep links share one Events tab; once visited it stays mounted (hidden
   // off-tab) so returning never rebuilds the calendar.
@@ -107,6 +132,9 @@ export function RoutedShell({ children }: { children: ReactNode }) {
         onBandSettings={() => router.push("/settings#settings-band")}
         activeTab={activeTab}
         tabHref={tabPath}
+        onTabIntent={(tab) => {
+          if (tab === "files") warmFiles();
+        }}
         profile={{ name: me.displayName, imageUrl: me.avatarUrl }}
         onProfileClick={() => router.push("/settings")}
       >

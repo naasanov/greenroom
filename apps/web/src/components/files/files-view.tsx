@@ -4,7 +4,8 @@ import {
   CheckSquare,
   FolderOpen,
   FolderPlus,
-  LayoutGrid,
+  Grid2x2,
+  Grid3x3,
   List,
   Plus,
   Trash2,
@@ -19,7 +20,12 @@ import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { EmptyState } from "@/components/app/empty-state";
 import { Fab } from "@/components/app/fab";
 import { SelectionBar } from "@/components/app/selection-bar";
+import {
+  SegmentedToggle,
+  type SegmentedOption,
+} from "@/components/app/segmented-toggle";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
+import { openMediaView } from "@/components/media/media-gallery-page";
 import { startDownload } from "@/components/media/media-download";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +48,7 @@ import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "./breadcrumbs";
 import { FileRow, FileTile, type EntryProps } from "./file-entry";
+import { FilesSkeleton } from "./files-skeleton";
 import { FileViewer } from "./file-viewer";
 import { entryHref, isProtected } from "./file-utils";
 import type { EntryActions } from "./item-menu";
@@ -49,11 +56,30 @@ import { LinkSongsDrawer } from "./link-songs-drawer";
 import { NameDialog, type NameDialogState } from "./name-dialog";
 import { useFilesUpload } from "./use-files-upload";
 
-const useViewChoice = createLocalChoice<"list" | "grid">(
+/** "grid" is the large-previews grid; the value predates the compact option. */
+type FilesViewMode = "list" | "grid" | "compact";
+
+const useViewChoice = createLocalChoice<FilesViewMode>(
   "gr-files-view",
-  ["list", "grid"],
+  ["list", "grid", "compact"],
   "list",
 );
+
+const VIEW_OPTIONS: SegmentedOption<FilesViewMode>[] = [
+  { value: "list", label: "List", icon: <List />, iconOnly: true },
+  {
+    value: "grid",
+    label: "Large previews",
+    icon: <Grid2x2 />,
+    iconOnly: true,
+  },
+  {
+    value: "compact",
+    label: "Compact previews",
+    icon: <Grid3x3 />,
+    iconOnly: true,
+  },
+];
 
 const PROTECTED_HINT = "Delete the gig to remove its folder";
 
@@ -70,20 +96,6 @@ function Toast({ text, onDismiss }: { text: string; onDismiss: () => void }) {
       className="fixed inset-x-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+5rem)] z-40 mx-auto w-fit max-w-sm rounded-2xl bg-foreground px-4 py-3 text-sm text-background shadow-lift md:bottom-6"
     >
       {text}
-    </div>
-  );
-}
-
-function ListSkeleton() {
-  return (
-    <div
-      aria-hidden
-      data-testid="files-skeleton"
-      className="flex flex-col gap-2"
-    >
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="h-14 animate-pulse rounded-xl bg-muted/60" />
-      ))}
     </div>
   );
 }
@@ -152,7 +164,8 @@ export function FilesView({
   const actions: EntryActions = {
     onOpen: (e) => {
       const href = entryHref(e);
-      if (href) router.push(href);
+      if (e.gig) openMediaView(router, e.gig.id);
+      else if (href) router.push(href);
       else setViewer(e);
     },
     onRename: (e) => {
@@ -236,7 +249,7 @@ export function FilesView({
       />
     );
   } else if (!data) {
-    body = <ListSkeleton />;
+    body = <FilesSkeleton />;
   } else if (items.length === 0) {
     body = (
       <EmptyState
@@ -260,13 +273,23 @@ export function FilesView({
     });
     body = (
       <>
-        {view === "grid" ? (
+        {view !== "list" ? (
           <ul
             data-testid="files-grid"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+            data-density={view}
+            className={cn(
+              "grid",
+              view === "compact"
+                ? "grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9"
+                : "grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
+            )}
           >
             {items.map((e) => (
-              <FileTile key={e.id} {...rowProps(e)} />
+              <FileTile
+                key={e.id}
+                {...rowProps(e)}
+                compact={view === "compact"}
+              />
             ))}
           </ul>
         ) : (
@@ -331,19 +354,12 @@ export function FilesView({
           </div>
           {canAct ? (
             <div className="flex shrink-0 items-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={
-                  view === "list"
-                    ? "Switch to grid view"
-                    : "Switch to list view"
-                }
-                onClick={() => setView(view === "list" ? "grid" : "list")}
-                className="text-muted-foreground"
-              >
-                {view === "list" ? <LayoutGrid /> : <List />}
-              </Button>
+              <SegmentedToggle
+                label="View"
+                value={view}
+                onValueChange={setView}
+                options={VIEW_OPTIONS}
+              />
               <Button
                 variant="ghost"
                 size="icon"

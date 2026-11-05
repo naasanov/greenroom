@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AccountModule } from "./account/account.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { BandsModule } from "./bands/bands.module.js";
 import { CalendarSyncModule } from "./calendar-sync/calendar-sync.module.js";
@@ -27,6 +28,7 @@ import { TestingModule } from "./testing/testing.module.js";
     DatabaseModule,
     IntegrationsModule,
     AuthModule,
+    AccountModule,
     BandsModule,
     EventsModule,
     JobsModule,

@@ -7,6 +7,7 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Res,
 } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
@@ -15,6 +16,7 @@ import { uploadSessions, type Database } from "@greenroom/db";
 import { DRIZZLE } from "../db/db.constants.js";
 import { Public } from "../auth/decorators.js";
 import {
+  DriveAncestryCache,
   FakeIntegrationsRegistry,
   type DriveFile,
 } from "../integrations/index.js";
@@ -38,6 +40,7 @@ export class MediaTestController {
     private readonly registry: FakeIntegrationsRegistry,
     private readonly poller: DrivePollerService,
     private readonly uploads: UploadsService,
+    private readonly ancestry: DriveAncestryCache,
     @Inject(DRIZZLE) private readonly db: Database,
   ) {}
 
@@ -56,10 +59,19 @@ export class MediaTestController {
     res.send(buf);
   }
 
-  /** Simulates an edit made directly in the Drive UI. */
+  /** Fake Drive adapter calls since the last reset; `?clear=1` empties the log after reading. */
+  @Get("calls")
+  calls(@Query("clear") clear?: string): string[] {
+    const log = [...this.registry.googleDrive.callLog];
+    if (clear) this.registry.googleDrive.callLog = [];
+    return log;
+  }
+
+  /** Simulates an edit made directly in the Drive UI; the ancestry cache is dropped as if its TTL lapsed. */
   @Post("external")
   @HttpCode(200)
   external(@Body() b: ExternalBody): DriveFile | { ok: true } {
+    this.ancestry.clear();
     const d = this.registry.googleDrive;
     const need = (v: string | undefined, k: string): string => {
       if (!v) throw new BadRequestException(`${k} is required`);

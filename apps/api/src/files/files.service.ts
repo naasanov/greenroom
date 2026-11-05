@@ -85,14 +85,21 @@ export class FilesService {
   ): Promise<FilesFolderListing> {
     const ctx = await this.structure.requireContext(bandId);
     const memo: DriveLookupMemo = new Map();
-    const { file, chain } = await this.resolveFolder(
-      ctx,
-      folderId ?? "root",
-      memo,
+    const id = !folderId || folderId === "root" ? ctx.rootFolderId : folderId;
+    const epoch = this.structure.ancestryCache.epoch();
+    // The listing runs alongside the authorization walk; it is discarded unless the walk passes.
+    const childrenPromise = this.drive.listChildren(ctx.token, id);
+    childrenPromise.catch(() => undefined);
+    const { file, chain } = await this.resolveFolder(ctx, id, memo);
+    const listed = await childrenPromise;
+    this.structure.rememberChildren(
+      ctx.token,
+      ctx.rootFolderId,
+      chain,
+      listed,
+      epoch,
     );
-    const children = (await this.drive.listChildren(ctx.token, file.id)).sort(
-      byFolderThenName,
-    );
+    const children = listed.sort(byFolderThenName);
     const truncated = children.length > FILES_LISTING_CAP;
     const shown = children.slice(0, FILES_LISTING_CAP);
     const ids = shown.map((c) => c.id);

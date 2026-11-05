@@ -42,7 +42,10 @@ export function SortMenu({
           {iconOnly ? null : <span>Sort: {SORT_LABELS[sort]}</span>}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        className="w-auto max-w-[calc(100vw-1.5rem)] min-w-max"
+      >
         <DropdownMenuRadioGroup
           value={sort}
           onValueChange={(v) => {
@@ -52,7 +55,11 @@ export function SortMenu({
           }}
         >
           {SONG_SORTS.map((s) => (
-            <DropdownMenuRadioItem key={s} value={s}>
+            <DropdownMenuRadioItem
+              key={s}
+              value={s}
+              className="whitespace-nowrap"
+            >
               {SORT_LABELS[s]}
             </DropdownMenuRadioItem>
           ))}

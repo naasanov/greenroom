@@ -194,7 +194,7 @@ test("a month chip shows its time range under the title", async ({
   const gig = seed.gigs.upcomingClub;
   await showGigDate(page, gig.id, gig.title);
   const chip = calendar(page)
-    .locator(`td[data-date="${gig.date}"] .fc-event`)
+    .locator(`td[data-date="${gig.date}"] .fc-event`, { hasText: gig.title })
     .first();
   await expect(chip.getByTestId("chip-details")).toContainText("8:00 PM");
   const head = (await chip.locator(".gr-chip-head").boundingBox())!;

@@ -34,3 +34,6 @@ Specs missing from the plan go to the lightest shard by the project's median fil
 
 Refresh the plan from a recent run: `gh run download <run> -p 'timings-*' -D /tmp/timings`, then `node apps/e2e/scripts/shard-plan.mjs /tmp/timings --shards desktop=3,mobile=5` (add `--check` alone to print predicted per-shard seconds).
 If you change shard counts, update the `e2e` matrix in `.github/workflows/ci.yml` to match.
+
+## Fake Drive latency and call log
+`FAKE_DRIVE_LATENCY_MS` (default 0) delays every fake Drive call (`getFile`, `listChildren`, `createFolder`, `rename`, `move`, `trash`, `download`, `getThumbnail`) to mimic network time; export it before starting the API. `GET /__test__/media/calls` lists the adapter calls made since the last reset (`?clear=1` empties the log), used to assert how many Drive round trips a request needs. `DRIVE_ANCESTRY_CACHE_TTL_MS` (default 60000, 0 disables) controls the API's folder-ancestry cache; `/__test__/media/external` edits and `reset` clear it.

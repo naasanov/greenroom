@@ -5,6 +5,7 @@ import Link from "next/link";
 import { tabPath, useLastTab } from "@/components/app/routed-shell";
 import { GoogleLinkReturn } from "@/components/google/google-link-return";
 import { BandSection } from "@/components/settings/band-section";
+import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { LeaveBandSection } from "@/components/settings/leave-band-section";
 import { PersonalSection } from "@/components/settings/personal-section";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function SettingsView() {
       {currentBand ? (
         <LeaveBandSection key={currentBand.id} band={currentBand} />
       ) : null}
+      <DeleteAccountSection />
     </div>
   );
 }

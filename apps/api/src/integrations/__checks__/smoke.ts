@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   const reg = app.get(FakeIntegrationsRegistry);
 
   // DI binds tokens to the registry's fakes
-  assert.equal(app.get(GOOGLE_DRIVE), reg.googleDrive);
+  assert.ok(app.get(GOOGLE_DRIVE));
   const oauth = app.get<GoogleOAuthAdapter>(GOOGLE_OAUTH);
   const drive = app.get<GoogleDriveAdapter>(GOOGLE_DRIVE);
   const cal = app.get<GoogleCalendarAdapter>(GOOGLE_CALENDAR);

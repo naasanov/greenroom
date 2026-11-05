@@ -77,6 +77,14 @@ export class FakeDrive {
     return (await this.api.get("/__test__/media/files")).json();
   }
 
+  /** Fake Drive adapter call names since the last reset; `clear` empties the log after reading. */
+  async calls(clear = false): Promise<string[]> {
+    const res = await this.api.get("/__test__/media/calls", {
+      params: clear ? { clear: "1" } : {},
+    });
+    return res.json();
+  }
+
   async byName(name: string): Promise<Fx | undefined> {
     return (await this.files()).find((f) => f.name === name);
   }

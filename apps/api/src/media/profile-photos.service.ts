@@ -250,6 +250,22 @@ export class ProfilePhotosService {
     }
   }
 
+  /** Best effort: trashes member photo copies in their band Drives, e.g. after account deletion. */
+  async trashMemberCopies(
+    copies: { bandId: string; fileId: string }[],
+  ): Promise<void> {
+    await Promise.all(
+      copies.map(async (c) => {
+        try {
+          const ctx = await this.structure.context(c.bandId);
+          if (ctx) await this.trashQuietly(ctx, c.fileId);
+        } catch (err) {
+          this.log.warn(`photo copy cleanup failed: ${String(err)}`);
+        }
+      }),
+    );
+  }
+
   private async membership(bandId: string, userId: string) {
     const [m] = await this.db
       .select()

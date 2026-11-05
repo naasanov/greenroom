@@ -4,6 +4,7 @@ export * from "./integrations.module.js";
 export * from "./google-oauth/google-oauth.adapter.js";
 export * from "./google-oauth/google-oauth.fake.js";
 export * from "./google-oauth/google-oauth.real.js";
+export * from "./google-drive/drive-ancestry-cache.js";
 export * from "./google-drive/google-drive.adapter.js";
 export * from "./google-drive/google-drive.fake.js";
 export * from "./google-drive/google-drive.real.js";

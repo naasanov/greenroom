@@ -46,3 +46,22 @@ export type MeResponse = z.infer<typeof meResponseSchema>;
 
 export const setCurrentBandSchema = z.object({ bandId: z.string().uuid() });
 export type SetCurrentBand = z.infer<typeof setCurrentBandSchema>;
+
+export const deleteAccountSchema = z.object({ confirm: z.literal("DELETE") });
+export type DeleteAccount = z.infer<typeof deleteAccountSchema>;
+
+const accountBandSchema = z.object({ id: z.string().uuid(), name: z.string() });
+export type AccountBand = z.infer<typeof accountBandSchema>;
+
+/** What deleting the account would do to each of the user's bands. */
+export const deletionPreviewSchema = z.object({
+  deleteBands: z.array(accountBandSchema),
+  leaveBands: z.array(accountBandSchema),
+  blockedBands: z.array(accountBandSchema),
+});
+export type DeletionPreview = z.infer<typeof deletionPreviewSchema>;
+
+/** Error codes returned in the `code` field of account 409 responses. */
+export const ACCOUNT_ERROR_CODES = {
+  lastAdmin: "ACCOUNT_LAST_ADMIN",
+} as const;

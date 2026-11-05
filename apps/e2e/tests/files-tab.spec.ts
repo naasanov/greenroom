@@ -277,7 +277,8 @@ test("gigs root and gig folders look distinct and cannot be trashed", async ({
   await page.goto("/files");
   const gigsRoot = row(page, "Gigs");
   await expect(gigsRoot.getByTestId("gigs-root-icon")).toBeVisible();
-  await expect(gigsRoot.getByTestId("gigs-root-badge")).toBeVisible();
+  await expect(gigsRoot.getByTestId("gigs-root-badge")).toHaveCount(0);
+  await expect(gigsRoot).not.toContainText("Gig folders");
   await expect(
     row(page, "Rehearsal Notes").getByTestId("folder-icon"),
   ).toBeVisible();
@@ -336,14 +337,52 @@ test("opens a file in the viewer", async ({ page }) => {
   await expect(viewer).toBeHidden();
 });
 
-test("grid view persists across reloads", async ({ page }) => {
+test("view mode persists across reloads and offers compact previews", async ({
+  page,
+}) => {
   await page.goto("/files");
-  await page.getByRole("button", { name: "Switch to grid view" }).click();
-  await expect(page.getByTestId("files-grid")).toBeVisible();
+  await page.getByRole("radio", { name: "Large previews" }).click();
+  await expect(page.getByTestId("files-grid")).toHaveAttribute(
+    "data-density",
+    "grid",
+  );
+  await page.getByRole("radio", { name: "Compact previews" }).click();
+  await expect(page.getByTestId("files-grid")).toHaveAttribute(
+    "data-density",
+    "compact",
+  );
   await page.reload();
-  await expect(page.getByTestId("files-grid")).toBeVisible();
-  await page.getByRole("button", { name: "Switch to list view" }).click();
+  await expect(page.getByTestId("files-grid")).toHaveAttribute(
+    "data-density",
+    "compact",
+  );
+  await page.getByRole("radio", { name: "List" }).click();
   await expect(page.getByTestId("files-list")).toBeVisible();
+});
+
+test("a legacy stored grid value opens the large previews grid", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem("gr-files-view", "grid"));
+  await page.goto("/files");
+  await expect(page.getByTestId("files-grid")).toHaveAttribute(
+    "data-density",
+    "grid",
+  );
+});
+
+test("closing a gig's media page returns to the Files folder", async ({
+  page,
+}) => {
+  await page.goto("/files");
+  await page.getByRole("link", { name: "Open Gigs" }).click();
+  await expect(row(page, m.gigTitle)).toBeVisible();
+  const folderUrl = page.url();
+  await page.getByRole("link", { name: `Open ${m.gigTitle}` }).click();
+  await expect(page).toHaveURL(new RegExp(`/gigs/${m.gigId}/media$`));
+  await page.getByRole("button", { name: "Back to gig" }).click();
+  await expect(page).toHaveURL(folderUrl);
+  await expect(row(page, m.gigTitle)).toBeVisible();
 });
 
 test("an unlinked band sees the Drive link prompt", async ({

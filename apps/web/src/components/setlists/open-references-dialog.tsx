@@ -181,7 +181,7 @@ export function OpenReferencesDialog({
           <div
             role="radiogroup"
             aria-label="Reference tag"
-            className="flex flex-wrap gap-2"
+            className="grid grid-cols-2 gap-2"
           >
             {tags.map((t) => (
               <button
@@ -191,13 +191,18 @@ export function OpenReferencesDialog({
                 aria-checked={t.key === selectedKey}
                 onClick={() => choose(t.key)}
                 className={cn(
-                  "min-h-9 rounded-full border px-3 py-1 text-sm transition-colors",
+                  "flex min-h-14 min-w-0 flex-col items-start justify-center rounded-2xl border px-3 py-2 text-left transition-colors",
                   t.key === selectedKey
                     ? "border-primary bg-primary text-primary-foreground"
                     : "bg-card hover:bg-muted",
                 )}
               >
-                {t.label} ({t.songCount} of {total} songs)
+                <span className="w-full truncate text-sm font-medium">
+                  {t.label}
+                </span>
+                <span className="text-xs opacity-80">
+                  {t.songCount}/{total} songs
+                </span>
               </button>
             ))}
           </div>
@@ -214,7 +219,7 @@ export function OpenReferencesDialog({
             {rows.map((row, i) => (
               <li
                 key={row.songId + i}
-                className="flex min-h-12 items-center gap-3 rounded-2xl border bg-card px-3 py-2"
+                className="flex h-12 items-center gap-3 rounded-2xl border bg-card pr-1 pl-3"
               >
                 <span className="w-5 shrink-0 text-xs text-muted-foreground tabular-nums">
                   {i + 1}
@@ -223,15 +228,18 @@ export function OpenReferencesDialog({
                   {row.title}
                 </span>
                 {row.urls.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">No link</span>
+                  <span className="shrink-0 px-2.5 text-xs text-muted-foreground">
+                    No link
+                  </span>
                 ) : (
                   <span className="flex shrink-0 gap-1">
                     {row.urls.map((url, n) => (
                       <Button
                         key={url + n}
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
+                        className="h-11 px-2.5 text-primary"
                         aria-label={`Open ${row.title}${row.urls.length > 1 ? ` link ${n + 1}` : ""}`}
                         onClick={() => {
                           setResult(null);

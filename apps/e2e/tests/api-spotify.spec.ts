@@ -1,6 +1,6 @@
 import { oauthConnections, oauthStates } from "@greenroom/db";
 import { eq } from "drizzle-orm";
-import { API_URL, WEB_URL } from "../src/env.js";
+import { API_PORT, API_URL, WEB_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
 import type { TestApi } from "../src/test-api.js";
 import {
@@ -29,7 +29,7 @@ test("start redirects to the authorize URL with the loopback redirect URI and al
   const { api } = await bandWithClient(testApi);
   const { location, state } = await startSpotify(api, "/library");
   expect(location.searchParams.get("redirect_uri")).toBe(
-    `http://127.0.0.1:4100${CALLBACK}`,
+    `http://127.0.0.1:${API_PORT}${CALLBACK}`,
   );
   expect(location.searchParams.get("scope")).toBe(
     "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public",

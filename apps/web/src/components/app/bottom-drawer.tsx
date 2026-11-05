@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ChevronDown, X } from "lucide-react";
 import {
   Drawer,
@@ -14,6 +21,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+
+/**
+ * Holds the close handler of the aside that is open inside a BottomDrawer, so
+ * the first outside press or Escape dismisses only the aside, not its parent.
+ */
+const AsideDismissContext = createContext<
+  ((close: (() => void) | null) => void) | null
+>(null);
 
 export interface BottomDrawerProps {
   open?: boolean;
@@ -84,92 +99,105 @@ export function BottomDrawer({
     if (isOpen) openedAt.current = performance.now();
   }, [isOpen]);
   // Every dismissal route funnels here so guarded drawers stay open.
+  const asideClose = useRef<(() => void) | null>(null);
+  const registerAside = (close: (() => void) | null) => {
+    asideClose.current = close;
+  };
   const requestClose = () =>
     dismissible ? setOpen(false) : onDismissAttempt?.();
   return (
-    <Root open={isOpen} onOpenChange={setOpen} dismissible={dismissible}>
-      {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
-      <DrawerContent
-        data-exiting={open === false ? "" : undefined}
-        onPointerDownOutside={
-          dismissible
-            ? (e) => {
-                if (e.detail.originalEvent.timeStamp >= openedAt.current)
+    <AsideDismissContext.Provider value={registerAside}>
+      <Root open={isOpen} onOpenChange={setOpen} dismissible={dismissible}>
+        {trigger ? <DrawerTrigger asChild>{trigger}</DrawerTrigger> : null}
+        <DrawerContent
+          data-exiting={open === false ? "" : undefined}
+          onPointerDownOutside={
+            dismissible
+              ? (e) => {
+                  if (e.detail.originalEvent.timeStamp < openedAt.current)
+                    return;
+                  if (asideClose.current) return asideClose.current();
                   requestClose();
-              }
-            : undefined
-        }
-        onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
-        onEscapeKeyDown={(e) => {
-          if (!dismissible) {
-            e.preventDefault();
-            onDismissAttempt?.();
+                }
+              : undefined
           }
-        }}
-        className={cn(
-          "mx-auto w-full max-w-lg data-[vaul-drawer-direction=bottom]:mt-12 data-[vaul-drawer-direction=bottom]:max-h-[90dvh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:shadow-lift",
-          nested &&
-            "data-[vaul-drawer-direction=bottom]:max-h-[calc(90dvh-3rem)] data-[vaul-drawer-direction=bottom]:shadow-[0_-10px_36px_-6px_rgb(0_0_0/0.28)]",
-          tall && "h-[min(42rem,90dvh)]",
-          className,
-        )}
-      >
-        {hideHeader ? (
-          <>
-            <DrawerTitle className="sr-only">{title}</DrawerTitle>
-            {description ? (
-              <DrawerDescription className="sr-only">
-                {description}
-              </DrawerDescription>
-            ) : null}
-          </>
-        ) : (
-          <DrawerHeader
-            className={cn(
-              "relative pt-3 pb-2 text-center md:text-center",
-              headerAction || headerLeading ? "px-24" : "px-12",
-            )}
-          >
-            <DrawerTitle className="text-lg font-semibold">{title}</DrawerTitle>
-            {description ? (
-              <DrawerDescription>{description}</DrawerDescription>
-            ) : null}
-            {headerLeading ? (
-              <div className="absolute top-1 left-3 flex items-center">
-                {headerLeading}
-              </div>
-            ) : null}
-            <div className="absolute top-1 right-3 flex items-center">
-              {headerAction}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Close"
-                className="text-muted-foreground"
-                onClick={requestClose}
-              >
-                <ChevronDown />
-              </Button>
-            </div>
-          </DrawerHeader>
-        )}
-        <div
+          onOutsideClickGuard={dismissible ? undefined : onDismissAttempt}
+          onEscapeKeyDown={(e) => {
+            if (asideClose.current) {
+              e.preventDefault();
+              asideClose.current();
+            } else if (!dismissible) {
+              e.preventDefault();
+              onDismissAttempt?.();
+            }
+          }}
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5",
-            footer ? "pb-6" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
-            bodyClassName,
+            "mx-auto w-full max-w-lg data-[vaul-drawer-direction=bottom]:mt-12 data-[vaul-drawer-direction=bottom]:max-h-[90dvh] data-[vaul-drawer-direction=bottom]:rounded-t-3xl data-[vaul-drawer-direction=bottom]:shadow-lift",
+            nested &&
+              "data-[vaul-drawer-direction=bottom]:max-h-[calc(90dvh-3rem)] data-[vaul-drawer-direction=bottom]:shadow-[0_-10px_36px_-6px_rgb(0_0_0/0.28)]",
+            tall && "h-[min(42rem,90dvh)]",
+            className,
           )}
         >
-          {children}
-        </div>
-        {footer ? (
-          <div className="border-t bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {footer}
+          {hideHeader ? (
+            <>
+              <DrawerTitle className="sr-only">{title}</DrawerTitle>
+              {description ? (
+                <DrawerDescription className="sr-only">
+                  {description}
+                </DrawerDescription>
+              ) : null}
+            </>
+          ) : (
+            <DrawerHeader
+              className={cn(
+                "relative pt-3 pb-2 text-center md:text-center",
+                headerAction || headerLeading ? "px-24" : "px-12",
+              )}
+            >
+              <DrawerTitle className="text-lg font-semibold">
+                {title}
+              </DrawerTitle>
+              {description ? (
+                <DrawerDescription>{description}</DrawerDescription>
+              ) : null}
+              {headerLeading ? (
+                <div className="absolute top-1 left-3 flex items-center">
+                  {headerLeading}
+                </div>
+              ) : null}
+              <div className="absolute top-1 right-3 flex items-center">
+                {headerAction}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Close"
+                  className="text-muted-foreground"
+                  onClick={requestClose}
+                >
+                  <ChevronDown />
+                </Button>
+              </div>
+            </DrawerHeader>
+          )}
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5",
+              footer ? "pb-6" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+              bodyClassName,
+            )}
+          >
+            {children}
           </div>
-        ) : null}
-        {aside}
-      </DrawerContent>
-    </Root>
+          {footer ? (
+            <div className="border-t bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {footer}
+            </div>
+          ) : null}
+          {aside}
+        </DrawerContent>
+      </Root>
+    </AsideDismissContext.Provider>
   );
 }
 
@@ -200,6 +228,12 @@ export function SideDrawer({
   className?: string;
 }) {
   const wide = useMediaQuery("(min-width: 768px)");
+  const registerAside = useContext(AsideDismissContext);
+  useEffect(() => {
+    if (!registerAside || !open) return;
+    registerAside(() => onOpenChange(false));
+    return () => registerAside(null);
+  }, [registerAside, open, onOpenChange]);
 
   if (!wide) {
     return (

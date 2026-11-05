@@ -43,6 +43,34 @@ function mapsUrl(gig: Gig): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}${place}`;
 }
 
+/** Inline map icon that flows at the end of the text it follows. */
+function MapsLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Open in Maps"
+      className="inline-block align-text-bottom text-primary"
+    >
+      <ExternalLink className="size-4" />
+    </a>
+  );
+}
+
+/** The last word and the icon share a nowrap span so the icon never sits alone on a line. */
+function AddressWithLink({ address, href }: { address: string; href: string }) {
+  const cut = address.trimEnd().lastIndexOf(" ") + 1;
+  return (
+    <>
+      {address.slice(0, cut)}
+      <span className="whitespace-nowrap">
+        {address.slice(cut)} <MapsLink href={href} />
+      </span>
+    </>
+  );
+}
+
 function GigDetails({
   bandId,
   gig,
@@ -120,24 +148,24 @@ function GigDetails({
               ) : null}
               {gig.venueName || gig.address ? (
                 <Fact label="Venue">
-                  <span className="flex items-start gap-2">
-                    <span className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3">
-                      <span className="font-medium">{gig.venueName}</span>
-                      {gig.address ? (
-                        <span className="ml-auto min-w-0 text-right break-words text-muted-foreground">
-                          {gig.address}
-                        </span>
-                      ) : null}
+                  <span className="flex flex-wrap justify-between gap-x-3">
+                    <span className="font-medium">
+                      {gig.venueName}
+                      {gig.address ? null : (
+                        <>
+                          {" "}
+                          <MapsLink href={mapsUrl(gig)} />
+                        </>
+                      )}
                     </span>
-                    <a
-                      href={mapsUrl(gig)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="Open in Maps"
-                      className="mt-0.5 shrink-0 text-primary"
-                    >
-                      <ExternalLink className="size-4" />
-                    </a>
+                    {gig.address ? (
+                      <span className="ml-auto min-w-0 text-left break-words text-muted-foreground">
+                        <AddressWithLink
+                          address={gig.address}
+                          href={mapsUrl(gig)}
+                        />
+                      </span>
+                    ) : null}
                   </span>
                 </Fact>
               ) : null}

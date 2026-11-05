@@ -284,41 +284,50 @@ export class BandsService {
     userId: string,
     deleteBand: boolean,
   ): Promise<void> {
-    let bandDeleted = false;
-    await this.db.transaction(async (tx) => {
-      await this.lockBand(tx, bandId);
-      const m = await this.activeMembership(tx, bandId, userId);
-      const [total] = await tx
-        .select({ n: count() })
-        .from(memberships)
-        .innerJoin(users, eq(users.id, memberships.userId))
-        .where(
-          and(
-            eq(memberships.bandId, bandId),
-            isNull(memberships.leftAt),
-            eq(users.isPlaceholder, false),
-          ),
-        );
-      if (total!.n <= 1) {
-        if (!deleteBand) {
-          throw new ConflictException({
-            message: "You are the only member; leaving deletes the band",
-            code: BAND_ERROR_CODES.onlyMemberMustDelete,
-          });
-        }
-        await tx.delete(bands).where(eq(bands.id, bandId));
-        bandDeleted = true;
-        return;
-      }
-      if (m.role === "admin" && (await this.adminCount(tx, bandId)) <= 1) {
-        throw this.lastAdmin();
-      }
-      await tx
-        .update(memberships)
-        .set({ leftAt: new Date() })
-        .where(eq(memberships.id, m.id));
-    });
+    const bandDeleted = await this.db.transaction((tx) =>
+      this.leaveInTx(tx, bandId, userId, deleteBand),
+    );
     if (!bandDeleted) await this.calendarSync.bandAcl(bandId);
+  }
+
+  /** Leave or delete (sole member) inside the caller's transaction; true when the band was deleted. */
+  async leaveInTx(
+    tx: Tx,
+    bandId: string,
+    userId: string,
+    deleteBand: boolean,
+  ): Promise<boolean> {
+    await this.lockBand(tx, bandId);
+    const m = await this.activeMembership(tx, bandId, userId);
+    const [total] = await tx
+      .select({ n: count() })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.bandId, bandId),
+          isNull(memberships.leftAt),
+          eq(users.isPlaceholder, false),
+        ),
+      );
+    if (total!.n <= 1) {
+      if (!deleteBand) {
+        throw new ConflictException({
+          message: "You are the only member; leaving deletes the band",
+          code: BAND_ERROR_CODES.onlyMemberMustDelete,
+        });
+      }
+      await tx.delete(bands).where(eq(bands.id, bandId));
+      return true;
+    }
+    if (m.role === "admin" && (await this.adminCount(tx, bandId)) <= 1) {
+      throw this.lastAdmin();
+    }
+    await tx
+      .update(memberships)
+      .set({ leftAt: new Date() })
+      .where(eq(memberships.id, m.id));
+    return false;
   }
 
   // Instruments

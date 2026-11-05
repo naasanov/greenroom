@@ -2,8 +2,10 @@
 
 import { Check } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { FileEntry } from "@greenroom/shared";
+import { openMediaView } from "@/components/media/media-gallery-page";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { EntryVisual } from "./file-icon";
@@ -27,6 +29,8 @@ export interface EntryProps {
   onToggle: () => void;
   onOpenFile: (entry: FileEntry) => void;
   actions: EntryActions;
+  /** Denser tile with smaller previews (grid view only). */
+  compact?: boolean;
 }
 
 const displayName = (e: FileEntry) => e.gig?.title ?? e.name;
@@ -50,6 +54,7 @@ function Activator({
   EntryProps,
   "entry" | "selecting" | "selected" | "onToggle" | "onOpenFile"
 > & { className?: string; children: ReactNode }) {
+  const router = useRouter();
   const name = displayName(entry);
   const base = cn(
     "min-w-0 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -71,7 +76,18 @@ function Activator({
   const href = entryHref(entry);
   if (href) {
     return (
-      <Link href={href} aria-label={`Open ${name}`} className={base}>
+      <Link
+        href={href}
+        aria-label={`Open ${name}`}
+        className={base}
+        onClick={(e) => {
+          // Gig folders open the media view in-app so closing it returns here.
+          if (!entry.gig || e.metaKey || e.ctrlKey || e.shiftKey || e.button)
+            return;
+          e.preventDefault();
+          openMediaView(router, entry.gig.id);
+        }}
+      >
         {children}
       </Link>
     );
@@ -140,11 +156,6 @@ function NameBlock({
         <span className="max-w-full truncate text-sm font-medium">
           {displayName(entry)}
         </span>
-        {entry.isGigsRoot ? (
-          <Badge variant="secondary" data-testid="gigs-root-badge">
-            Gig folders
-          </Badge>
-        ) : null}
       </span>
       {subtitle ? (
         <span className="truncate text-xs text-muted-foreground">
@@ -223,7 +234,7 @@ export function FileRow(props: EntryProps) {
 
 /** Grid tile: large preview or folder, name row with the kebab beneath. */
 export function FileTile(props: EntryProps) {
-  const { bandId, entry, selecting, selected } = props;
+  const { bandId, entry, selecting, selected, compact } = props;
   const gigDate = entry.gig ? formatGigDate(entry.gig.date) : "";
   return (
     <li
@@ -244,9 +255,16 @@ export function FileTile(props: EntryProps) {
     >
       <Activator
         {...props}
-        className="relative flex aspect-[4/3] w-full items-center justify-center bg-muted/40"
+        className={cn(
+          "relative flex w-full items-center justify-center bg-muted/40",
+          compact ? "aspect-square" : "aspect-[4/3]",
+        )}
       >
-        <EntryVisual bandId={bandId} entry={entry} size="tile" />
+        <EntryVisual
+          bandId={bandId}
+          entry={entry}
+          size={compact ? "compact" : "tile"}
+        />
         {selecting ? (
           <span className="absolute top-2 left-2">
             <SelectMark selected={selected} />

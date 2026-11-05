@@ -49,6 +49,9 @@ function TabItem({
   children: ReactNode;
   className?: string;
   onClick?: () => void;
+  onPointerEnter?: () => void;
+  onFocus?: () => void;
+  onTouchStart?: () => void;
   "aria-current"?: "page";
 }) {
   if (href) {
@@ -69,6 +72,7 @@ function TabItem({
 export function BottomTabBar({
   active,
   onChange,
+  onTabIntent,
   tabHref,
   layout = "responsive",
   placement = "fixed",
@@ -76,6 +80,8 @@ export function BottomTabBar({
 }: {
   active: TabKey | null;
   onChange?: (tab: TabKey) => void;
+  /** Pointer-enter, focus, or touch on a tab: warm what it will need. */
+  onTabIntent?: (tab: TabKey) => void;
   tabHref?: TabHref;
   layout?: ShellLayout;
   placement?: Placement;
@@ -101,6 +107,9 @@ export function BottomTabBar({
                 href={tabHref?.(t.key)}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => onChange?.(t.key)}
+                onPointerEnter={() => onTabIntent?.(t.key)}
+                onFocus={() => onTabIntent?.(t.key)}
+                onTouchStart={() => onTabIntent?.(t.key)}
                 className={cn(
                   "flex flex-1 flex-col items-center justify-center gap-0.5 text-[0.7rem] font-medium outline-none transition-colors focus-visible:bg-muted",
                   isActive ? "text-primary" : "text-muted-foreground",
@@ -131,12 +140,15 @@ export function BottomTabBar({
 export function TopTabs({
   active,
   onChange,
+  onTabIntent,
   tabHref,
   layout = "responsive",
   className,
 }: {
   active: TabKey | null;
   onChange?: (tab: TabKey) => void;
+  /** Pointer-enter, focus, or touch on a tab: warm what it will need. */
+  onTabIntent?: (tab: TabKey) => void;
   tabHref?: TabHref;
   layout?: ShellLayout;
   className?: string;
@@ -155,6 +167,9 @@ export function TopTabs({
             href={tabHref?.(t.key)}
             aria-current={isActive ? "page" : undefined}
             onClick={() => onChange?.(t.key)}
+            onPointerEnter={() => onTabIntent?.(t.key)}
+            onFocus={() => onTabIntent?.(t.key)}
+            onTouchStart={() => onTabIntent?.(t.key)}
             className={cn(
               "flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
               isActive
@@ -213,6 +228,7 @@ export function AppShell({
   onBandSettings,
   activeTab,
   onTabChange,
+  onTabIntent,
   tabHref,
   profile,
   onProfileClick,
@@ -229,6 +245,7 @@ export function AppShell({
   /** Null on pages outside the tabs (e.g. settings). */
   activeTab: TabKey | null;
   onTabChange?: (tab: TabKey) => void;
+  onTabIntent?: (tab: TabKey) => void;
   tabHref?: TabHref;
   profile?: { name?: string; imageUrl?: string | null };
   onProfileClick?: () => void;
@@ -265,6 +282,7 @@ export function AppShell({
           <TopTabs
             active={activeTab}
             onChange={onTabChange}
+            onTabIntent={onTabIntent}
             tabHref={tabHref}
             layout={layout}
             className="ml-3"
@@ -289,6 +307,7 @@ export function AppShell({
       <BottomTabBar
         active={activeTab}
         onChange={onTabChange}
+        onTabIntent={onTabIntent}
         tabHref={tabHref}
         layout={layout}
         placement={placement}
