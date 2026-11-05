@@ -28,18 +28,24 @@ async function newAction(
   isMobile: boolean,
   action: "folder" | "upload",
 ) {
-  await page.getByRole("button", { name: "New", exact: true }).click();
+  // Next keeps earlier /files pages mounted but hidden, so match the visible copy only.
+  await page
+    .getByRole("button", { name: "New", exact: true })
+    .filter({ visible: true })
+    .click();
   if (isMobile) {
     await page
       .getByTestId(
         `fab-action-${action === "folder" ? "new-folder" : "upload"}`,
       )
+      .filter({ visible: true })
       .click();
   } else {
     await page
       .getByRole("menuitem", {
         name: action === "folder" ? "New folder" : "Upload files",
       })
+      .filter({ visible: true })
       .click();
   }
 }

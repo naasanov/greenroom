@@ -15,6 +15,11 @@ test.beforeEach(async ({ testApi, loginAs }) => {
 
 const rows = (page: Page) => page.getByTestId("setlist-row");
 const total = (page: Page) => page.getByTestId("setlist-total");
+/** The summary note for songs without a length; compact below 640px. */
+const noLength = (page: Page, n: number) =>
+  (page.viewportSize()?.width ?? 1280) < 640
+    ? `${n} no length`
+    : `${n} without a length`;
 const libraryRow = (page: Page, title: string) =>
   page.getByTestId("library-picker").getByRole("button", { name: title });
 const rowTitles = async (page: Page) =>
@@ -219,7 +224,9 @@ test("running total counts songs, minutes and songs without a length", async ({
 }) => {
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);
-  await expect(total(page)).toHaveText("5 songs · 11 min · 2 without a length");
+  await expect(total(page)).toHaveText(
+    `5 songs · 11 min · ${noLength(page, 2)}`,
+  );
 });
 
 test("Open references is an open icon, not a link icon", async ({ page }) => {
@@ -234,7 +241,9 @@ test("removing a row updates the list and the total", async ({ page }) => {
   await expect(rows(page)).toHaveCount(5);
   await page.getByRole("button", { name: "Remove Original One" }).click();
   await expect(rows(page)).toHaveCount(4);
-  await expect(total(page)).toHaveText("4 songs · 11 min · 1 without a length");
+  await expect(total(page)).toHaveText(
+    `4 songs · 11 min · ${noLength(page, 1)}`,
+  );
   await page.reload();
   await expect(rows(page)).toHaveCount(4);
 });
@@ -502,7 +511,7 @@ test.describe("copy from a past gig", () => {
     await page.getByTestId("history-entry").first().click();
     await expect(rows(page)).toHaveCount(2);
     expect(await rowTitles(page)).toEqual(["Red Line", "Harbor Lights"]);
-    await expect(total(page)).toHaveText("2 songs · 2 without a length");
+    await expect(total(page)).toHaveText(`2 songs · ${noLength(page, 2)}`);
   });
 
   test("into a filled setlist asks, and Replace swaps the songs", async ({
