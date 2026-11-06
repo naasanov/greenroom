@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCheck, Plus, X } from "lucide-react";
+import { CheckCheck, FolderInput, Music2, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import type { UploadEntry } from "./upload-store";
 import { BatchBar, isActive } from "./upload-progress";
 import { UploadTile } from "./upload-tile";
 
-/** Thin bottom tray: batch bar, a Select all button, and one tile per upload. */
+/** Thin bottom tray: batch bar, Select all / Folder / Song buttons, and one tile per upload. */
 export function UploadTray({
   entries,
   hiddenKeys,
@@ -21,6 +21,9 @@ export function UploadTray({
   onStartRename,
   onRename,
   onRetry,
+  onCancel,
+  onPickFolder,
+  onPickSong,
   onCancelAll,
   onDismissDone,
   onReadd,
@@ -37,6 +40,10 @@ export function UploadTray({
   onStartRename: (key: string) => void;
   onRename: (key: string, name: string | null) => void;
   onRetry: (key: string) => void;
+  onCancel: (key: string) => void;
+  /** Opens the folder / song picker for every tray entry. */
+  onPickFolder: () => void;
+  onPickSong: () => void;
   onCancelAll: () => void;
   onDismissDone: () => void;
   onReadd: () => void;
@@ -74,7 +81,7 @@ export function UploadTray({
       )}
     >
       <BatchBar entries={entries} className="absolute inset-x-0 top-0" />
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+      <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5 pb-1">
         <Button
           variant="outline"
           size="sm"
@@ -83,6 +90,24 @@ export function UploadTray({
           className="rounded-full"
         >
           <CheckCheck /> Select all
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="upload-folder"
+          onClick={onPickFolder}
+          className="rounded-full"
+        >
+          <FolderInput /> Folder
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="upload-song-pick"
+          onClick={onPickSong}
+          className="rounded-full"
+        >
+          <Music2 /> Song
         </Button>
         <div className="ml-auto flex items-center gap-1">
           {hasReadd ? (
@@ -141,6 +166,7 @@ export function UploadTray({
             onStartRename={() => onStartRename(e.key)}
             onRename={(name) => onRename(e.key, name)}
             onRetry={() => onRetry(e.key)}
+            onCancel={() => onCancel(e.key)}
           />
         ))}
       </ul>

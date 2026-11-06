@@ -1,12 +1,27 @@
-import type { EmailAdapter } from "./email.adapter.js";
+import type { CalendarInviteInput, EmailAdapter } from "./email.adapter.js";
 
 export interface SentMagicLink {
   to: string;
   link: string;
 }
 
+export type SentCalendarInvite = CalendarInviteInput & { sentAt: string };
+
 export class FakeEmailAdapter implements EmailAdapter {
   private sent: SentMagicLink[] = [];
+  private invites: SentCalendarInvite[] = [];
+
+  async sendCalendarInvite(input: CalendarInviteInput): Promise<void> {
+    this.invites.push({ ...input, sentAt: new Date().toISOString() });
+  }
+
+  sentCalendarInvites(): SentCalendarInvite[] {
+    return this.invites.map((i) => ({ ...i }));
+  }
+
+  clearCalendarInvites(): void {
+    this.invites = [];
+  }
 
   async sendMagicLink(input: { to: string; link: string }): Promise<void> {
     this.sent.push({ ...input });
@@ -24,5 +39,6 @@ export class FakeEmailAdapter implements EmailAdapter {
 
   reset(): void {
     this.sent = [];
+    this.invites = [];
   }
 }

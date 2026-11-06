@@ -66,8 +66,9 @@ export class PublicLinksService {
     // The window counts from the gig date, or from today for past gigs.
     const gigDay = new Date(`${gig.date}T00:00:00Z`).getTime();
     const base = Math.max(gigDay, Date.now());
+    // Expiry is the last millisecond of the target UTC day, so it displays as that day.
     const expiresAt = new Date(base + ((days ?? 7) + 1) * DAY_MS);
-    expiresAt.setUTCHours(0, 0, 0, 0);
+    expiresAt.setUTCHours(0, 0, 0, -1);
     const [row] = await this.db
       .insert(publicUploadLinks)
       .values({

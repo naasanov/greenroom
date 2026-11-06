@@ -330,14 +330,23 @@
     flex: 1 1 0;
     flex-direction: column;
     min-height: 0;
+    /* A bare strip under the chips stays clickable for adding another event. */
+    margin-bottom: 1rem;
   }
-  .gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness {
+  .gr-cal
+    .fc
+    .fc-dayGridMonth-view
+    .fc-daygrid-event-harness:not(.fc-daygrid-event-harness-abs) {
     display: flex;
     flex: 1 1 0;
     min-width: 0;
     min-height: 1.25rem;
   }
-  .gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness > .fc-event {
+  .gr-cal
+    .fc
+    .fc-dayGridMonth-view
+    .fc-daygrid-event-harness:not(.fc-daygrid-event-harness-abs)
+    > .fc-event {
     display: flex;
     width: 100%;
     min-width: 0;
@@ -345,12 +354,20 @@
     align-items: stretch;
     overflow: hidden;
   }
-  .gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness .fc-event-main {
+  .gr-cal
+    .fc
+    .fc-dayGridMonth-view
+    .fc-daygrid-event-harness:not(.fc-daygrid-event-harness-abs)
+    .fc-event-main {
     display: flex;
     min-width: 0;
     flex: 1;
   }
-  .gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness .gr-chip {
+  .gr-cal
+    .fc
+    .fc-dayGridMonth-view
+    .fc-daygrid-event-harness:not(.fc-daygrid-event-harness-abs)
+    .gr-chip {
     width: 100%;
     padding-block: 0.1875rem 0;
   }

@@ -271,6 +271,13 @@ export function EventsTab({
   const lastClosed = useRef<number | null>(null);
   // The create drawer is portaled to body, so it closes when another tab takes over.
   if (!active && create.open) setCreate({ ...create, open: false });
+  const createGuard = useRef<((proceed: () => void) => boolean) | null>(null);
+  const registerCreateGuard = useCallback(
+    (fn: ((proceed: () => void) => boolean) | null) => {
+      createGuard.current = fn;
+    },
+    [],
+  );
   const openCreate = (date: string) => {
     // The outside pointerdown already closed (or guarded) the drawer for the
     // day it shows, so the click that follows must not reopen it.
@@ -278,8 +285,13 @@ export function EventsTab({
     if (date && create.date === date) {
       if (create.open || (closed && performance.now() - closed < 600)) return;
     }
-    if (selRef.current) go(null, "replace");
-    setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
+    const reopen = () => {
+      if (selRef.current) go(null, "replace");
+      setCreate((c) => ({ open: true, date, nonce: c.nonce + 1 }));
+    };
+    // A different day while the form holds input asks before replacing it.
+    if (create.open && createGuard.current?.(reopen)) return;
+    reopen();
   };
   // Close functions the open drawers register, so the FAB closes them through
   // their own unsaved-changes prompts.
@@ -506,6 +518,7 @@ export function EventsTab({
             defaultDate={create.date}
             beside={agendaOpen}
             registerClose={registerCreateClose}
+            registerGuard={registerCreateGuard}
             onOpenChange={(open) => {
               if (!open) lastClosed.current = performance.now();
               setCreate((c) => ({ ...c, open }));

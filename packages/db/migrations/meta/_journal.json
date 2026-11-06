@@ -127,6 +127,13 @@
       "when": 1793833369526,
       "tag": "0017_fearless_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793947134101,
+      "tag": "0018_calendar_invites",
+      "breakpoints": true
     }
   ]
 }

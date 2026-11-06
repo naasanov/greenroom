@@ -294,7 +294,7 @@ test("gigs root and gig folders look distinct and cannot be trashed", async ({
   await openMenu(page, "Gigs");
   await expect(
     page.getByRole("menuitem", { name: "Move to trash" }),
-  ).toHaveCount(0);
+  ).toBeDisabled();
   await page.keyboard.press("Escape");
 
   await page.getByRole("link", { name: "Open Gigs" }).click();
@@ -305,7 +305,7 @@ test("gigs root and gig folders look distinct and cannot be trashed", async ({
   await openMenu(page, m.gigTitle);
   await expect(
     page.getByRole("menuitem", { name: "Move to trash" }),
-  ).toHaveCount(0);
+  ).toBeDisabled();
   await expect(page.getByTestId("trash-locked-hint")).toHaveText(
     "Delete the gig to remove its folder",
   );
@@ -314,6 +314,41 @@ test("gigs root and gig folders look distinct and cannot be trashed", async ({
   await page.getByRole("link", { name: `Open ${m.gigTitle}` }).click();
   await expect(page).toHaveURL(new RegExp(`/gigs/${m.gigId}/media$`));
   await expect(page.getByTestId("media-gallery")).toBeVisible();
+});
+
+test("folder menu links a plain folder to a gig; protected folders show a blocked trash action", async ({
+  page,
+}) => {
+  const target = seed.gigs.tentative;
+  await page.goto("/files");
+  await openMenu(page, "stage-plot.png");
+  await expect(page.getByRole("menuitem", { name: "Link to gig" })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press("Escape");
+
+  await openMenu(page, "Rehearsal Notes");
+  await page.getByRole("menuitem", { name: "Link to gig" }).click();
+  const dialog = page.getByTestId("link-gig-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: new RegExp(target.title) }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId("files-toast")).toContainText(
+    'Linked "Rehearsal Notes"',
+  );
+  await expect(row(page, target.title)).toBeVisible();
+  await expect(
+    row(page, target.title).getByTestId("gig-folder-icon"),
+  ).toBeVisible();
+
+  await openMenu(page, "Gigs");
+  await expect(page.getByRole("menuitem", { name: "Link to gig" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("menuitem", { name: "Move to trash" }),
+  ).toBeDisabled();
+  await expect(page.getByTestId("trash-locked-hint")).toBeVisible();
 });
 
 test("links a file to songs and shows the chip", async ({ page }) => {

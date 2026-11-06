@@ -30,6 +30,7 @@ import {
   type SetPracticeSetlist,
   type UpdatePractice,
 } from "@greenroom/shared";
+import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { copyItems } from "../setlists/items.js";
@@ -105,6 +106,7 @@ export class PracticesService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly calendarSync: CalendarSyncQueue,
+    private readonly invites: CalendarInviteQueue,
   ) {}
 
   // ---- lookups ----
@@ -274,6 +276,7 @@ export class PracticesService {
       })
       .returning();
     await this.calendarSync.series(bandId, row!.id);
+    await this.invites.series(bandId, row!.id);
     return toSeries(row!);
   }
 
@@ -295,6 +298,7 @@ export class PracticesService {
     if (patch.scope === "this") {
       await this.editThis(series, original, override, patch);
       await this.calendarSync.occurrence(bandId, series.id, original);
+      await this.invites.series(bandId, series.id);
       const fresh = await this.findOverride(series.id, original);
       return {
         series: toSeries(series),
@@ -311,6 +315,8 @@ export class PracticesService {
 
     await this.calendarSync.series(bandId, series.id);
     if (splits) await this.calendarSync.series(bandId, result.series.id);
+    await this.invites.series(bandId, series.id);
+    if (splits) await this.invites.series(bandId, result.series.id);
 
     const target = splits ? result.first : original;
     const occurrence = isOccurrence(result.series, target)
@@ -601,6 +607,7 @@ export class PracticesService {
           set: { cancelled: true },
         });
       await this.calendarSync.occurrence(bandId, seriesId, original);
+      await this.invites.series(bandId, seriesId);
       return;
     }
 
@@ -610,6 +617,7 @@ export class PracticesService {
         .set({ deletedAt: new Date() })
         .where(eq(practiceSeries.id, seriesId));
       await this.calendarSync.series(bandId, seriesId);
+      await this.invites.series(bandId, seriesId);
       return;
     }
 
@@ -645,6 +653,7 @@ export class PracticesService {
         );
     });
     await this.calendarSync.series(bandId, seriesId);
+    await this.invites.series(bandId, seriesId);
   }
 
   // ---- RSVP ----

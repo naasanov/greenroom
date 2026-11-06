@@ -453,6 +453,22 @@ export function AgendaSheet({
   const settledEmpty =
     empty && pastDone && futureDone && !pastBusy && !futureBusy;
 
+  const todayLine = (
+    <div
+      ref={todayRef}
+      role="separator"
+      aria-label="Today"
+      data-testid="agenda-today"
+      className="flex shrink-0 items-center gap-2 py-1.5"
+    >
+      <span className="h-0.5 flex-1 rounded-full bg-today" />
+      <span className="rounded-full bg-today px-2 py-0.5 text-xs font-semibold text-white">
+        Today
+      </span>
+      <span className="h-0.5 flex-1 rounded-full bg-today" />
+    </div>
+  );
+
   return (
     <RightSheet
       open={open}
@@ -489,17 +505,20 @@ export function AgendaSheet({
         {!ready || (empty && !settledEmpty) ? (
           <Spinner />
         ) : settledEmpty ? (
-          <EmptyState
-            icon={CalendarX2}
-            title="No events yet"
-            description={
-              memberId
-                ? `No gigs for ${other ? memberLabel : "you"}.`
-                : filter === "all"
-                  ? "Gigs and practices you add will show up here."
-                  : `No ${filter === "gig" ? "gigs" : "practices"} to show.`
-            }
-          />
+          <>
+            {todayLine}
+            <EmptyState
+              icon={CalendarX2}
+              title="No events yet"
+              description={
+                memberId
+                  ? `No gigs for ${other ? memberLabel : "you"}.`
+                  : filter === "all"
+                    ? "Gigs and practices you add will show up here."
+                    : `No ${filter === "gig" ? "gigs" : "practices"} to show.`
+              }
+            />
+          </>
         ) : (
           <>
             {pastDone ? (
@@ -512,19 +531,7 @@ export function AgendaSheet({
             {past.map((e) => (
               <AgendaCard key={e.id} event={e} past onSelect={onSelect} />
             ))}
-            <div
-              ref={todayRef}
-              role="separator"
-              aria-label="Today"
-              data-testid="agenda-today"
-              className="flex shrink-0 items-center gap-2 py-1.5"
-            >
-              <span className="h-0.5 flex-1 rounded-full bg-today" />
-              <span className="rounded-full bg-today px-2 py-0.5 text-xs font-semibold text-white">
-                Today
-              </span>
-              <span className="h-0.5 flex-1 rounded-full bg-today" />
-            </div>
+            {todayLine}
             <div className="flex min-h-[calc(100dvh-8rem)] flex-col gap-2.5 pb-8">
               {upcoming.length ? (
                 upcoming.map((e) => (

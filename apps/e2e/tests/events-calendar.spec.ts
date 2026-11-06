@@ -4,6 +4,7 @@ import {
   AVA,
   calendar,
   eventIn,
+  pickSide,
   showGigDate,
   showWeekOf,
 } from "./events-helpers.js";
@@ -242,4 +243,21 @@ test("month chips stay inside their day cell and clip long titles", async ({
     }),
   );
   expect(bad).toEqual([]);
+});
+
+test("a month day that has events keeps a clickable strip to add another", async ({
+  page,
+}) => {
+  test.skip(page.viewportSize()!.width < 768, "desktop fill layout");
+  await page.goto("/events");
+  const cell = calendar(page)
+    .locator("td.fc-daygrid-day:has(.fc-event)")
+    .first();
+  await expect(cell).toBeVisible();
+  const date = await cell.getAttribute("data-date");
+  const box = (await cell.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 6);
+  await expect(page.getByTestId("split-viewport")).toBeVisible();
+  const pane = await pickSide(page, "gig");
+  await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date!);
 });

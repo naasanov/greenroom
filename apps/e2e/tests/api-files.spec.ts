@@ -325,8 +325,8 @@ test("members create, rename, and trash; protected folders refuse", async ({
   );
   expect((await ben.get(folderUrl(charts.id))).status()).toBe(404);
 
-  // Protected: Files root, gigs root, gig folder.
-  for (const id of [root, status.gigsFolderId]) {
+  // Protected: Files root, gigs root, Profile photos, gig folder.
+  for (const id of [root, status.gigsFolderId, status.photosFolderId]) {
     const res = await ben.post(trashUrl, { data: { ids: [id] } });
     expect(res.status()).toBe(409);
     expect(await codeOf(res)).toBe("FILES_GIG_FOLDER_PROTECTED");

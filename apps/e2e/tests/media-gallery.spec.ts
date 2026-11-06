@@ -553,7 +553,8 @@ test("uploading into an empty gallery shows an Unsorted section", async ({
     buffer: Buffer.from("first-image"),
   });
   await expect(section(page, "Unsorted")).toBeVisible();
-  await expect(page.getByTestId("upload-tray")).toBeVisible();
+  await expect(tile(page, "first.png")).toBeVisible();
+  await expect(page.getByTestId("upload-tray")).toHaveCount(0);
 });
 
 test("plus menu options sit above the FAB stack and are tappable", async ({
@@ -654,18 +655,13 @@ test("an upload in flight shows a global indicator off the media page that links
   await expect(chip).toHaveCount(0);
 });
 
-test("finished and organized uploads do not return to the tray after a reload", async ({
+test("finished uploads file into the gallery and do not return to the tray after a reload", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
   await page.getByTestId("media-file-input").setInputFiles(file("kept.png"));
-  await expect(page.getByTestId("upload-tile")).toHaveAttribute(
-    "data-status",
-    "done",
-  );
-  await page.getByTestId("upload-select-all").click();
-  await barButton(page, "Move to folder").click();
-  await page.getByRole("button", { name: "Move to Stage" }).click();
+  await expect(tile(page, "kept.png")).toBeVisible();
+  await expect(page.getByTestId("upload-tray")).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("media-gallery")).toBeVisible();
   await expect(tile(page, "kept.png")).toBeVisible();

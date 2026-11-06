@@ -44,6 +44,18 @@ export interface MagicLink {
   link: string;
 }
 
+/** A calendar invite email captured by the email fake. */
+export interface CalendarInviteEmail {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  ics: string;
+  method: "REQUEST" | "CANCEL";
+  from?: string;
+  sentAt: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -92,6 +104,34 @@ export class TestApi {
       { params: { to: email } },
     );
     return links;
+  }
+
+  /** Calendar invite emails the fake captured (optionally for one address); `clear` empties the log. */
+  async calendarInvitesFor(
+    to?: string,
+    clear = false,
+  ): Promise<CalendarInviteEmail[]> {
+    const { invites } = await this.call<{ invites: CalendarInviteEmail[] }>(
+      "get",
+      "email/calendar-invites",
+      { params: { ...(to ? { to } : {}), ...(clear ? { clear: "1" } : {}) } },
+    );
+    return invites;
+  }
+
+  /** Sends every pending calendar invite now (one band, or all). */
+  async calendarInvitesFlush(bandId?: string): Promise<void> {
+    await this.call("post", "calendar-invites/flush", { data: { bandId } });
+  }
+
+  /** Turns a user's calendar invites on or off. */
+  async calendarInvitesEnabled(
+    userId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.call("post", "calendar-invites/enabled", {
+      data: { userId, enabled },
+    });
   }
 
   /** Creates the user if needed plus a session; returns the raw session cookie. */

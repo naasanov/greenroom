@@ -1,5 +1,5 @@
 import { MAGIC_LINK_TTL_MS } from "../../auth/auth.constants.js";
-import type { EmailAdapter } from "./email.adapter.js";
+import type { CalendarInviteInput, EmailAdapter } from "./email.adapter.js";
 
 const RESEND_URL = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Greenroom <login@greenroom.fyi>";
@@ -26,19 +26,47 @@ export class RealEmailAdapter implements EmailAdapter {
     if (!key) throw new EmailNotConfiguredError();
     const minutes = Math.round(MAGIC_LINK_TTL_MS / 60_000);
     const expiry = `This link expires in ${minutes} minutes and can be used once.`;
+    await this.post(key, {
+      from: process.env.EMAIL_FROM || DEFAULT_FROM,
+      to: [input.to],
+      subject: "Your Greenroom sign-in link",
+      text: `Sign in to Greenroom:\n\n${input.link}\n\n${expiry}\nIf you did not request this, you can ignore this email.`,
+      html: `<p>Sign in to Greenroom:</p><p><a href="${escapeHtml(input.link)}">Sign in</a></p><p>${expiry}<br>If you did not request this, you can ignore this email.</p>`,
+    });
+  }
+
+  /**
+   * Resend has no raw MIME or alternative parts, so the invite goes as an
+   * invite.ics attachment typed `text/calendar; method=...`, which Gmail,
+   * Outlook and Apple Mail render as an RSVP card.
+   */
+  async sendCalendarInvite(input: CalendarInviteInput): Promise<void> {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new EmailNotConfiguredError();
+    await this.post(key, {
+      from: input.from || process.env.EMAIL_FROM || DEFAULT_FROM,
+      to: [input.to],
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+      attachments: [
+        {
+          filename: "invite.ics",
+          content: Buffer.from(input.ics, "utf8").toString("base64"),
+          content_type: `text/calendar; method=${input.method}; charset=UTF-8`,
+        },
+      ],
+    });
+  }
+
+  private async post(key: string, payload: object): Promise<void> {
     const res = await fetch(RESEND_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || DEFAULT_FROM,
-        to: [input.to],
-        subject: "Your Greenroom sign-in link",
-        text: `Sign in to Greenroom:\n\n${input.link}\n\n${expiry}\nIf you did not request this, you can ignore this email.`,
-        html: `<p>Sign in to Greenroom:</p><p><a href="${escapeHtml(input.link)}">Sign in</a></p><p>${expiry}<br>If you did not request this, you can ignore this email.</p>`,
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {

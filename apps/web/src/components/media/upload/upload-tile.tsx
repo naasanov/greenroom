@@ -8,6 +8,7 @@ import {
   ImageIcon,
   Music2,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,7 @@ export function UploadTile({
   onStartRename,
   onRename,
   onRetry,
+  onCancel,
 }: {
   entry: UploadEntry;
   /** Fills a gallery grid cell instead of the fixed tray size. */
@@ -109,6 +111,7 @@ export function UploadTile({
   onStartRename: () => void;
   onRename: (name: string | null) => void;
   onRetry: () => void;
+  onCancel?: () => void;
 }) {
   const done = entry.status === "done";
   const fraction = done
@@ -130,7 +133,7 @@ export function UploadTile({
       data-folder={entry.folderId ?? ""}
       data-song={entry.songId ?? ""}
       className={cn(
-        "flex flex-col transition-all duration-500",
+        "relative flex flex-col transition-all duration-500",
         fill ? "min-w-0" : "w-[4.5rem] shrink-0",
         entry.flying && "-translate-y-16 opacity-0",
       )}
@@ -177,7 +180,7 @@ export function UploadTile({
           </span>
         ) : null}
         {entry.status === "error" ? (
-          <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-destructive text-white">
+          <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-full bg-destructive text-white">
             <AlertCircle className="size-3.5" />
           </span>
         ) : null}
@@ -197,6 +200,17 @@ export function UploadTile({
           />
         ) : null}
       </button>
+      {onCancel && !done ? (
+        <button
+          type="button"
+          aria-label={`Cancel ${entry.fileName}`}
+          data-testid="upload-cancel"
+          onClick={onCancel}
+          className="absolute top-0.5 right-0.5 flex size-6 items-center justify-center rounded-full bg-black/65 text-white outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
       {editing ? (
         <input
           autoFocus

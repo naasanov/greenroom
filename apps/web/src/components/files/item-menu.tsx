@@ -3,6 +3,7 @@
 import {
   Download,
   ExternalLink,
+  FolderInput,
   Music2,
   MoreVertical,
   Pencil,
@@ -24,6 +25,7 @@ export interface EntryActions {
   onRename: (entry: FileEntry) => void;
   onDownload: (entry: FileEntry) => void;
   onLinkSongs: (entry: FileEntry) => void;
+  onLinkGig: (entry: FileEntry) => void;
   onTrash: (entry: FileEntry) => void;
 }
 
@@ -40,6 +42,7 @@ export function ItemMenu({
   actions: EntryActions;
 }) {
   const locked = isProtected(entry);
+  const canLinkGig = entry.kind === "folder" && !locked;
   const canDownload = entry.kind === "file" && !isGoogleDoc(entry);
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -68,16 +71,26 @@ export function ItemMenu({
         <DropdownMenuItem onSelect={() => actions.onLinkSongs(entry)}>
           <Music2 /> Link to songs
         </DropdownMenuItem>
+        {canLinkGig ? (
+          <DropdownMenuItem onSelect={() => actions.onLinkGig(entry)}>
+            <FolderInput /> Link to gig
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         {locked ? (
-          <p
-            data-testid="trash-locked-hint"
-            className="px-2.5 py-2 text-xs text-muted-foreground"
-          >
-            {entry.gig
-              ? "Delete the gig to remove its folder"
-              : "The gigs folder can't be deleted"}
-          </p>
+          <>
+            <DropdownMenuItem disabled variant="destructive">
+              <Trash2 /> Move to trash
+            </DropdownMenuItem>
+            <p
+              data-testid="trash-locked-hint"
+              className="px-2.5 pb-2 text-xs text-muted-foreground"
+            >
+              {entry.gig
+                ? "Delete the gig to remove its folder"
+                : "The gigs folder can't be deleted"}
+            </p>
+          </>
         ) : (
           <DropdownMenuItem
             variant="destructive"

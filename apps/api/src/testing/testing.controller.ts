@@ -21,6 +21,8 @@ import { Public } from "../auth/decorators.js";
 import { AuthService } from "../auth/auth.service.js";
 import { SessionService } from "../auth/session.service.js";
 import { sessionCookieName } from "../auth/auth.constants.js";
+import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
+import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { CalendarSyncService } from "../calendar-sync/calendar-sync.service.js";
 import { DRIZZLE } from "../db/db.constants.js";
@@ -31,6 +33,7 @@ import {
   type CalendarEvent,
   type CalendarEventPatch,
   type FakeIssue,
+  type SentCalendarInvite,
   type SentMagicLink,
 } from "../integrations/index.js";
 
@@ -47,6 +50,8 @@ export class TestingController {
     private readonly calendarSync: CalendarSyncService,
     private readonly calendarQueue: CalendarSyncQueue,
     private readonly driveCache: DriveAncestryCache,
+    private readonly invites: CalendarInviteService,
+    private readonly inviteQueue: CalendarInviteQueue,
   ) {}
 
   @Post("reset")
@@ -56,6 +61,7 @@ export class TestingController {
     this.registry.resetAll();
     this.driveCache.clear();
     this.calendarQueue.reset();
+    this.inviteQueue.reset();
     return { ok: true };
   }
 
@@ -70,6 +76,7 @@ export class TestingController {
     this.registry.resetAll();
     this.driveCache.clear();
     this.calendarQueue.reset();
+    this.inviteQueue.reset();
     return seedScenario(this.db, body.scenario);
   }
 
@@ -77,6 +84,47 @@ export class TestingController {
   magicLinks(@Query("to") to?: string): { links: SentMagicLink[] } {
     const all = this.registry.email.sentMagicLinks();
     return { links: to ? all.filter((l) => l.to === to) : all };
+  }
+
+  /** Calendar invite emails the fake sent, oldest first; `clear=1` empties the log after reading. */
+  @Get("email/calendar-invites")
+  calendarInvites(
+    @Query("to") to?: string,
+    @Query("clear") clear?: string,
+  ): { invites: SentCalendarInvite[] } {
+    const all = this.registry.email.sentCalendarInvites();
+    if (clear === "1") this.registry.email.clearCalendarInvites();
+    return {
+      invites: to
+        ? all.filter((i) => i.to.toLowerCase() === to.toLowerCase())
+        : all,
+    };
+  }
+
+  /** Sends every pending calendar invite reconcile now (one band, or all). */
+  @Post("calendar-invites/flush")
+  @HttpCode(200)
+  async calendarInvitesFlush(
+    @Body() body: { bandId?: string },
+  ): Promise<{ ok: true }> {
+    await this.invites.flush(body?.bandId);
+    return { ok: true };
+  }
+
+  /** Turns a user's calendar invites on or off (the later UI does this through settings). */
+  @Post("calendar-invites/enabled")
+  @HttpCode(200)
+  async calendarInvitesEnabled(
+    @Body() body: { userId?: unknown; enabled?: unknown },
+  ): Promise<{ ok: true }> {
+    if (
+      typeof body?.userId !== "string" ||
+      typeof body?.enabled !== "boolean"
+    ) {
+      throw new BadRequestException("userId and enabled are required");
+    }
+    await this.invites.setEnabled(body.userId, body.enabled);
+    return { ok: true };
   }
 
   /** Issues the GitHub fake received, in creation order. */

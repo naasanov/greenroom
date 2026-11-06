@@ -73,6 +73,12 @@ test("admin creates and copies an upload link from the gig drawer", async ({
     "data-reason",
     "revoked",
   );
+  await expect(pub.getByTestId("upload-link-unavailable")).toContainText(
+    "turned off",
+  );
+  await expect(
+    pub.getByTestId("upload-link-unavailable").locator("svg.lucide-ban"),
+  ).toBeVisible();
   await pub.goto(second);
   await expect(pub.getByTestId("upload-link-unavailable")).toHaveAttribute(
     "data-reason",
@@ -109,6 +115,8 @@ test("an anonymous visitor uploads to the gig's Unsorted", async ({
     `Upload your photos and videos from ${gig.title}`,
   );
   await expect(pub.getByText("The Night Owls")).toBeVisible();
+  // The fallback avatar skips the leading article.
+  await expect(pub.getByText("NO", { exact: true })).toBeVisible();
   // No navigation into the app.
   await expect(pub.getByRole("link")).toHaveCount(0);
   await pub.getByTestId("uploader-name").fill("Sam from the crowd");
@@ -171,6 +179,7 @@ test("an expired link shows a friendly page", async ({
   const box = pub.getByTestId("upload-link-unavailable");
   await expect(box).toHaveAttribute("data-reason", "expired");
   await expect(box).toContainText("expired");
+  await expect(box.locator("svg.lucide-clock")).toBeVisible();
   await expect(pub.getByTestId("public-upload-input")).toHaveCount(0);
   await shot(pub, "expired");
 

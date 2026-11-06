@@ -31,7 +31,7 @@ const EXPIRY_CHOICES = [
 
 const expiryText = (iso: string | null) =>
   iso
-    ? `Expires ${new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+    ? `Expires ${new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`
     : "Never expires";
 
 /** Trigger plus dialog for the gig's anonymous upload link. */

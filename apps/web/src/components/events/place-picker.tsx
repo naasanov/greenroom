@@ -64,6 +64,11 @@ export function PlacePicker({
       ? (suggestions.data ?? [])
       : [];
   const open = options.length > 0;
+  const listRef = useRef<HTMLUListElement>(null);
+  // Brings the suggestions above the drawer's sticky footer as they appear.
+  useEffect(() => {
+    if (open) listRef.current?.scrollIntoView({ block: "nearest" });
+  }, [open, options.length]);
 
   function type(text: string) {
     onChange({ ...EMPTY_PLACE, venueName: text });
@@ -127,10 +132,13 @@ export function PlacePicker({
           placeholder="Search for a venue"
           value={value.venueName}
           onChange={(e) => type(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={(e) => {
+            setFocused(true);
+            e.currentTarget.scrollIntoView({ block: "nearest" });
+          }}
           onBlur={() => setFocused(false)}
           onKeyDown={onKeyDown}
-          className={cn(value.venueName && "pr-11")}
+          className={cn("scroll-mb-28", value.venueName && "pr-11")}
         />
         {resolving ? (
           <Loader2 className="absolute top-3.5 right-3.5 size-4 animate-spin text-muted-foreground" />
@@ -152,10 +160,11 @@ export function PlacePicker({
       </div>
       {open ? (
         <ul
+          ref={listRef}
           id={listId}
           role="listbox"
           aria-label="Venue suggestions"
-          className="overflow-hidden rounded-xl border bg-popover shadow-soft"
+          className="scroll-mb-28 overflow-hidden rounded-xl border bg-popover shadow-soft"
         >
           {options.map((o, i) => (
             <li

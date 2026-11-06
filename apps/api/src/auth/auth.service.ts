@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { magicLinkTokens, users, type Database } from "@greenroom/db";
 import type { User } from "@greenroom/shared";
+import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { EMAIL, type EmailAdapter } from "../integrations/index.js";
@@ -16,6 +17,7 @@ export class AuthService {
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(EMAIL) private readonly email: EmailAdapter,
     private readonly calendarSync: CalendarSyncQueue,
+    private readonly invites: CalendarInviteQueue,
   ) {}
 
   async sendMagicLink(email: string, redirectTo?: string): Promise<void> {
@@ -142,6 +144,7 @@ export class AuthService {
       .returning();
     if (patch.calendarEmail !== undefined) {
       await this.calendarSync.userAcl(userId);
+      await this.invites.user(userId);
     }
     return await toUser(this.db, updated!);
   }

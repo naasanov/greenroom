@@ -404,27 +404,7 @@ export function MediaGallery({
   };
   const onTrayHeight = useCallback((px: number) => setTrayHeight(px), []);
 
-  // Finished uploads waiting in the tray are shown there, not in the gallery.
-  const trayItemIds = useMemo(
-    () =>
-      new Set(
-        entries.flatMap((e) =>
-          e.status === "done" && e.item && !e.placed ? [e.item.id] : [],
-        ),
-      ),
-    [entries],
-  );
-  const data = useMemo(() => {
-    const raw = media.data;
-    if (!raw || trayItemIds.size === 0) return raw;
-    const keep = (items: MediaItem[]) =>
-      items.filter((i) => !trayItemIds.has(i.id));
-    return {
-      ...raw,
-      unsorted: keep(raw.unsorted),
-      folders: raw.folders.map((f) => ({ ...f, items: keep(f.items) })),
-    };
-  }, [media.data, trayItemIds]);
+  const data = media.data;
   const drive = integrations.data?.drive;
   const ready = !!data?.driveLinked && !!drive?.folderId;
 
@@ -494,11 +474,10 @@ export function MediaGallery({
     return out;
   }, [data, folders, galleryUploads, entries.length, selecting]);
 
-  // Placed uploads whose item has landed in the gallery are done with the queue.
+  // Finished uploads whose item has landed in the gallery are done with the queue.
   useEffect(() => {
     const landed = entries.filter(
-      (e) =>
-        e.placed && e.status === "done" && e.item && landedIds.has(e.item.id),
+      (e) => e.status === "done" && e.item && landedIds.has(e.item.id),
     );
     if (landed.length > 0) store.dismiss(landed.map((e) => e.key));
   }, [entries, landedIds, store]);
@@ -940,6 +919,7 @@ export function MediaGallery({
                       onStartRename={() => setEditingKey(e.key)}
                       onRename={(name) => commitTrayRename(e.key, name)}
                       onRetry={() => store.retry(e.key)}
+                      onCancel={() => setConfirmCancel([e.key])}
                     />
                   ))}
                 </ul>
@@ -1182,6 +1162,13 @@ export function MediaGallery({
           onStartRename={setEditingKey}
           onRename={commitTrayRename}
           onRetry={(key) => store.retry(key)}
+          onCancel={(key) => setConfirmCancel([key])}
+          onPickFolder={() => {
+            setSelecting(true);
+            setSelected(new Set(trayEntries.map((e) => e.key)));
+            setMoveMenu(true);
+          }}
+          onPickSong={() => setPicker(trayEntries.map((e) => e.key))}
           onCancelAll={() =>
             store.cancel(
               entries.filter((e) => e.status !== "done").map((e) => e.key),
@@ -1305,7 +1292,7 @@ export function MediaGallery({
         open={!!confirmDelete}
         onOpenChange={(o) => !o && setConfirmDelete(null)}
         title="Delete from Drive?"
-        description={`Move ${plural(confirmDelete?.length ?? 0)} to Google Drive trash? You can restore them from Drive.`}
+        description={`Move ${plural(confirmDelete?.length ?? 0)} to Google Drive trash? You can restore ${confirmDelete?.length === 1 ? "it" : "them"} from Drive.`}
         confirmLabel="Move to trash"
         destructive
         onConfirm={() => {

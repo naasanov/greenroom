@@ -21,6 +21,7 @@ import {
 } from "@greenroom/shared";
 import { decryptToken } from "../common/token-crypto.js";
 import { BandsService } from "../bands/bands.service.js";
+import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
@@ -41,6 +42,7 @@ export class AccountService {
     private readonly bandsService: BandsService,
     private readonly photos: ProfilePhotosService,
     private readonly calendarSync: CalendarSyncQueue,
+    private readonly invites: CalendarInviteQueue,
   ) {}
 
   /** Classifies each active band: deleted (sole member), left, or blocked (last admin with others). */
@@ -165,9 +167,10 @@ export class AccountService {
 
     const deleted = new Set(result.deleteBands.map((b) => b.id));
     await Promise.all(
-      result.leaveBands.map((b) =>
-        this.calendarSync.bandAcl(b.id).catch(() => undefined),
-      ),
+      result.leaveBands.map(async (b) => {
+        await this.calendarSync.bandAcl(b.id).catch(() => undefined);
+        await this.invites.band(b.id);
+      }),
     );
     await this.photos.trashMemberCopies(
       copies.flatMap((c) =>

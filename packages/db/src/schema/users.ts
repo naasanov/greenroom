@@ -22,6 +22,10 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   calendarEmail: text("calendar_email"),
+  // When false no calendar invite emails are sent to this user.
+  calendarInvitesEnabled: boolean("calendar_invites_enabled")
+    .notNull()
+    .default(true),
   googleSub: text("google_sub").unique(),
   // Roster-only member with no login. `email` holds a unique unroutable address.
   isPlaceholder: boolean("is_placeholder").notNull().default(false),

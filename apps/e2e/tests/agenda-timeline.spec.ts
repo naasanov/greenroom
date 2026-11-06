@@ -208,5 +208,6 @@ test("shows an empty state when the band has no events", async ({
     await page.getByRole("button", { name: "Agenda" }).click();
   }
   await expect(agendaSheet(page).getByText("No events yet")).toBeVisible();
+  await expect(agendaSheet(page).getByTestId("agenda-today")).toBeVisible();
   await expect(agendaSheet(page).getByTestId("agenda-card")).toHaveCount(0);
 });

@@ -105,7 +105,7 @@ Parallel group 7A
 - **9.6 E2E specs + docs.** Status: Done (api-files, api-files-uploads, files-tab, files-import, account-delete, setlist-mobile-polish specs; README documents the routes)
 
 # Phase 10: Calendar invites (added 2026-11-06, design.md "Calendar invites")
-- **10.1 Core:** iCalendar builder (REQUEST, CANCEL, RRULE, VTIMEZONE, RECURRENCE-ID), invite send queue through Resend with edit batching, SEQUENCE and UID bookkeeping, hooks on gig and practice create, edit, cancel and membership changes. Status: Not started
+- **10.1 Core:** iCalendar builder (REQUEST, CANCEL, RRULE, VTIMEZONE, RECURRENCE-ID), invite send queue through Resend with edit batching, SEQUENCE and UID bookkeeping, hooks on gig and practice create, edit, cancel and membership changes. Status: Done (2026-11-06, backend core: ICS builder, send queue, migration 0018, hooks, fake capture; real Gmail/Outlook rendering and real Resend send unverified)
 - **10.2 Replies and feed:** Resend inbound webhook parsing METHOD:REPLY into RSVPs, signed one-click RSVP links, per-member subscription feed. Status: Not started
 - **10.3 UI:** "Add to your calendar" toolbar action and dialog, returning banner, first-event nudge, copy no longer says Google, settings rework. Status: Not started
 - **10.4 E2E specs, docs, and the manual step:** Resend inbound DNS and webhook (needs the user). Status: Not started

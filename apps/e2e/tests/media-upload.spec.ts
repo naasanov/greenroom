@@ -100,32 +100,85 @@ const mediaState = async () =>
     folders: { name: string; items: { name: string; sizeBytes: number }[] }[];
   };
 
-test("finished files stay in the tray until moved, here to Unsorted", async ({
+test("finished files file into Unsorted and leave the tray on their own", async ({
   page,
 }) => {
   await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
   await pick(page, makeFile("big.mp4", CHUNK + MIB));
-  await expect(tray(page)).toBeVisible();
-  await expect(utile(page, "big.mp4")).toHaveAttribute("data-status", "done");
-  await expect(
-    utile(page, "big.mp4").getByTestId("upload-progress"),
-  ).toHaveAttribute("data-progress", "100");
-  // Done files wait in the tray; the gallery does not list them twice.
-  await expect(
-    section(page, "Unsorted").locator('[data-name="big.mp4"]'),
-  ).toHaveCount(0);
-  await expect(tray(page)).toBeVisible();
-  await utile(page, "big.mp4").getByTestId("upload-open").click();
-  await barButton(page, "Move to folder").click();
-  await page.getByRole("button", { name: "Move to Unsorted" }).click();
-  await expect(tray(page)).toBeHidden();
+  await expect(utile(page, "big.mp4")).toHaveAttribute(
+    "data-status",
+    "uploading",
+  );
+  release();
   await expect(
     section(page, "Unsorted").locator('[data-name="big.mp4"]'),
   ).toBeVisible();
+  await expect(tray(page)).toBeHidden();
   const state = await mediaState();
   expect(state.unsorted.find((i) => i.name === "big.mp4")?.sizeBytes).toBe(
     CHUNK + MIB,
   );
+});
+
+test("the tray has bulk folder and song pickers and a per-item cancel", async ({
+  page,
+}) => {
+  await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
+  await pick(page, [makeFile("a.png", 4000), makeFile("b.png", 4000, 2)]);
+  await expect(utile(page, "a.png")).toHaveAttribute(
+    "data-status",
+    "uploading",
+  );
+  await page.getByTestId("upload-folder").click();
+  await page.getByRole("button", { name: "Move to Stage" }).click();
+  await expect(section(page, "Stage").getByTestId("upload-tile")).toHaveCount(
+    2,
+  );
+
+  await expect(tray(page)).toBeHidden();
+  release();
+  await expect(
+    section(page, "Stage").locator('[data-name="a.png"]'),
+  ).toBeVisible();
+});
+
+test("a single upload can be cancelled from its tile", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
+  await pick(page, [makeFile("a.png", 4000), makeFile("b.png", 4000, 2)]);
+  await expect(utile(page, "a.png")).toHaveAttribute(
+    "data-status",
+    "uploading",
+  );
+  await utile(page, "a.png").getByTestId("upload-cancel").click();
+  await page.getByRole("button", { name: "Cancel uploads" }).click();
+  await expect(utile(page, "a.png")).toHaveCount(0);
+  await expect(utile(page, "b.png")).toBeVisible();
+  release();
+  await expect(
+    section(page, "Unsorted").locator('[data-name="b.png"]'),
+  ).toBeVisible();
+});
+
+test("the tray song picker links every pending upload", async ({ page }) => {
+  await openGallery(page, m.gigId);
+  const release = await holdChunks(page);
+  await pick(page, [makeFile("a.png", 4000), makeFile("b.png", 4000, 2)]);
+  await expect(utile(page, "a.png")).toHaveAttribute(
+    "data-status",
+    "uploading",
+  );
+  await page.getByTestId("upload-song-pick").click();
+  await page
+    .getByTestId("song-pick-row")
+    .filter({ hasText: SONGS.lowTide.title })
+    .first()
+    .click();
+  await expect(utile(page, "a.png")).toHaveAttribute("data-song", /.+/);
+  await expect(utile(page, "b.png")).toHaveAttribute("data-song", /.+/);
+  release();
 });
 
 test("Select all then Move to folder works while items are still uploading", async ({
@@ -190,13 +243,6 @@ test("rename and link-to-song while uploading apply on completion", async ({
   ).toBeVisible();
 
   release();
-  await expect(utile(page, "renamed.mp4")).toHaveAttribute(
-    "data-status",
-    "done",
-  );
-  await utile(page, "renamed.mp4").getByTestId("upload-open").click();
-  await barButton(page, "Move to folder").click();
-  await page.getByRole("button", { name: "Move to Unsorted" }).click();
   const landed = tile(page, "renamed.mp4");
   await expect(landed).toBeVisible();
   await expect(landed.getByTestId("media-song")).toHaveText(
@@ -274,7 +320,9 @@ test("an interrupted chunk is retried from the server offset", async ({
   });
   expect(res.status()).toBe(200);
   release();
-  await expect(utile(page, "flaky.mp4")).toHaveAttribute("data-status", "done");
+  await expect(
+    section(page, "Unsorted").locator('[data-name="flaky.mp4"]'),
+  ).toBeVisible();
 });
 
 test("after a reload unfinished items say Re-add to finish; re-picking resumes", async ({

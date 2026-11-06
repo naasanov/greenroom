@@ -60,6 +60,25 @@ function put(
   });
 }
 
+test("a link created with N days expires at the end of the Nth day after the gig", async ({
+  testApi,
+}) => {
+  const seed = await testApi.seed("band");
+  const ava = await clientFor(testApi, USERS.ava.email);
+  await setupDrive(ava);
+  const gig = seed.gigs.upcomingClub;
+  const link = await (
+    await ava.post(`/bands/${BAND}/gigs/${gig.id}/upload-links`, {
+      data: { expiresInDaysAfterGig: 7 },
+    })
+  ).json();
+  const expected = new Date(`${gig.date}T00:00:00Z`);
+  expected.setUTCDate(expected.getUTCDate() + 7);
+  expect(new Date(link.expiresAt).toISOString().slice(0, 10)).toBe(
+    expected.toISOString().slice(0, 10),
+  );
+});
+
 test("admin creates, reuses, lists, and revokes a link", async ({
   testApi,
 }) => {

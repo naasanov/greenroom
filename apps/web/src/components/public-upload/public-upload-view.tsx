@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Ban,
   CheckCircle2,
   Clock,
   ImagePlus,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUploadLinkInfo } from "@greenroom/shared";
+import { bandInitials } from "@/components/app/band-switcher";
 import { Brand } from "@/components/onboarding/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,13 +115,14 @@ function Unavailable({ error }: { error: unknown }) {
       "We could not load this page. Please try again in a moment.",
     ],
   }[reason];
+  const Icon = reason === "revoked" ? Ban : Clock;
   return (
     <div
       data-testid="upload-link-unavailable"
       data-reason={reason}
       className="flex flex-col items-center gap-3 rounded-3xl border bg-card p-6 text-center shadow-soft"
     >
-      <Clock className="size-8 text-muted-foreground" />
+      <Icon className="size-8 text-muted-foreground" />
       <h1 className="text-xl font-semibold">{copy![0]}</h1>
       <p className="text-sm text-muted-foreground">{copy![1]}</p>
     </div>
@@ -326,7 +329,7 @@ function BandPhoto({ name, url }: { name: string; url: string | null }) {
   }
   return (
     <div className="flex size-20 items-center justify-center rounded-2xl bg-muted text-2xl font-semibold text-muted-foreground">
-      {name.trim().slice(0, 2).toUpperCase()}
+      {bandInitials(name)}
     </div>
   );
 }

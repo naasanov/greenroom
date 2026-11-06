@@ -27,6 +27,7 @@ export function CreateEventDrawer({
   onCreated,
   beside = false,
   registerClose,
+  registerGuard,
 }: {
   bandId: string;
   open: boolean;
@@ -39,11 +40,17 @@ export function CreateEventDrawer({
   beside?: boolean;
   /** Receives a function that closes the drawer, asking first when it has unsaved input. */
   registerClose?: (close: (() => void) | null) => void;
+  /**
+   * Receives a guard for replacing the drawer's contents. It returns false when
+   * clean; when dirty it asks to discard first and runs `proceed` on confirm.
+   */
+  registerGuard?: (guard: ((proceed: () => void) => boolean) | null) => void;
 }) {
   const createGig = useCreateGig(bandId);
   const createPractice = useCreatePractice(bandId);
   const [dirty, setDirty] = useState({ gig: false, practice: false });
   const [discardOpen, setDiscardOpen] = useState(false);
+  const afterDiscard = useRef<(() => void) | null>(null);
   const isDirty = dirty.gig || dirty.practice;
   const timeZone = localTimeZone();
 
@@ -67,6 +74,21 @@ export function CreateEventDrawer({
     registerClose(() => requestCloseRef.current());
     return () => registerClose(null);
   }, [open, registerClose]);
+
+  const guardRef = useRef<(proceed: () => void) => boolean>(() => false);
+  useEffect(() => {
+    guardRef.current = (proceed) => {
+      if (!isDirty) return false;
+      afterDiscard.current = proceed;
+      setDiscardOpen(true);
+      return true;
+    };
+  });
+  useEffect(() => {
+    if (!open || !registerGuard) return;
+    registerGuard((proceed) => guardRef.current(proceed));
+    return () => registerGuard(null);
+  }, [open, registerGuard]);
 
   function close() {
     setDirty({ gig: false, practice: false });
@@ -135,8 +157,16 @@ export function CreateEventDrawer({
       />
       <DiscardChangesDialog
         open={discardOpen}
-        onOpenChange={setDiscardOpen}
-        onDiscard={close}
+        onOpenChange={(next) => {
+          setDiscardOpen(next);
+          if (!next) afterDiscard.current = null;
+        }}
+        onDiscard={() => {
+          const proceed = afterDiscard.current;
+          afterDiscard.current = null;
+          close();
+          proceed?.();
+        }}
       />
     </>
   );

@@ -24,6 +24,7 @@ import {
 import {
   FormActions,
   FieldError,
+  NextDayNote,
   NATIVE_DATE_TIME_INPUT,
 } from "@/components/events/form-parts";
 
@@ -59,11 +60,11 @@ const gigFormSchema = z
         path: ["endTime"],
         message: "Add a start time first.",
       });
-    } else if (v.endTime && v.startTime && v.endTime < v.startTime) {
+    } else if (v.endTime && v.startTime && v.endTime === v.startTime) {
       ctx.addIssue({
         code: "custom",
         path: ["endTime"],
-        message: "End time must be after the start time",
+        message: "End time can't match the start time",
       });
     }
   });
@@ -156,6 +157,10 @@ export function GigForm({
 
   const id = (name: string) => `${idPrefix}-${name}`;
   const place: PlaceValue = useWatch({ control: form.control, name: "place" });
+  const watchedStart = useWatch({ control: form.control, name: "startTime" });
+  const watchedEnd = useWatch({ control: form.control, name: "endTime" });
+  const endsNextDay =
+    !!watchedStart && !!watchedEnd && watchedEnd < watchedStart;
 
   return (
     <form
@@ -215,7 +220,11 @@ export function GigForm({
             aria-invalid={!!errors.endTime}
             {...form.register("endTime")}
           />
-          <FieldError message={errors.endTime?.message} />
+          {errors.endTime ? (
+            <FieldError message={errors.endTime.message} />
+          ) : endsNextDay ? (
+            <NextDayNote />
+          ) : null}
         </FormField>
         <FormField
           label="Load-in time"

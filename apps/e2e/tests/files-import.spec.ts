@@ -116,7 +116,7 @@ test.describe("Drive import: gigs root step", () => {
     await picker.getByRole("button", { name: "Band stuff" }).click();
     const kept = (await driveStatus(ava)).gigsFolderId;
     expect(kept).toBeTruthy();
-    await picker.getByRole("button", { name: "Keep Gigs" }).click();
+    await picker.getByRole("button", { name: "Confirm" }).click();
     await expect(picker).toBeHidden();
     expect((await driveStatus(ava)).gigsFolderId).toBe(kept);
     await expect(page.getByTestId("settings-google-gigs-folder")).toContainText(

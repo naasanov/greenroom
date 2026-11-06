@@ -24,6 +24,7 @@ import {
   FieldError,
   FormActions,
   NativeSelect,
+  NextDayNote,
   NATIVE_DATE_TIME_INPUT,
 } from "@/components/events/form-parts";
 import {
@@ -33,7 +34,7 @@ import {
   shiftDate,
 } from "@/components/events/time";
 import {
-  WEEKDAY_INITIAL,
+  WEEKDAY_ABBR,
   WEEKDAY_ORDER,
   WEEKDAY_SHORT,
   nthWeekdayLabel,
@@ -61,12 +62,12 @@ const practiceFormSchema = practiceFieldsSchema.superRefine((v, ctx) => {
   if (
     localTimeSchema.safeParse(v.startTime).success &&
     localTimeSchema.safeParse(v.endTime).success &&
-    v.endTime <= v.startTime
+    v.endTime === v.startTime
   ) {
     ctx.addIssue({
       code: "custom",
       path: ["endTime"],
-      message: "End time must be after the start time",
+      message: "End time can't match the start time",
     });
   }
   if (v.freq === "weekly" && v.byWeekday.length === 0) {
@@ -227,6 +228,12 @@ export function PracticeForm({
     Number(useWatch({ control: form.control, name: "interval" })) || 1;
   const monthlyMode = useWatch({ control: form.control, name: "monthlyMode" });
   const endDate = useWatch({ control: form.control, name: "endDate" });
+  const watchedStart = useWatch({ control: form.control, name: "startTime" });
+  const watchedEnd = useWatch({ control: form.control, name: "endTime" });
+  const endsNextDay =
+    localTimeSchema.safeParse(watchedStart).success &&
+    localTimeSchema.safeParse(watchedEnd).success &&
+    watchedEnd < watchedStart;
   const endCount =
     Number(useWatch({ control: form.control, name: "endCount" })) || 1;
 
@@ -435,6 +442,8 @@ export function PracticeForm({
                   : "Pick a time."
               }
             />
+          ) : endsNextDay ? (
+            <NextDayNote />
           ) : null}
         </FormField>
       </div>
@@ -487,7 +496,7 @@ export function PracticeForm({
                             : "border-input text-muted-foreground hover:bg-muted",
                         )}
                       >
-                        {WEEKDAY_INITIAL[d]}
+                        {WEEKDAY_ABBR[d]}
                       </button>
                     );
                   })}

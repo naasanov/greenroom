@@ -30,14 +30,14 @@ export const WEEKDAY_SHORT: Record<Weekday, string> = {
   SU: "Sun",
 };
 
-export const WEEKDAY_INITIAL: Record<Weekday, string> = {
-  MO: "M",
-  TU: "T",
-  WE: "W",
-  TH: "T",
-  FR: "F",
-  SA: "S",
-  SU: "S",
+export const WEEKDAY_ABBR: Record<Weekday, string> = {
+  MO: "Mo",
+  TU: "Tu",
+  WE: "We",
+  TH: "Th",
+  FR: "Fr",
+  SA: "Sa",
+  SU: "Su",
 };
 
 const ORDINALS = ["first", "second", "third", "fourth", "last"];

@@ -409,8 +409,7 @@ export class UploadStore {
       void this.qc.invalidateQueries({
         queryKey: ["bands", entry.bandId, "song-media"],
       });
-      // Finished files stay in the tray until the user places them. Placed ones
-      // render in their gallery folder and are dismissed once the item lands.
+      // Finished files leave the tray once their item shows up in the gallery.
     } catch (e) {
       if (isAbortError(e) || this.cancelled.has(key)) {
         // Cancelled by the user; the entry is already gone.

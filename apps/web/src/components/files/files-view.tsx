@@ -52,6 +52,7 @@ import { FilesSkeleton } from "./files-skeleton";
 import { FileViewer } from "./file-viewer";
 import { entryHref, isProtected } from "./file-utils";
 import type { EntryActions } from "./item-menu";
+import { LinkGigDialog } from "./link-gig-dialog";
 import { LinkSongsDrawer } from "./link-songs-drawer";
 import { NameDialog, type NameDialogState } from "./name-dialog";
 import { useFilesUpload } from "./use-files-upload";
@@ -82,6 +83,8 @@ const VIEW_OPTIONS: SegmentedOption<FilesViewMode>[] = [
 ];
 
 const PROTECTED_HINT = "Delete the gig to remove its folder";
+const PROTECTED_ERROR =
+  "Gig folders, the gigs folder, and Profile photos can't be moved to trash.";
 
 function Toast({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   useEffect(() => {
@@ -128,6 +131,7 @@ export function FilesView({
   const [nameError, setNameError] = useState<string | null>(null);
   const [viewer, setViewer] = useState<FileEntry | null>(null);
   const [linkTarget, setLinkTarget] = useState<FileEntry | null>(null);
+  const [gigTarget, setGigTarget] = useState<FileEntry | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [trashTargets, setTrashTargets] = useState<FileEntry[]>([]);
   const [selecting, setSelecting] = useState(false);
@@ -178,6 +182,7 @@ export function FilesView({
       setLinkError(null);
       setLinkTarget(e);
     },
+    onLinkGig: setGigTarget,
     onTrash: (e) => setTrashTargets([e]),
   };
 
@@ -206,7 +211,7 @@ export function FilesView({
       onError: (e) =>
         setToast(
           isApiError(e, 409) && e.code === FILES_ERROR_CODES.gigFolderProtected
-            ? PROTECTED_HINT
+            ? PROTECTED_ERROR
             : "Could not move to trash.",
         ),
     });
@@ -500,6 +505,15 @@ export function FilesView({
         confirmLabel="Move to trash"
         destructive
         onConfirm={confirmTrash}
+      />
+      <LinkGigDialog
+        bandId={bandId}
+        entry={gigTarget}
+        onClose={() => setGigTarget(null)}
+        onLinked={(name) => {
+          setGigTarget(null);
+          setToast(`Linked "${name}" to the gig`);
+        }}
       />
       <LinkSongsDrawer
         bandId={bandId}

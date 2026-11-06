@@ -164,7 +164,7 @@ test("editing details swaps the block inline and saves", async ({ page }) => {
   await expect(section).toContainText("Bring the long cable");
 });
 
-test("an end time before the start time is rejected when editing", async ({
+test("an end time before the start time ends the next day when editing", async ({
   page,
 }) => {
   const gig = seed.gigs.upcomingClub;
@@ -172,15 +172,17 @@ test("an end time before the start time is rejected when editing", async ({
   const drawer = dialog(page, gig.title);
   await drawer.getByRole("button", { name: "Edit details" }).click();
   await drawer.getByLabel("Start time").fill("14:00");
-  await drawer.getByLabel("End time").fill("12:00");
+  await drawer.getByLabel("End time").fill("14:00");
   await drawer.getByRole("button", { name: "Save changes" }).click();
   await expect(
     drawer
       .getByRole("alert")
-      .filter({ hasText: "End time must be after the start time" }),
+      .filter({ hasText: "End time can't match the start time" }),
   ).toBeVisible();
-  await expect(drawer.getByLabel("Title")).toBeVisible();
+  await drawer.getByLabel("End time").fill("12:00");
+  await expect(drawer.getByTestId("ends-next-day")).toBeVisible();
   await drawer.getByLabel("End time").fill("16:00");
+  await expect(drawer.getByTestId("ends-next-day")).toHaveCount(0);
   await drawer.getByRole("button", { name: "Save changes" }).click();
   await expect(drawer.getByLabel("Title")).toHaveCount(0);
   await expect(drawer.getByTestId("details-section")).toContainText(
@@ -409,12 +411,16 @@ test("'All events' with an untouched date keeps the series start", async ({
   expect(after.dtstart.toISOString()).toBe(before.dtstart.toISOString());
 });
 
-test("an end time before the start blocks saving an edit", async ({ page }) => {
+test("an end time matching the start blocks saving an edit", async ({
+  page,
+}) => {
   const drawer = await openMovedPracticeEdit(page);
-  await drawer.getByLabel("End time").fill("18:00");
+  await drawer
+    .getByLabel("End time")
+    .fill(await drawer.getByLabel("Start time").inputValue());
   await drawer.getByRole("button", { name: "Save changes" }).click();
   await expect(
-    drawer.getByText("End time must be after the start time"),
+    drawer.getByText("End time can't match the start time"),
   ).toBeVisible();
   await expect(scopeDialog(page)).toHaveCount(0);
   await drawer.getByLabel("End time").fill("20:00");

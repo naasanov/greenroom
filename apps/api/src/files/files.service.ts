@@ -241,7 +241,7 @@ export class FilesService {
       );
   }
 
-  /** Trashes files and plain folders; gig folders, the gigs root, and anything holding them are protected. */
+  /** Trashes files and plain folders; gig folders, the gigs root, Profile photos, and anything holding them are protected. */
   async trash(bandId: string, ids: string[]): Promise<{ trashed: number }> {
     const ctx = await this.structure.requireContext(bandId);
     const memo: DriveLookupMemo = new Map();
@@ -274,17 +274,18 @@ export class FilesService {
   private gigFolderProtected() {
     return new ConflictException({
       code: FILES_ERROR_CODES.gigFolderProtected,
-      message: "Gig folders and the gigs root cannot be trashed here",
+      message:
+        "Gig folders, the gigs root, and Profile photos cannot be trashed here",
     });
   }
 
-  /** Drive ids of the gigs root and every non-deleted gig's folder. */
+  /** Drive ids of the gigs root, the Profile photos folder, and every non-deleted gig's folder. */
   private async protectedFolderIds(ctx: DriveContext): Promise<Set<string>> {
     const rows = await this.db
       .select({ folder: gigs.driveFolderId })
       .from(gigs)
       .where(and(eq(gigs.bandId, ctx.bandId), isNull(gigs.deletedAt)));
-    const out = new Set<string>([ctx.gigsFolderId]);
+    const out = new Set<string>([ctx.gigsFolderId, ctx.photosFolderId]);
     for (const r of rows) if (r.folder) out.add(r.folder);
     return out;
   }

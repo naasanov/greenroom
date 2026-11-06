@@ -193,6 +193,11 @@ export function DriveFolderPicker({
         className="z-[60] pointer-events-auto!"
         // Keeps a gig drawer underneath from treating picker clicks as outside clicks.
         onPointerDown={(e) => e.stopPropagation()}
+        // Focus lands on the dialog itself so the close button shows no ring on open.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
@@ -202,7 +207,7 @@ export function DriveFolderPicker({
           </DialogTitle>
           <DialogDescription>
             {gigsStep
-              ? "Pick the folder that holds your gig folders, or keep the default."
+              ? "Pick the folder that holds your gig folders."
               : "Gig photos and videos are kept in this folder."}
           </DialogDescription>
         </DialogHeader>
@@ -210,7 +215,6 @@ export function DriveFolderPicker({
           <GigsRootStep
             bandId={bandId}
             currentId={gigsStep.gigsFolderId}
-            skipLabel="Keep Gigs"
             onDone={finish}
           />
         ) : mode === "fake" ? (

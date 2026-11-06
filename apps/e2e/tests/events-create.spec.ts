@@ -31,26 +31,28 @@ test("gig form requires a title and a date", async ({ page }) => {
   await expect(pane.getByText("Pick a date.")).toBeVisible();
 });
 
-test("an end time before the start time blocks creating the gig", async ({
+test("a gig ending before it starts rolls to the next day with an indicator", async ({
   page,
 }) => {
   await page.goto("/events");
   await page.getByRole("button", { name: "Add event" }).click();
   const pane = await pickSide(page, "gig");
-  await pane.getByLabel("Title").fill("Backwards gig");
+  await pane.getByLabel("Title").fill("Late gig");
   await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
-  await pane.getByLabel("Start time").fill("14:00");
-  await pane.getByLabel("End time").fill("12:00");
+  await pane.getByLabel("Start time").fill("23:00");
+  await pane.getByLabel("End time").fill("23:00");
   await pane.getByRole("button", { name: "Create gig" }).click();
   await expect(
-    pane.getByText("End time must be after the start time"),
+    pane.getByText("End time can't match the start time"),
   ).toBeVisible();
-  await expect(page.getByTestId("split-viewport")).toBeVisible();
-  await pane.getByLabel("End time").fill("16:00");
+  await expect(pane.getByTestId("ends-next-day")).toHaveCount(0);
+  await pane.getByLabel("End time").fill("01:00");
+  await expect(pane.getByTestId("ends-next-day")).toBeVisible();
   await pane.getByRole("button", { name: "Create gig" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Backwards gig" }),
-  ).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Late gig" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Late gig" })).toContainText(
+    "11:00 PM - 1:00 AM",
+  );
 });
 
 test("clicking a day pre-fills the date", async ({ page }) => {
@@ -92,6 +94,34 @@ test("clicking the same empty day again closes the create drawer", async ({
   await expect(split).toBeVisible();
   const date = await second.getAttribute("data-date");
   const pane = await pickSide(page, "gig");
+  await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date!);
+});
+
+test("tapping another day with a dirty create form asks before discarding", async ({
+  page,
+}) => {
+  test.skip(page.viewportSize()!.width < 768, "desktop layout");
+  await page.goto("/events");
+  await expect(calendar(page).locator(".fc-event").first()).toBeVisible();
+  const empty = calendar(page).locator(
+    "td.fc-daygrid-day:not(:has(.fc-event))",
+  );
+  const pos = { position: { x: 10, y: 60 } };
+  const first = empty.first();
+  const second = empty.nth(1);
+  await first.click(pos);
+  let pane = await pickSide(page, "gig");
+  await pane.getByLabel("Title").fill("Keep me");
+  await second.click(pos);
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("Discard changes?");
+  await confirm.getByRole("button", { name: "Keep editing" }).click();
+  await expect(pane.getByLabel("Title")).toHaveValue("Keep me");
+  await second.click(pos);
+  await page.getByRole("button", { name: "Discard" }).click();
+  pane = await pickSide(page, "gig");
+  await expect(pane.getByLabel("Title")).toHaveValue("");
+  const date = await second.getAttribute("data-date");
   await expect(pane.getByLabel("Date", { exact: true })).toHaveValue(date!);
 });
 
@@ -155,21 +185,26 @@ test("a recurring practice shows a summary and creates its occurrences", async (
   await expect(eventIn(page, "Horn section")).toHaveCount(4);
 });
 
-test("a practice ending before it starts is blocked on create", async ({
+test("a practice ending before it starts rolls to the next day", async ({
   page,
 }) => {
   await page.goto("/events");
   await page.getByRole("button", { name: "Add event" }).click();
   const pane = await pickSide(page, "practice");
-  await pane.getByLabel("Title").fill("Backwards jam");
+  await pane.getByLabel("Title").fill("Late jam");
   await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
-  await pane.getByLabel("End time").fill("18:00");
+  await pane.getByLabel("Start time").fill("23:00");
+  await pane.getByLabel("End time").fill("23:00");
   await pane.getByRole("button", { name: "Create practice" }).click();
   await expect(
-    pane.getByText("End time must be after the start time"),
+    pane.getByText("End time can't match the start time"),
   ).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Backwards jam" })).toHaveCount(
-    0,
+  await pane.getByLabel("End time").fill("01:00");
+  await expect(pane.getByTestId("ends-next-day")).toBeVisible();
+  await pane.getByRole("button", { name: "Create practice" }).click();
+  await expect(page.getByRole("dialog", { name: "Late jam" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Late jam" })).toContainText(
+    "11:00 PM - 1:00 AM",
   );
 });
 

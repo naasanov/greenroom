@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { isApiError } from "@/lib/api";
 import { useFolderListing, useSetGigsFolder } from "@/lib/queries/drive-browse";
+import { useDriveStatus } from "@/lib/queries/google";
 
 const CREATE = "create";
 
@@ -28,10 +29,11 @@ export function GigsRootStep({
 }: {
   bandId: string;
   currentId: string | null;
-  skipLabel: string;
+  skipLabel?: string;
   onDone: () => void;
 }) {
   const root = useFolderListing(bandId, null);
+  const status = useDriveStatus(bandId, true);
   const setGigs = useSetGigsFolder(bandId);
   const [choice, setChoice] = useState<string>(currentId ?? CREATE);
   const [custom, setCustom] = useState<{ id: string; name: string } | null>(
@@ -40,7 +42,10 @@ export function GigsRootStep({
   const [browsing, setBrowsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const children = (root.data?.items ?? []).filter((i) => i.kind === "folder");
+  const photosId = status.data?.photosFolderId ?? null;
+  const children = (root.data?.items ?? []).filter(
+    (i) => i.kind === "folder" && i.id !== photosId,
+  );
   const nestedCurrent =
     !!currentId && !!root.data && !children.some((c) => c.id === currentId);
   const nested = useFolderListing(bandId, currentId, nestedCurrent);
@@ -71,7 +76,8 @@ export function GigsRootStep({
     );
   }
 
-  if (root.isPending) {
+  // Waits for fresh status so the Profile photos folder is never offered.
+  if (root.isPending || status.isPending || status.isFetching) {
     return (
       <p
         role="status"
@@ -120,9 +126,11 @@ export function GigsRootStep({
         </p>
       ) : null}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onDone}>
-          {skipLabel}
-        </Button>
+        {skipLabel ? (
+          <Button type="button" variant="outline" onClick={onDone}>
+            {skipLabel}
+          </Button>
+        ) : null}
         <Button type="button" disabled={setGigs.isPending} onClick={confirm}>
           Confirm
         </Button>

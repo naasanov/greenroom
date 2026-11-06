@@ -39,6 +39,7 @@ import {
   type UpdateBand,
 } from "@greenroom/shared";
 import { webUrl } from "../auth/auth.constants.js";
+import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 
@@ -71,6 +72,7 @@ export class BandsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly calendarSync: CalendarSyncQueue,
+    private readonly invites: CalendarInviteQueue,
   ) {}
 
   private async uniqueSlug(tx: Tx, name: string): Promise<string> {
@@ -277,6 +279,7 @@ export class BandsService {
         .where(eq(memberships.id, m.id));
     });
     await this.calendarSync.bandAcl(bandId);
+    await this.invites.band(bandId);
   }
 
   async leave(
@@ -287,7 +290,10 @@ export class BandsService {
     const bandDeleted = await this.db.transaction((tx) =>
       this.leaveInTx(tx, bandId, userId, deleteBand),
     );
-    if (!bandDeleted) await this.calendarSync.bandAcl(bandId);
+    if (!bandDeleted) {
+      await this.calendarSync.bandAcl(bandId);
+      await this.invites.band(bandId);
+    }
   }
 
   /** Leave or delete (sole member) inside the caller's transaction; true when the band was deleted. */
@@ -516,7 +522,10 @@ export class BandsService {
       if (existing) return toSummary(band, existing.role);
       return toSummary(band, "member");
     });
-    if (joined) await this.calendarSync.bandAcl(band.id);
+    if (joined) {
+      await this.calendarSync.bandAcl(band.id);
+      await this.invites.band(band.id);
+    }
     return summary;
   }
 
@@ -594,7 +603,10 @@ export class BandsService {
       joined = true;
       return toSummary(band, "member");
     });
-    if (joined) await this.calendarSync.bandAcl(band.id);
+    if (joined) {
+      await this.calendarSync.bandAcl(band.id);
+      await this.invites.band(band.id);
+    }
     return summary;
   }
 

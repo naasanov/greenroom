@@ -12,6 +12,15 @@ export function FieldError({ message }: { message?: string }) {
   );
 }
 
+/** Shown under an end time that falls at or before its start, meaning the next day. */
+export function NextDayNote() {
+  return (
+    <p data-testid="ends-next-day" className="text-sm text-muted-foreground">
+      Ends the next day
+    </p>
+  );
+}
+
 /**
  * Sticky action bar at the bottom of a drawer form, with an optional server error.
  * It reaches through the drawer body's bottom padding so it sits flush with the edge.

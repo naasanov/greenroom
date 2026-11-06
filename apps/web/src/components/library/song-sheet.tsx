@@ -132,7 +132,7 @@ function SongVideos({
   const media = useSongMedia(bandId, songId);
   const [viewerId, setViewerId] = useState<string | null>(null);
   const groups = media.data;
-  const { sections, flat } = useMemo(() => {
+  const { sections, flat, hasVideos } = useMemo(() => {
     const build = (pick: (i: MediaItem) => boolean) =>
       (groups ?? []).flatMap((g) => {
         const items = g.items.filter(pick);
@@ -145,15 +145,20 @@ function SongVideos({
     return {
       sections: [
         { key: "videos", label: null, groups: videos },
-        { key: "photos", label: "Photos", groups: photos },
+        {
+          key: "photos",
+          label: videos.length > 0 ? "Photos" : null,
+          groups: photos,
+        },
       ].filter((s) => s.groups.length > 0),
       flat: [...videos, ...photos].flatMap((g) => g.items),
+      hasVideos: videos.length > 0,
     };
   }, [groups]);
   if (flat.length === 0) return null;
   const viewerIndex = viewerId ? flat.findIndex((i) => i.id === viewerId) : -1;
   return (
-    <Section label="Videos">
+    <Section label={hasVideos ? "Videos" : "Photos"}>
       <div data-testid="song-videos" className="flex flex-col gap-3">
         {sections.map((sec) => (
           <div key={sec.key} className="flex flex-col gap-3">

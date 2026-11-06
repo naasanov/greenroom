@@ -44,6 +44,11 @@ export function FolderPickerDialog({
         className="z-[60] pointer-events-auto! max-h-[85dvh] overflow-y-auto"
         // Keeps drawers underneath from treating clicks here as outside clicks.
         onPointerDown={(e) => e.stopPropagation()}
+        // Focus lands on the dialog itself so the close button shows no ring on open.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
