@@ -172,6 +172,7 @@ test("a horizontal swipe pages the calendar and a vertical one does not", async 
 test("a month chip fills the width and most of the height of its day", async ({
   page,
 }) => {
+  test.skip(page.viewportSize()!.width < 640, "mobile chips are thin");
   const gig = seed.gigs.upcomingClub;
   await showGigDate(page, gig.id, gig.title);
   const cell = calendar(page).locator(`td[data-date="${gig.date}"]`);
