@@ -1,0 +1,50 @@
+name: Deploy prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref (branch, tag, or sha) to deploy
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Require green CI for this commit
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "Deploying $sha"
+          conclusion=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$sha&status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
+          if [ "$conclusion" -lt 1 ]; then
+            echo "No successful CI run found for $sha; refusing to deploy." >&2
+            exit 1
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy api
+        run: flyctl deploy . --config infra/fly/prod.api.toml --dockerfile apps/api/Dockerfile --remote-only
+      - name: Deploy web
+        run: flyctl deploy . --config infra/fly/prod.web.toml --dockerfile apps/web/Dockerfile --remote-only
+      - name: Check api health
+        run: |
+          sleep 10
+          curl -fsS https://api.greenroom.fyi/health | tee /dev/stderr | grep -q '"status":"ok"'

@@ -2,7 +2,7 @@
 
 Staging: web `https://staging.greenroom.fyi`, api `https://api.staging.greenroom.fyi`, region `iad`.
 Apps: `greenroom-staging-web`, `greenroom-staging-api`, `greenroom-staging-db` (self-run `postgres:17`, private network only).
-Prod is a copy: drop `staging-` from app names, use apex `greenroom.fyi` and `api.greenroom.fyi`, copy the tomls to `prod.*.toml`.
+Production (`greenroom.fyi`, `api.greenroom.fyi`) is a copy of this setup; see the [Production](#production) section at the end.
 
 All commands run from the repo root. On the Mac `fly` is `~/.fly/bin/fly`; on the remote factory (`FACTORY=1`) `fly` is on PATH but not logged in, so deploys there go through CI on push to `main`. Never print secrets.
 
@@ -131,3 +131,130 @@ fly secrets set STAGING_LOGIN_PASSCODE=<passcode> -a greenroom-staging-api
 ```
 
 The route exists only when `INTEGRATIONS_MODE=fake` and the secret is non-empty, both read at startup. Never set it on prod: prod runs real integrations, so the route never exists there. Wrong passcodes are limited to 10 per IP per 15 minutes.
+
+## Production
+
+Prod mirrors staging: web `https://greenroom.fyi` (apex), api `https://api.greenroom.fyi`, region `iad`, apps `greenroom-web`, `greenroom-api`, `greenroom-db`. Configs are `infra/fly/prod.{db,api,web}.toml`. Differences from staging: real integrations, session cookie `gr_session` with `COOKIE_DOMAIN=greenroom.fyi`, api `min_machines_running = 1` with 512MB (background pollers run every minute and must not be stopped), 14 day snapshots. Prod never sets `STAGING_LOGIN_PASSCODE`. Creating these resources and DNS needs explicit user approval.
+
+### P1. Create apps and volume
+
+```sh
+fly apps create greenroom-db  -o $ORG
+fly apps create greenroom-api -o $ORG
+fly apps create greenroom-web -o $ORG
+fly volumes create pgdata -a greenroom-db -r iad -s 1 -n 1 --yes
+```
+
+### P2. Database password and secrets
+
+```sh
+DB_PW=$(openssl rand -hex 24)
+security add-generic-password -a "$USER" -s GREENROOM_PROD_DB_PASSWORD -w "$DB_PW" -U
+printf 'POSTGRES_PASSWORD=%s\n' "$DB_PW" | fly secrets import --stage -a greenroom-db
+printf 'DATABASE_URL=postgres://greenroom:%s@greenroom-db.internal:5432/greenroom\n' "$DB_PW" \
+  | fly secrets import --stage -a greenroom-api
+unset DB_PW
+```
+
+API secrets (set with `fly secrets set --stage -a greenroom-api NAME=value`, or pipe `NAME=value` lines to `fly secrets import --stage`). Names come from `.env.example` and the api code.
+
+| Secret | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Set in P2. |
+| `OAUTH_TOKEN_KEY` | yes | `openssl rand -base64 32`; encrypts stored OAuth tokens. Losing it invalidates stored Google and Spotify links. Keep a copy in the Keychain. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | yes | Google OAuth web client (sign-in, Calendar, Drive). |
+| `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | yes | Spotify app credentials. |
+| `GOOGLE_PLACES_API_KEY` | yes | Venue search and photos. |
+| `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER` | yes for Drive folder picking | Without them the picker config returns nulls and the Drive picker cannot open. |
+| `CALENDAR_SA_KEY` | yes for calendar setup | Base64 one-line JSON key of `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` (see the staging note above). Without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. |
+| `YOUTUBE_API_KEY` | optional | Without it YouTube songs get no auto duration. |
+| `GITHUB_FEEDBACK_TOKEN` | optional | Fine-grained PAT, Issues write on `naasanov/greenroom`. Without it `POST /feedback` returns 503. |
+| `RESEND_API_KEY` | not used yet | No code reads it today; skip until email sending exists. |
+
+Non-secret values (`GITHUB_FEEDBACK_REPO` defaults to `naasanov/greenroom`) need no setting. No Sentry DSN variables exist in the code. Never set `STAGING_LOGIN_PASSCODE` on prod.
+
+### P3. First deploy: db, then api, then web
+
+```sh
+fly deploy -c infra/fly/prod.db.toml --ha=false --no-public-ips
+fly deploy . -c infra/fly/prod.api.toml --dockerfile apps/api/Dockerfile --remote-only --ha=false
+fly deploy . -c infra/fly/prod.web.toml --dockerfile apps/web/Dockerfile --remote-only --ha=false
+fly ips list -a greenroom-db   # must be empty
+```
+
+### P4. Certificates
+
+```sh
+fly certs add greenroom.fyi     -a greenroom-web
+fly certs add api.greenroom.fyi -a greenroom-api
+```
+
+### P5. Cloudflare DNS (DNS-only, grey cloud)
+
+Reuse the `CF` header and `ZONE_ID` from step 5. Run `fly ips list -a greenroom-web` and `fly certs show greenroom.fyi -a greenroom-web` for the exact targets. The apex cannot be a plain CNAME at most DNS hosts, but Cloudflare flattens a root CNAME, so either of these works (keep `proxied: false`):
+
+```sh
+# Option A: A + AAAA to the web app's Fly addresses (from fly ips list)
+curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  --data '{"type":"A","name":"@","content":"<web v4>","proxied":false,"ttl":1}' | jq '.success,.errors'
+curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  --data '{"type":"AAAA","name":"@","content":"<web v6>","proxied":false,"ttl":1}' | jq '.success,.errors'
+
+# Option B: flattened CNAME at the apex
+curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  --data '{"type":"CNAME","name":"@","content":"greenroom-web.fly.dev","proxied":false,"ttl":1}' | jq '.success,.errors'
+
+# api subdomain
+curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  --data '{"type":"CNAME","name":"api","content":"greenroom-api.fly.dev","proxied":false,"ttl":1}' | jq '.success,.errors'
+```
+
+Add any `_acme-challenge` CNAME that `fly certs add` prints. Then `fly certs check greenroom.fyi -a greenroom-web` and `fly certs check api.greenroom.fyi -a greenroom-api` until issued. Existing `staging` and `api.staging` records are unaffected.
+
+### P6. GitHub `production` environment and deploy token
+
+Create the environment in the repo settings (Settings, Environments, `production`) and add required reviewers so each prod deploy needs approval. Store the token as an environment secret named `FLY_API_TOKEN` (separate from the repo-level staging secret):
+
+```sh
+T_API=$(fly tokens create deploy -a greenroom-api -x 8760h | tail -n1)
+T_WEB=$(fly tokens create deploy -a greenroom-web -x 8760h | tail -n1)
+printf '%s,%s' "$T_API" "${T_WEB#FlyV1 }" | gh secret set FLY_API_TOKEN --env production --repo naasanov/greenroom
+unset T_API T_WEB
+```
+
+### P7. OAuth redirect URIs
+
+Add these exact URIs for prod (keep the staging ones):
+
+| Provider | Redirect URI |
+| --- | --- |
+| Google (sign-in) | `https://api.greenroom.fyi/auth/google/callback` |
+| Google (Calendar and Drive linking) | `https://api.greenroom.fyi/integrations/google/callback` |
+| Spotify | `https://api.greenroom.fyi/integrations/spotify/callback` |
+
+Also add `https://greenroom.fyi` as an authorized JavaScript origin for the Google client (Drive picker), and make sure the OAuth consent screen is published for external users.
+
+### P8. Deploy and verify
+
+```sh
+gh workflow run deploy-prod.yml -f ref=main
+gh run watch    # pick the deploy-prod run; approve the pending deployment in the GitHub UI if reviewers are required
+curl -s https://api.greenroom.fyi/health
+curl -s -o /dev/null -w "%{http_code}\n" https://greenroom.fyi/
+```
+
+`deploy-prod.yml` is manual only. It refuses to run unless the chosen commit has a successful CI run, deploys api then web, and fails if `/health` is not ok afterwards.
+
+### Rollback and backups
+
+```sh
+fly releases -a greenroom-api            # find the last good version / image
+fly releases -a greenroom-api --image    # shows image refs
+fly deploy -c infra/fly/prod.api.toml --image <registry.fly.io/greenroom-api:deployment-...>
+```
+
+Repeat for `greenroom-web`. Rolling the api back does not undo migrations, so keep migrations backward compatible. Backups: daily Fly volume snapshots kept 14 days (`fly volumes snapshots list <vol-id> -a greenroom-db`), restored by creating a new volume from a snapshot. Take a `pg_dump` before risky migrations: `fly proxy 5433:5432 -a greenroom-db`.
