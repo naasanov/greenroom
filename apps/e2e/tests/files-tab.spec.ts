@@ -119,7 +119,9 @@ test("breadcrumbs follow entering and leaving folders", async ({ page }) => {
   await expect(crumbs.locator('[aria-current="page"]:visible')).toHaveText(
     "Old Takes",
   );
-  await expect(page.getByText("This folder is empty")).toBeVisible();
+  await expect(
+    page.getByText("This folder is empty").filter({ visible: true }),
+  ).toBeVisible();
   await page.goBack();
   await expect(crumbs.locator('[aria-current="page"]:visible')).toHaveText(
     "Rehearsal Notes",
