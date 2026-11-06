@@ -87,7 +87,7 @@ Parallel group 7A
 - **7.2 Public gig calendar.** Public fields only, per-gig toggle, list/calendar views, band profile header. Status: Done (no migration needed, columns pre-existed; admin link in Settings, public page at /c/<token>, GET /public/calendar/:token)
 - **7.3 Feedback widget.** Posts to backend, which opens GitHub issues. Status: Done (POST /feedback with GitHub adapter and fake, header widget, e2e specs; needs `GITHUB_FEEDBACK_TOKEN` in real mode)
 
-🛑 **GATE 5: Stage mode + public page review.** Status: Awaiting review (2026-10-30, CI green, staging deploying. Try: Stage mode button on a gig with a setlist (tap to advance, swipe back, offline after one online load), Band settings public gig calendar link with Copy and Reset plus band profile, per-gig Show on public calendar toggle and the public page at /c/<token>, and the feedback icon in the header (needs GITHUB_FEEDBACK_TOKEN))
+🛑 **GATE 5: Stage mode + public page review.** Status: Approved (2026-11-06). Prior notes: Awaiting review (2026-10-30, CI green, staging deploying. Try: Stage mode button on a gig with a setlist (tap to advance, swipe back, offline after one online load), Band settings public gig calendar link with Copy and Reset plus band profile, per-gig Show on public calendar toggle and the public page at /c/<token>, and the feedback icon in the header (needs GITHUB_FEEDBACK_TOKEN))
 
 # Phase 8: Validation
 - **8.1 Full automated suite green** on staging. Status: Not started
@@ -102,7 +102,7 @@ Parallel group 7A
 - **9.3 Import flow + link-folder-to-gig UI.** Status: Done (2026-11-04)
 - **9.4 Uploads into any folder.** Status: Done (2026-11-04)
 - **9.5 Song links UI (Files tab + song detail Files section).** Status: Done (2026-11-04)
-- **9.6 E2E specs + docs.** Status: Not started
+- **9.6 E2E specs + docs.** Status: Done (api-files, api-files-uploads, files-tab, files-import, account-delete, setlist-mobile-polish specs; README documents the routes)
 
 # Open questions
 - (Resolved 2026-10-27) Member photos: set per band, stored in each band's Profile photos folder.
