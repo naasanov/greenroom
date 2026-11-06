@@ -1,4 +1,4 @@
-# Prod copy: rename app to greenroom-api and change the hostnames in the README.
+# Prod copy: see prod.api.toml (app greenroom-fyi-api).
 app = "greenroom-staging-api"
 primary_region = "iad"
 

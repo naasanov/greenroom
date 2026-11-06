@@ -1,4 +1,4 @@
-app = "greenroom-api"
+app = "greenroom-fyi-api"
 primary_region = "iad"
 
 [build]

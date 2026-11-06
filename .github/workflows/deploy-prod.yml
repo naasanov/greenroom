@@ -21,7 +21,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    environment: production
+    environment:
+      name: production
+      url: https://greenroom.fyi
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       GH_TOKEN: ${{ github.token }}

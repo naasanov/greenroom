@@ -134,13 +134,13 @@ The route exists only when `INTEGRATIONS_MODE=fake` and the secret is non-empty,
 
 ## Production
 
-Prod mirrors staging: web `https://greenroom.fyi` (apex), api `https://api.greenroom.fyi`, region `iad`, apps `greenroom-web`, `greenroom-api`, `greenroom-db`. Configs are `infra/fly/prod.{db,api,web}.toml`. Differences from staging: real integrations, session cookie `gr_session` with `COOKIE_DOMAIN=greenroom.fyi`, api `min_machines_running = 1` with 512MB (background pollers run every minute and must not be stopped), 14 day snapshots. Prod never sets `STAGING_LOGIN_PASSCODE`. Creating these resources and DNS needs explicit user approval.
+Prod mirrors staging: web `https://greenroom.fyi` (apex), api `https://api.greenroom.fyi`, region `iad`, apps `greenroom-web`, `greenroom-fyi-api`, `greenroom-db`. Configs are `infra/fly/prod.{db,api,web}.toml`. Differences from staging: real integrations, session cookie `gr_session` with `COOKIE_DOMAIN=greenroom.fyi`, api `min_machines_running = 1` with 512MB (background pollers run every minute and must not be stopped), 14 day snapshots. Prod never sets `STAGING_LOGIN_PASSCODE`. Creating these resources and DNS needs explicit user approval.
 
 ### P1. Create apps and volume
 
 ```sh
 fly apps create greenroom-db  -o $ORG
-fly apps create greenroom-api -o $ORG
+fly apps create greenroom-fyi-api -o $ORG
 fly apps create greenroom-web -o $ORG
 fly volumes create pgdata -a greenroom-db -r iad -s 1 -n 1 --yes
 ```
@@ -152,11 +152,11 @@ DB_PW=$(openssl rand -hex 24)
 security add-generic-password -a "$USER" -s GREENROOM_PROD_DB_PASSWORD -w "$DB_PW" -U
 printf 'POSTGRES_PASSWORD=%s\n' "$DB_PW" | fly secrets import --stage -a greenroom-db
 printf 'DATABASE_URL=postgres://greenroom:%s@greenroom-db.internal:5432/greenroom\n' "$DB_PW" \
-  | fly secrets import --stage -a greenroom-api
+  | fly secrets import --stage -a greenroom-fyi-api
 unset DB_PW
 ```
 
-API secrets (set with `fly secrets set --stage -a greenroom-api NAME=value`, or pipe `NAME=value` lines to `fly secrets import --stage`). Names come from `.env.example` and the api code.
+API secrets (set with `fly secrets set --stage -a greenroom-fyi-api NAME=value`, or pipe `NAME=value` lines to `fly secrets import --stage`). Names come from `.env.example` and the api code.
 
 | Secret | Required | Notes |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ fly ips list -a greenroom-db   # must be empty
 
 ```sh
 fly certs add greenroom.fyi     -a greenroom-web
-fly certs add api.greenroom.fyi -a greenroom-api
+fly certs add api.greenroom.fyi -a greenroom-fyi-api
 ```
 
 ### P5. Cloudflare DNS (DNS-only, grey cloud)
@@ -211,17 +211,17 @@ curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
 # api subdomain
 curl -s -X POST -H "$CF" -H "Content-Type: application/json" \
   "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-  --data '{"type":"CNAME","name":"api","content":"greenroom-api.fly.dev","proxied":false,"ttl":1}' | jq '.success,.errors'
+  --data '{"type":"CNAME","name":"api","content":"greenroom-fyi-api.fly.dev","proxied":false,"ttl":1}' | jq '.success,.errors'
 ```
 
-Add any `_acme-challenge` CNAME that `fly certs add` prints. Then `fly certs check greenroom.fyi -a greenroom-web` and `fly certs check api.greenroom.fyi -a greenroom-api` until issued. Existing `staging` and `api.staging` records are unaffected.
+Add any `_acme-challenge` CNAME that `fly certs add` prints. Then `fly certs check greenroom.fyi -a greenroom-web` and `fly certs check api.greenroom.fyi -a greenroom-fyi-api` until issued. Existing `staging` and `api.staging` records are unaffected.
 
 ### P6. GitHub `production` environment and deploy token
 
 Create the environment in the repo settings (Settings, Environments, `production`) and add required reviewers so each prod deploy needs approval. Store the token as an environment secret named `FLY_API_TOKEN` (separate from the repo-level staging secret):
 
 ```sh
-T_API=$(fly tokens create deploy -a greenroom-api -x 8760h | tail -n1)
+T_API=$(fly tokens create deploy -a greenroom-fyi-api -x 8760h | tail -n1)
 T_WEB=$(fly tokens create deploy -a greenroom-web -x 8760h | tail -n1)
 printf '%s,%s' "$T_API" "${T_WEB#FlyV1 }" | gh secret set FLY_API_TOKEN --env production --repo naasanov/greenroom
 unset T_API T_WEB
@@ -253,9 +253,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://greenroom.fyi/
 ### Rollback and backups
 
 ```sh
-fly releases -a greenroom-api            # find the last good version / image
-fly releases -a greenroom-api --image    # shows image refs
-fly deploy -c infra/fly/prod.api.toml --image <registry.fly.io/greenroom-api:deployment-...>
+fly releases -a greenroom-fyi-api            # find the last good version / image
+fly releases -a greenroom-fyi-api --image    # shows image refs
+fly deploy -c infra/fly/prod.api.toml --image <registry.fly.io/greenroom-fyi-api:deployment-...>
 ```
 
 Repeat for `greenroom-web`. Rolling the api back does not undo migrations, so keep migrations backward compatible. Backups: daily Fly volume snapshots kept 14 days (`fly volumes snapshots list <vol-id> -a greenroom-db`), restored by creating a new volume from a snapshot. Take a `pg_dump` before risky migrations: `fly proxy 5433:5432 -a greenroom-db`.
