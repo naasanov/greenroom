@@ -28,3 +28,10 @@
     animation: none;
   }
 }
+
+/* The harness holding the selected chip rises above its siblings so the ring
+   is not covered by the neighbouring event. */
+.gr-cal .fc .fc-daygrid-event-harness:has(> .fc-event.gr-selected) {
+  position: relative;
+  z-index: 4;
+}
