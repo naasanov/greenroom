@@ -297,6 +297,27 @@
   }
 }
 
+/* At every width the chip ancestors are width-bound and clip, so a long title
+   ellipsizes inside its day cell instead of bleeding into the next one. */
+.gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness {
+  min-width: 0;
+  max-width: 100%;
+}
+.gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness > .fc-event {
+  min-width: 0;
+  overflow: hidden;
+}
+.gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness .fc-event-main {
+  min-width: 0;
+  overflow: hidden;
+}
+.gr-cal .fc .fc-dayGridMonth-view .fc-daygrid-event-harness .gr-chip,
+.gr-cal .fc .fc-dayGridMonth-view .gr-chip-head {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 /* From 640px up, month chips fill the day cell and split its height evenly.
    Below that they keep FullCalendar's natural-height single-row layout. */
 @media (min-width: 640px) {

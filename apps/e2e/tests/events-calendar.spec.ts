@@ -225,3 +225,21 @@ test("Month to Week keeps the paged-to month instead of snapping to today", asyn
   ).toBeVisible();
   await expect(calendar(page).locator(".fc-day-today")).toHaveCount(0);
 });
+
+test("month chips stay inside their day cell and clip long titles", async ({
+  page,
+}) => {
+  await page.goto("/events");
+  const chips = calendar(page).locator(".fc-dayGridMonth-view .fc-event");
+  await expect(chips.first()).toBeVisible();
+  const bad = await chips.evaluateAll((els) =>
+    els.flatMap((el) => {
+      const cell = el.closest("td.fc-daygrid-day")!.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const inside = r.left >= cell.left - 0.5 && r.right <= cell.right + 0.5;
+      const clipped = el.scrollWidth <= el.clientWidth;
+      return inside && clipped ? [] : [el.textContent];
+    }),
+  );
+  expect(bad).toEqual([]);
+});
