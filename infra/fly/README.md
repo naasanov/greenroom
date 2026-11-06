@@ -169,7 +169,8 @@ API secrets (set with `fly secrets set --stage -a greenroom-api NAME=value`, or 
 | `CALENDAR_SA_KEY` | yes for calendar setup | Base64 one-line JSON key of `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` (see the staging note above). Without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. |
 | `YOUTUBE_API_KEY` | optional | Without it YouTube songs get no auto duration. |
 | `GITHUB_FEEDBACK_TOKEN` | optional | Fine-grained PAT, Issues write on `naasanov/greenroom`. Without it `POST /feedback` returns 503. |
-| `RESEND_API_KEY` | not used yet | No code reads it today; skip until email sending exists. |
+| `RESEND_API_KEY` | required for sign-in in real mode | Resend key with Sending access on `greenroom.fyi`. Without it magic-link sign-in fails. |
+| `EMAIL_FROM` | optional | From address for magic-link emails; default `Greenroom <login@greenroom.fyi>`. Must be on the verified `greenroom.fyi` domain. |
 
 Non-secret values (`GITHUB_FEEDBACK_REPO` defaults to `naasanov/greenroom`) need no setting. No Sentry DSN variables exist in the code. Never set `STAGING_LOGIN_PASSCODE` on prod.
 

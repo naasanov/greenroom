@@ -18,7 +18,6 @@ import {
   FAKE_DRIVE_ROOT_ID,
   FakeIntegrationsRegistry,
   IntegrationsModule,
-  NotImplementedError,
   type EmailAdapter,
   type GithubAdapter,
   type GoogleCalendarAdapter,
@@ -371,12 +370,58 @@ async function main(): Promise<void> {
   assert.equal(reg.email.sentMagicLinks().length, 0);
   assert.equal(reg.googleDrive.allFiles().length, 1);
 
-  // real stubs throw
-  const { RealEmailAdapter } = await import("../index.js");
-  await assert.rejects(
-    new RealEmailAdapter().sendMagicLink(),
-    NotImplementedError,
-  );
+  // real email adapter: offline checks against a stubbed fetch
+  const { RealEmailAdapter, EmailNotConfiguredError } =
+    await import("../index.js");
+  const savedKey = process.env.RESEND_API_KEY;
+  const savedFetch = globalThis.fetch;
+  try {
+    delete process.env.RESEND_API_KEY;
+    await assert.rejects(
+      new RealEmailAdapter().sendMagicLink({
+        to: "a@x.test",
+        link: "http://x",
+      }),
+      EmailNotConfiguredError,
+    );
+    process.env.RESEND_API_KEY = "re_smoke_key";
+    let seen: {
+      url: string;
+      auth: string;
+      body: Record<string, unknown>;
+    } | null = null;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      seen = {
+        url,
+        auth: (init.headers as Record<string, string>).Authorization ?? "",
+        body: JSON.parse(init.body as string) as Record<string, unknown>,
+      };
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch;
+    await new RealEmailAdapter().sendMagicLink({
+      to: "a@x.test",
+      link: "http://x/m/1",
+    });
+    assert.equal(seen!.url, "https://api.resend.com/emails");
+    assert.equal(seen!.auth, "Bearer re_smoke_key");
+    assert.deepEqual(seen!.body.to, ["a@x.test"]);
+    assert.match(String(seen!.body.text), /http:\/\/x\/m\/1/);
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ message: "domain not verified" }), {
+        status: 403,
+      })) as typeof fetch;
+    await assert.rejects(
+      new RealEmailAdapter().sendMagicLink({
+        to: "a@x.test",
+        link: "http://x",
+      }),
+      (e: Error) => /403/.test(e.message) && !e.message.includes("re_smoke"),
+    );
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (savedKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = savedKey;
+  }
 
   await app.close();
   console.log("integrations smoke: ok");

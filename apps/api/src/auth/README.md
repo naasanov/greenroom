@@ -16,6 +16,7 @@ list(@CurrentUser() user: User) {}        // user = { id, email, displayName, av
 - Session: opaque token in an httpOnly cookie (`SESSION_COOKIE_NAME`, `COOKIE_DOMAIN`), SHA-256 hash in `sessions`, 30 days, sliding.
 - `redirectTo` values go through `safeRedirect` (same-site relative paths only).
 - Endpoints: `POST /auth/magic-link`, `POST /auth/magic-link/verify`, `GET /auth/google/start`, `GET /auth/google/callback`, `GET|PATCH /auth/me` (PATCH also sets the optional `calendarEmail`; `AuthService.inviteEmailFor(user)` returns the address calendar invites use), `POST /auth/logout`. Account deletion lives in `src/account/README.md`.
+- Magic-link email: `RealEmailAdapter` posts to Resend (`RESEND_API_KEY`, required in real mode; optional `EMAIL_FROM`, default `Greenroom <login@greenroom.fyi>`). Links expire after `MAGIC_LINK_TTL_MS` (15 min). Missing key or a non-2xx from Resend makes `POST /auth/magic-link` fail with 500.
 - Env: `WEB_URL`, `WEB_ORIGIN` (CORS, comma-separated), `API_PUBLIC_URL` (Google redirect URI).
 - E2E: `testApi.loginAs(email)` logs a browser context in; see `apps/e2e/README.md`.
 
