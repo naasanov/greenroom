@@ -79,7 +79,7 @@ function GigsFolderLine({
       <span className="min-w-0 break-words text-sm text-muted-foreground">
         Gigs folder: {listing.data ? listing.data.folder.name : "..."}
       </span>
-      <Button variant="outline" size="sm" onClick={() => setChanging(true)}>
+      <Button variant="ghost" size="sm" onClick={() => setChanging(true)}>
         Change
       </Button>
       <GigsRootDialog
