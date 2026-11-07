@@ -331,7 +331,7 @@ export function FilesView({
   return (
     <div
       data-testid="files-tab"
-      className="pb-28"
+      className="pb-44 md:pb-28"
       onDragOver={(e) => {
         const target = dropFolder(e);
         if (target === null) return;
