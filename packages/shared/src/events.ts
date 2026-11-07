@@ -312,6 +312,8 @@ export interface PracticeEvent {
   recurring: boolean;
   /** True when this occurrence has an override row (moved or edited). */
   modified: boolean;
+  /** Only true in lists that opt in with `includeCancelled`. */
+  cancelled?: boolean;
 }
 
 export type CalendarEvent = GigEvent | PracticeEvent;
@@ -320,6 +322,11 @@ export const listEventsQuerySchema = z.object({
   from: instantSchema,
   to: instantSchema,
   type: z.enum(EVENT_TYPES).optional(),
+  /** "true" also returns cancelled practice occurrences, flagged `cancelled`. */
+  includeCancelled: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
 });
 export type ListEventsQuery = z.infer<typeof listEventsQuerySchema>;
 

@@ -8,7 +8,8 @@ const MAC_HEX = 20;
 export const replyDomain = (): string =>
   process.env.EMAIL_REPLY_DOMAIN || "greenroom.fyi";
 
-function secret(): string {
+/** Server secret shared by the reply token and the signed RSVP links. */
+export function inviteSecret(): string {
   const s = process.env.INVITE_TOKEN_SECRET || process.env.OAUTH_TOKEN_KEY;
   if (s) return s;
   if (process.env.NODE_ENV === "production") {
@@ -18,7 +19,7 @@ function secret(): string {
 }
 
 const mac = (payload: string): string =>
-  createHmac("sha256", `calendar-invite-reply:${secret()}`)
+  createHmac("sha256", `calendar-invite-reply:${inviteSecret()}`)
     .update(payload)
     .digest("hex")
     .slice(0, MAC_HEX);
@@ -54,7 +55,7 @@ export const replyAddress = (kind: InviteKind, eventId: string): string =>
 
 /** Token from a reply address, or null when it is not an rsvp+ address on the reply domain. */
 export function tokenFromAddress(address: string): string | null {
-  const m = /^rsvp\+([0-9a-f]+)@(.+)$/i.exec(address.trim());
+  const m = /^rsvp\+([gp][0-9a-f]+)@(.+)$/i.exec(address.trim());
   return m && m[2]!.toLowerCase() === replyDomain().toLowerCase()
     ? m[1]!
     : null;

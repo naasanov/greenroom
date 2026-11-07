@@ -97,8 +97,12 @@ function SearchBox({
 /** Where the library drawer goes when there is no room beside the event drawer. */
 const OVERLAY_CLASS = "right-0 w-full";
 
-/** Beside the event drawer: bottom-aligned and tall even when the drawer is short. */
-const SIDE_CLASS = "inset-y-auto bottom-0 h-[min(34rem,85dvh)]";
+/**
+ * Beside the event drawer: bottom-aligned and tall even when the drawer is short.
+ * Narrows to fit the room left of the drawer when the agenda sheet is open.
+ */
+const SIDE_CLASS =
+  "inset-y-auto bottom-0 h-[min(34rem,85dvh)] w-[clamp(15rem,calc(100vw-1038px),20rem)]";
 
 const asideClass = (mode: SetlistBuilder["mode"]) =>
   mode === "overlay" ? OVERLAY_CLASS : mode === "side" ? SIDE_CLASS : undefined;

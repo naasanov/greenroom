@@ -125,17 +125,20 @@ function AgendaCard({
   const Icon = style.icon;
   const time = cardTime(event);
   const venue = event.type === "gig" ? event.venueName : null;
+  const cancelled = event.type === "practice" && event.cancelled === true;
   return (
     <button
       type="button"
       data-testid="agenda-card"
       data-agenda-card={past ? "past" : "upcoming"}
       data-event-type={event.type}
+      data-cancelled={cancelled || undefined}
       onClick={() => onSelect(event)}
       className={cn(
         "flex w-full shrink-0 items-start gap-3 rounded-2xl border border-l-4 bg-card p-3 text-left shadow-soft outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-muted",
         style.border,
         past && "opacity-75",
+        cancelled && "opacity-60",
       )}
     >
       <span
@@ -148,7 +151,12 @@ function AgendaCard({
         <Icon className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-semibold">
+        <span
+          className={cn(
+            "block truncate text-base font-semibold",
+            cancelled && "line-through",
+          )}
+        >
           {event.title}
         </span>
         <span className="block text-sm text-muted-foreground">
@@ -172,7 +180,7 @@ function AgendaCard({
           style.soft,
         )}
       >
-        {style.label}
+        {cancelled ? "Cancelled" : style.label}
       </span>
     </button>
   );

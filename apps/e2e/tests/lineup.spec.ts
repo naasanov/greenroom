@@ -93,7 +93,7 @@ test("tapping roster rows adds and removes people with check marks", async ({
 
 test("a member can be dragged into the lineup", async ({ page, isMobile }) => {
   test.skip(isMobile, "Drag from the roster is desktop only");
-  // Roster drag needs the side layout, which requires a viewport of 1300px or more.
+  // Roster drag needs the side layout, which requires a viewport of 1280px or more.
   await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await openRoster(page);
@@ -132,7 +132,7 @@ test("opening the setlist library closes the roster drawer", async ({
     isMobile,
     "The stacked phone drawer covers the Edit setlist button",
   );
-  // Below 1300px the roster overlays the gig drawer and covers the Edit setlist button.
+  // Below 960px the roster overlays the gig drawer and covers the Edit setlist button.
   await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await openRoster(page);

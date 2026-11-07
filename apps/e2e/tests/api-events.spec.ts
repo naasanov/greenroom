@@ -594,7 +594,10 @@ test("practice: edit this moves one occurrence, cancel excludes it", async ({
     "20261027T230000Z",
     "20261111T000000Z",
   ]);
-  expect((await api.get(occPath(bandId, s.id, key))).status()).toBe(404);
+  // A cancelled occurrence stays readable and is flagged as cancelled.
+  const cancelled = await api.get(occPath(bandId, s.id, key));
+  expect(cancelled.status()).toBe(200);
+  expect(await cancelled.json()).toMatchObject({ cancelled: true });
   // Cancelling again is idempotent.
   expect(
     (await api.delete(`${occPath(bandId, s.id, key)}?scope=this`)).status(),
@@ -930,7 +933,8 @@ test("rsvp scope: this, this_and_following and all touch only the caller's rows"
     Promise.all(
       keys.map(async (_, i) => {
         const res = await a.api.get(path(i));
-        return res.ok() ? (await res.json()).myRsvp : null;
+        const body = res.ok() ? await res.json() : null;
+        return body && !body.cancelled ? body.myRsvp : null;
       }),
     );
   const put = (i: number, data: Json) => a.api.put(`${path(i)}/rsvp`, { data });

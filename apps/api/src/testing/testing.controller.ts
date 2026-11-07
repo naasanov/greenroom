@@ -21,6 +21,7 @@ import { Public } from "../auth/decorators.js";
 import { AuthService } from "../auth/auth.service.js";
 import { SessionService } from "../auth/session.service.js";
 import { sessionCookieName } from "../auth/auth.constants.js";
+import { CalendarInviteInboundService } from "../calendar-invites/calendar-invite-inbound.service.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
@@ -52,6 +53,7 @@ export class TestingController {
     private readonly driveCache: DriveAncestryCache,
     private readonly invites: CalendarInviteService,
     private readonly inviteQueue: CalendarInviteQueue,
+    private readonly inbound: CalendarInviteInboundService,
   ) {}
 
   @Post("reset")
@@ -109,6 +111,58 @@ export class TestingController {
   ): Promise<{ ok: true }> {
     await this.invites.flush(body?.bandId);
     return { ok: true };
+  }
+
+  /** Stores an inbound message that a signed webhook post can then fetch by id. */
+  @Post("email/inbound")
+  @HttpCode(200)
+  addInbound(
+    @Body()
+    body: {
+      emailId?: unknown;
+      from?: unknown;
+      recipients?: unknown;
+      calendars?: unknown;
+      authFailed?: unknown;
+    },
+  ): { ok: true } {
+    if (
+      typeof body?.emailId !== "string" ||
+      typeof body.from !== "string" ||
+      !Array.isArray(body.recipients) ||
+      !Array.isArray(body.calendars)
+    ) {
+      throw new BadRequestException("emailId, from, recipients, calendars");
+    }
+    this.registry.email.addReceivedEmail(body.emailId, {
+      from: body.from,
+      recipients: body.recipients.map(String),
+      calendars: body.calendars.map(String),
+      authFailed: body.authFailed === true,
+    });
+    return { ok: true };
+  }
+
+  /** Runs a parsed inbound reply through the handler, skipping the webhook signature. */
+  @Post("calendar-invites/reply")
+  @HttpCode(200)
+  async calendarInviteReply(
+    @Body() body: { from?: unknown; to?: unknown; ics?: unknown },
+  ): Promise<{ outcome: string }> {
+    if (
+      typeof body?.from !== "string" ||
+      typeof body.to !== "string" ||
+      typeof body.ics !== "string"
+    ) {
+      throw new BadRequestException("from, to and ics are required");
+    }
+    const outcome = await this.inbound.handleReply({
+      from: body.from,
+      recipients: [body.to],
+      calendars: [body.ics],
+      authFailed: false,
+    });
+    return { outcome };
   }
 
   /** Turns a user's calendar invites on or off (the later UI does this through settings). */

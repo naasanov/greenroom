@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  ListMusic,
-  Music,
-  Plus,
-  Search,
-  Upload,
-  X,
-} from "lucide-react";
+import { ListMusic, Music, Plus, Search, Upload, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongSort } from "@greenroom/shared";
@@ -25,11 +18,7 @@ import { ExportDialog, useExportReturn } from "./export-dialog";
 import { ImportDialog } from "./import-dialog";
 import { SortMenu } from "./sort-menu";
 import { SongSheet, type SheetTarget } from "./song-sheet";
-import {
-  formatDuration,
-  loadSort,
-  songArt,
-} from "./song-utils";
+import { formatDuration, loadSort, songArt } from "./song-utils";
 import { useDebounced } from "./use-debounced";
 
 const SONG_PATH = /^\/songs\/([^/]+)\/?$/;

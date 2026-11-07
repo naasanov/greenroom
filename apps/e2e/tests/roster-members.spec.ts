@@ -307,3 +307,20 @@ test("invite page offers to claim a roster-only member", async ({
   await expect(page.getByTestId("member-card")).toHaveCount(5);
   await expect(page.getByText("Not on Greenroom")).toHaveCount(0);
 });
+
+test("an empty name keeps the field and its error in view", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/roster");
+  await page.getByRole("button", { name: "Add to roster" }).click();
+  await page.getByTestId("fab-action-add-manually").click();
+  const drawer = page.getByRole("dialog", { name: "Add member" });
+  await drawer.getByRole("button", { name: "Add to roster" }).click();
+  await expect(drawer.getByText("Enter a name.")).toBeInViewport();
+  await expect(drawer.getByLabel("Name")).toBeInViewport();
+  await expect(drawer.getByLabel("Name")).toBeFocused();
+});

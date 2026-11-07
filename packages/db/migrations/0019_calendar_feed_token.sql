@@ -1,0 +1,2 @@
+ALTER TABLE "memberships" ADD COLUMN "calendar_feed_token" text DEFAULT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '') NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "memberships_calendar_feed_token_idx" ON "memberships" USING btree ("calendar_feed_token");

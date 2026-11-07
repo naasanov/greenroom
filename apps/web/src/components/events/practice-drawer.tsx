@@ -121,7 +121,7 @@ function PracticeDetails({
           <h3 id="details-heading" className="text-base font-semibold">
             Details
           </h3>
-          {editing ? null : (
+          {editing || occ.cancelled ? null : (
             <Button
               type="button"
               variant="ghost"
@@ -134,6 +134,15 @@ function PracticeDetails({
             </Button>
           )}
         </div>
+        {occ.cancelled ? (
+          <p
+            role="status"
+            data-testid="practice-cancelled"
+            className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
+          >
+            This practice is cancelled.
+          </p>
+        ) : null}
         {editing ? (
           editForm
         ) : (
@@ -179,61 +188,69 @@ function PracticeDetails({
         )}
       </section>
 
-      <section aria-label="Your RSVP" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Your RSVP</h3>
-        <SegmentedToggle<RsvpChoice>
-          label="Your RSVP"
-          fullWidth
-          value={(occ.myRsvp === "no_response" ? "" : occ.myRsvp) as RsvpChoice}
-          onValueChange={(status) =>
-            occ.recurring
-              ? setPendingRsvp(status)
-              : rsvp.mutate({ status, scope: "this" })
-          }
-          options={RSVP_OPTIONS}
-        />
-        <EditScopeDialog
-          open={pendingRsvp !== null}
-          onOpenChange={(open) => !open && setPendingRsvp(null)}
-          action="rsvp"
-          onConfirm={(scope) => {
-            if (pendingRsvp)
-              rsvp.mutate({
-                status: pendingRsvp,
-                scope: SCOPE_TO_API[scope],
-              });
-          }}
-        />
-      </section>
+      {occ.cancelled ? null : (
+        <>
+          <section aria-label="Your RSVP" className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Your RSVP</h3>
+            <SegmentedToggle<RsvpChoice>
+              label="Your RSVP"
+              fullWidth
+              value={
+                (occ.myRsvp === "no_response" ? "" : occ.myRsvp) as RsvpChoice
+              }
+              onValueChange={(status) =>
+                occ.recurring
+                  ? setPendingRsvp(status)
+                  : rsvp.mutate({ status, scope: "this" })
+              }
+              options={RSVP_OPTIONS}
+            />
+            <EditScopeDialog
+              open={pendingRsvp !== null}
+              onOpenChange={(open) => !open && setPendingRsvp(null)}
+              action="rsvp"
+              onConfirm={(scope) => {
+                if (pendingRsvp)
+                  rsvp.mutate({
+                    status: pendingRsvp,
+                    scope: SCOPE_TO_API[scope],
+                  });
+              }}
+            />
+          </section>
 
-      <section aria-label="Attendees" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
-        <AttendeeList attendees={attendees} />
-      </section>
+          <section aria-label="Attendees" className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
+            <AttendeeList attendees={attendees} />
+          </section>
 
-      <SetlistSection
-        builder={setlist}
-        caption={
-          occ.recurring ? "Changes apply to this and later practices." : null
-        }
-        extra={
-          occ.setlistId ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="ml-auto text-muted-foreground"
-              onClick={onRemoveSetlist}
-            >
-              Remove setlist
-            </Button>
-          ) : null
-        }
-      />
-      {setlistError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {setlistError}
-        </p>
-      ) : null}
+          <SetlistSection
+            builder={setlist}
+            caption={
+              occ.recurring
+                ? "Changes apply to this and later practices."
+                : null
+            }
+            extra={
+              occ.setlistId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="ml-auto text-muted-foreground"
+                  onClick={onRemoveSetlist}
+                >
+                  Remove setlist
+                </Button>
+              ) : null
+            }
+          />
+          {setlistError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {setlistError}
+            </p>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -358,11 +375,11 @@ export function PracticeDrawer({
           description={EVENT_TYPES.practice.label}
           headerAction={<ShareButton path={path} title={title} />}
           headerLeading={
-            occ ? (
+            occ && !occ.cancelled ? (
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Delete practice"
+                aria-label="Cancel practice"
                 className="text-muted-foreground"
                 onClick={() =>
                   occ.recurring
@@ -446,9 +463,10 @@ export function PracticeDrawer({
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete this practice?"
+        title="Cancel this practice?"
         description="It is removed from the calendar for everyone."
-        confirmLabel="Delete practice"
+        confirmLabel="Cancel practice"
+        cancelLabel="Keep practice"
         destructive
         onConfirm={() => remove.mutate("all", { onSuccess: onClose })}
       />

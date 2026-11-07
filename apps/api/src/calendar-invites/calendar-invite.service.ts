@@ -21,6 +21,7 @@ import {
   type IcsEvent,
   type IcsMethod,
   type IcsPartstat,
+  type InviteMethod,
 } from "./ics.js";
 import { buildOccurrence, isRecurring } from "../events/occurrences.js";
 import type { OverrideRow, SeriesRow } from "../events/occurrences.js";
@@ -33,6 +34,7 @@ import {
   type InviteJob,
 } from "./calendar-invite.queue.js";
 import { replyAddress, replyDomain, type InviteKind } from "./reply-token.js";
+import { rsvpLinkUrls, type RsvpLinks } from "./rsvp-link.js";
 
 type GigRow = typeof gigs.$inferSelect;
 type InviteRow = typeof calendarInvites.$inferSelect;
@@ -48,6 +50,12 @@ const RSVP_PARTSTAT: Record<string, IcsPartstat> = {
   not_going: "DECLINED",
   no_response: "NEEDS-ACTION",
 };
+
+interface BandCtx {
+  bandId: string;
+  bandName: string;
+  members: Recipient[];
+}
 
 interface Recipient {
   userId: string | null;
@@ -70,6 +78,8 @@ interface EventPlan {
   /** True when the event is gone and every recipient gets a CANCEL. */
   cancelled: boolean;
   events(r: Recipient, sequence: number, method: IcsMethod): IcsEvent[];
+  /** One-click RSVP links for this recipient (practices only). */
+  rsvpLinks?(r: Recipient): RsvpLinks | null;
 }
 
 const escapeHtml = (s: string): string =>
@@ -161,6 +171,108 @@ export class CalendarInviteService {
     await this.queue.user(userId);
   }
 
+  /**
+   * Runs an RSVP change that came from the member's own calendar. When the member's
+   * invite was current before the change, its stored hash moves to the new state without
+   * an email (their calendar already shows the answer); otherwise a normal reconcile runs.
+   */
+  withSilentReply(
+    bandId: string,
+    seriesId: string,
+    userId: string,
+    change: () => Promise<void>,
+  ): Promise<void> {
+    return this.locked(async () => {
+      const before = await this.memberHash(bandId, seriesId, userId);
+      await change();
+      const after = await this.memberHash(bandId, seriesId, userId);
+      if (!before || !after || before.hash === after.hash) return;
+      if (before.row.lastPayloadHash !== before.hash) return;
+      await this.db
+        .update(calendarInvites)
+        .set({ lastPayloadHash: after.hash })
+        .where(eq(calendarInvites.id, before.row.id));
+      this.queue.done({ bandId, kind: "series", id: seriesId });
+    });
+  }
+
+  private async memberHash(
+    bandId: string,
+    seriesId: string,
+    userId: string,
+  ): Promise<{ row: InviteRow; hash: string } | null> {
+    const [s] = await this.db
+      .select()
+      .from(practiceSeries)
+      .where(eq(practiceSeries.id, seriesId));
+    const ctx = await this.bandContext(bandId);
+    const r = ctx?.members.find((m) => m.userId === userId && m.enabled);
+    if (!s || !ctx || !r) return null;
+    const plan = await this.seriesPlan(s, ctx);
+    if (!plan || plan.cancelled) return null;
+    const [row] = await this.db
+      .select()
+      .from(calendarInvites)
+      .where(
+        and(
+          eq(calendarInvites.kind, "series"),
+          eq(calendarInvites.eventId, seriesId),
+          eq(calendarInvites.email, r.key),
+        ),
+      );
+    if (!row || row.cancelledAt) return null;
+    return { row, hash: this.fingerprint(plan, r) };
+  }
+
+  /** Upcoming gigs and practices of a band as one METHOD:PUBLISH calendar for a member. */
+  async feed(bandId: string, userId: string): Promise<string | null> {
+    const ctx = await this.bandContext(bandId);
+    const r = ctx?.members.find((m) => m.userId === userId);
+    if (!ctx || !r) return null;
+    const today = addDays(new Date().toISOString().slice(0, 10), -1);
+    const gigRows = await this.db
+      .select()
+      .from(gigs)
+      .where(
+        and(
+          eq(gigs.bandId, bandId),
+          gte(gigs.date, today),
+          isNull(gigs.deletedAt),
+        ),
+      )
+      .orderBy(gigs.date, gigs.id);
+    const seriesRows = await this.db
+      .select()
+      .from(practiceSeries)
+      .where(
+        and(
+          eq(practiceSeries.bandId, bandId),
+          isNull(practiceSeries.deletedAt),
+        ),
+      )
+      .orderBy(practiceSeries.id);
+    const events: IcsEvent[] = [];
+    const plans: EventPlan[] = [];
+    for (const g of gigRows) {
+      const p = this.gigPlan(g, ctx);
+      if (p) plans.push(p);
+    }
+    for (const s of seriesRows) {
+      const p = await this.seriesPlan(s, ctx);
+      if (p) plans.push(p);
+    }
+    for (const p of plans) {
+      if (!p.cancelled) events.push(...p.events(r, 0, "PUBLISH"));
+    }
+    return buildCalendar({
+      method: "PUBLISH",
+      // Hour-stable so unchanged feeds keep one ETag.
+      dtstamp: new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000),
+      events,
+      name: `${ctx.bandName} (Greenroom)`,
+    });
+  }
+
   private async process(job: InviteJob): Promise<void> {
     // Marked done first: a failure is retried by pg-boss, and edits made meanwhile re-add the job.
     this.queue.done(job);
@@ -227,11 +339,7 @@ export class CalendarInviteService {
     if (ctx) await this.applySeries(s, ctx);
   }
 
-  private async bandContext(bandId: string): Promise<{
-    bandId: string;
-    bandName: string;
-    members: Recipient[];
-  } | null> {
+  private async bandContext(bandId: string): Promise<BandCtx | null> {
     const [band] = await this.db
       .select({ name: bands.name })
       .from(bands)
@@ -275,12 +383,14 @@ export class CalendarInviteService {
 
   // ---- plans ----
 
-  private async applyGig(
-    g: GigRow,
-    ctx: { bandId: string; bandName: string; members: Recipient[] },
-  ): Promise<void> {
+  private async applyGig(g: GigRow, ctx: BandCtx): Promise<void> {
+    const plan = this.gigPlan(g, ctx);
+    if (plan) await this.apply(plan, ctx);
+  }
+
+  private gigPlan(g: GigRow, ctx: BandCtx): EventPlan | null {
     const today = localDate(new Date(), g.timeZone);
-    if (g.date < today) return;
+    if (g.date < today) return null;
     const base = gigInput(g, webUrl());
     const allDay = base.allDay ?? false;
     const link = `${webUrl()}/gigs/${gigSlugId(g)}`;
@@ -318,13 +428,18 @@ export class CalendarInviteService {
         },
       ],
     };
-    await this.apply(plan, ctx);
+    return plan;
   }
 
-  private async applySeries(
+  private async applySeries(s: SeriesRow, ctx: BandCtx): Promise<void> {
+    const plan = await this.seriesPlan(s, ctx);
+    if (plan) await this.apply(plan, ctx);
+  }
+
+  private async seriesPlan(
     s: SeriesRow,
-    ctx: { bandId: string; bandName: string; members: Recipient[] },
-  ): Promise<void> {
+    ctx: BandCtx,
+  ): Promise<EventPlan | null> {
     const now = new Date();
     const upcoming =
       occurrencesBetween(
@@ -343,7 +458,7 @@ export class CalendarInviteService {
     if (
       recurring ? !upcoming : oneOffStart.getTime() < now.getTime() - DAY_MS
     ) {
-      return;
+      return null;
     }
     const rsvps = await this.db
       .select()
@@ -357,6 +472,22 @@ export class CalendarInviteService {
       );
       return RSVP_PARTSTAT[row?.status ?? "no_response"]!;
     };
+    const cancelledAt = new Set(
+      overrides
+        .filter((o) => o.cancelled)
+        .map((o) => o.originalStart.getTime()),
+    );
+    const overrideAt = new Set(overrides.map((o) => o.originalStart.getTime()));
+    const upcomingStarts = recurring
+      ? occurrencesBetween(
+          s,
+          now,
+          new Date(now.getTime() + HORIZON_DAYS * DAY_MS),
+        ).filter((d) => !cancelledAt.has(d.getTime()))
+      : [];
+    // The master carries the answer for the next occurrence; other answers become RECURRENCE-ID components.
+    const masterPartstat = (userId: string | null): IcsPartstat =>
+      upcomingStarts[0] ? rsvpOf(userId, upcomingStarts[0]) : "NEEDS-ACTION";
 
     const link = `${webUrl()}/practices/${s.id}`;
     const organizer = this.organizer("series", s.id, ctx.bandName);
@@ -417,7 +548,7 @@ export class CalendarInviteService {
           attendee: {
             email: r.email,
             name: r.name || undefined,
-            partstat: "NEEDS-ACTION",
+            partstat: masterPartstat(r.userId),
           },
           exdates:
             method === "CANCEL"
@@ -436,10 +567,28 @@ export class CalendarInviteService {
               recurrenceId: o.originalStart.toISOString(),
             }),
           );
-        return [master, ...moved];
+        const master0 = masterPartstat(r.userId);
+        const answered = upcomingStarts
+          .filter(
+            (d) =>
+              !overrideAt.has(d.getTime()) && rsvpOf(r.userId, d) !== master0,
+          )
+          .map((d) =>
+            component(r, sequence, d, undefined, {
+              recurrenceId: d.toISOString(),
+            }),
+          );
+        return [master, ...moved, ...answered];
       },
+      rsvpLinks: (r) =>
+        r.userId
+          ? rsvpLinkUrls(
+              { userId: r.userId, seriesId: s.id },
+              recurring ? undefined : s.dtstart,
+            )
+          : null,
     };
-    await this.apply(plan, ctx);
+    return plan;
   }
 
   private organizer(
@@ -522,7 +671,7 @@ export class CalendarInviteService {
     bandName: string,
     r: Recipient,
     row: InviteRow | undefined,
-    method: IcsMethod,
+    method: InviteMethod,
     hash?: string,
   ): Promise<void> {
     const sequence = row ? row.sequence + 1 : 0;
@@ -547,21 +696,36 @@ export class CalendarInviteService {
       `When: ${plan.when}`,
       ...(plan.where ? [`Where: ${plan.where}`] : []),
     ];
+    const links = method === "CANCEL" ? null : (plan.rsvpLinks?.(r) ?? null);
     const footer =
       method === "CANCEL"
         ? ""
-        : "Reply with Yes, Maybe or No in your calendar app.";
+        : `${links ? "Or reply" : "Reply"} with Yes, Maybe or No in your calendar app.`;
     const text = [
       lead,
       "",
       ...details,
       "",
       `Open in Greenroom: ${plan.link}`,
+      ...(links
+        ? [
+            "",
+            "Can you make it?",
+            `Yes: ${links.going}`,
+            `Maybe: ${links.maybe}`,
+            `No: ${links.no}`,
+          ]
+        : []),
       ...(footer ? ["", footer] : []),
     ].join("\n");
+    const href = (u: string, label: string): string =>
+      `<a href="${escapeHtml(u)}">${label}</a>`;
     const html =
       `<p>${escapeHtml(lead)}</p><p>${details.map(escapeHtml).join("<br>")}</p>` +
       `<p><a href="${escapeHtml(plan.link)}">Open in Greenroom</a></p>` +
+      (links
+        ? `<p>Can you make it? ${href(links.going, "Yes")} | ${href(links.maybe, "Maybe")} | ${href(links.no, "No")}</p>`
+        : "") +
       (footer ? `<p>${escapeHtml(footer)}</p>` : "");
     await this.email.sendCalendarInvite({
       to: r.email,

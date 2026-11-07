@@ -35,3 +35,11 @@
   position: relative;
   z-index: 4;
 }
+
+.gr-event.gr-cancelled {
+  opacity: 0.55;
+}
+.gr-event.gr-cancelled .gr-chip-title,
+.gr-event.gr-cancelled .gr-block-title {
+  text-decoration: line-through;
+}

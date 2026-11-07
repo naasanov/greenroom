@@ -24,8 +24,12 @@ import { LINEUP_TARGET, type LineupBuilder } from "./use-lineup-builder";
 /** Where the roster drawer goes when there is no room beside the gig drawer. */
 const OVERLAY_CLASS = "right-0 w-full";
 
-/** Beside the gig drawer: bottom-aligned and tall even when the drawer is short. */
-const SIDE_CLASS = "inset-y-auto bottom-0 h-[min(34rem,85dvh)]";
+/**
+ * Beside the gig drawer: bottom-aligned and tall even when the drawer is short.
+ * Narrows to fit the room left of the drawer when the agenda sheet is open.
+ */
+const SIDE_CLASS =
+  "inset-y-auto bottom-0 h-[min(34rem,85dvh)] w-[clamp(15rem,calc(100vw-1038px),20rem)]";
 
 const dayLabel = (date: string) =>
   new Intl.DateTimeFormat("en-US", {

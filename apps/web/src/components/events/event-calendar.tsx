@@ -67,6 +67,7 @@ function reducedMotion() {
 /** Extra chip lines in priority order; the chip clips whatever does not fit. */
 function chipDetails(ev: CalendarEvent): string[] {
   const lines: string[] = [];
+  if (ev.type === "practice" && ev.cancelled) lines.push("Cancelled");
   const range = timeRange(ev);
   if (range) lines.push(range);
   if (ev.type === "gig") {
@@ -357,6 +358,9 @@ export function EventCalendar({
               return [
                 "gr-event",
                 `gr-${ev.type}`,
+                ...(ev.type === "practice" && ev.cancelled
+                  ? ["gr-cancelled"]
+                  : []),
                 ...(isSelected(ev, selectedEvent) ? ["gr-selected"] : []),
               ];
             }}

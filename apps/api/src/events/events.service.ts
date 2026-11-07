@@ -46,6 +46,7 @@ export class EventsService {
     fromIso: string,
     toIso: string,
     type?: EventType,
+    includeCancelled = false,
   ): Promise<CalendarEvent[]> {
     const from = new Date(fromIso);
     const to = new Date(toIso);
@@ -153,6 +154,7 @@ export class EventsService {
             bySeries.get(s.id) ?? [],
             from,
             to,
+            includeCancelled,
           )) {
             items.push({
               sort: new Date(ev.startsAt).getTime(),

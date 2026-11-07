@@ -57,7 +57,7 @@ export const eventKeys = {
 
 const fetchEvents = (bandId: string, range: { from: string; to: string }) =>
   api(
-    `/bands/${bandId}/events?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+    `/bands/${bandId}/events?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&includeCancelled=true`,
     { schema: typed<CalendarEvent[]>() },
   );
 

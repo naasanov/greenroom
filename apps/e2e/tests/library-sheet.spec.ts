@@ -46,9 +46,12 @@ test("edit in place: plain-text reference renders without a link", async ({
   // Share and Edit sit together as one cluster.
   expect(box!.x - (share.x + share.width)).toBeLessThan(8);
   await editButton.click();
-  // The header button keeps its size and place when toggling to Cancel.
+  // Edit becomes a text Cancel, so the header holds a single X (Close).
   const cancel = s.getByRole("button", { name: "Cancel" });
-  expect(await cancel.boundingBox()).toEqual(box);
+  await expect(cancel).toHaveText("Cancel");
+  await expect(cancel.locator("svg")).toHaveCount(0);
+  const cancelBox = (await cancel.boundingBox())!;
+  expect(cancelBox.x + cancelBox.width).toBeCloseTo(box!.x + box!.width, 0);
 
   await s.getByRole("button", { name: "Add row" }).click();
   await s.getByLabel("Reference label").last().fill("Key");

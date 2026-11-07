@@ -1,5 +1,10 @@
 import { MAGIC_LINK_TTL_MS } from "../../auth/auth.constants.js";
-import type { CalendarInviteInput, EmailAdapter } from "./email.adapter.js";
+import type {
+  CalendarInviteInput,
+  EmailAdapter,
+  ReceivedEmail,
+} from "./email.adapter.js";
+import { extractCalendarParts } from "./mime.js";
 
 const RESEND_URL = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Greenroom <login@greenroom.fyi>";
@@ -57,6 +62,54 @@ export class RealEmailAdapter implements EmailAdapter {
         },
       ],
     });
+  }
+
+  /**
+   * The webhook carries metadata only. The message is fetched from the receiving API,
+   * then its original MIME (signed download URL) is walked for text/calendar parts.
+   */
+  async fetchReceivedEmail(emailId: string): Promise<ReceivedEmail | null> {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new EmailNotConfiguredError();
+    const res = await fetch(
+      `${RESEND_URL}/receiving/${encodeURIComponent(emailId)}`,
+      {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(`Resend received email fetch failed with ${res.status}`);
+    }
+    const body = (await res.json()) as {
+      from?: string;
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      received_for?: string[];
+      authentication?: { dmarc?: string } | null;
+      raw?: { download_url?: string } | null;
+    };
+    const url = body.raw?.download_url;
+    let calendars: string[] = [];
+    if (url) {
+      const raw = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (raw.ok) {
+        calendars = extractCalendarParts(Buffer.from(await raw.arrayBuffer()));
+      }
+    }
+    return {
+      from: body.from ?? "",
+      recipients: [
+        ...(body.to ?? []),
+        ...(body.cc ?? []),
+        ...(body.bcc ?? []),
+        ...(body.received_for ?? []),
+      ],
+      calendars,
+      authFailed: body.authentication?.dmarc === "fail",
+    };
   }
 
   private async post(key: string, payload: object): Promise<void> {

@@ -6,7 +6,10 @@ import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module.js";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // The inbound webhook verifies its signature over the raw body.
+    rawBody: true,
+  });
   // Behind the Fly proxy, req.ip must come from X-Forwarded-For.
   if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
   app.enableShutdownHooks();

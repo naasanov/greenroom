@@ -32,7 +32,7 @@ test("a regular member leaves and the app switches to their other band", async (
   await expect(switcher(page, "Side Project")).toBeVisible();
 });
 
-test("the last admin cannot leave until someone else is admin", async ({
+test("the last admin sees the warning up front and cannot leave", async ({
   page,
   testApi,
   loginAs,
@@ -40,16 +40,29 @@ test("the last admin cannot leave until someone else is admin", async ({
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Leave The Night Owls" }).click();
-  await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Leave band" })
-    .click();
   await expect(
     page.getByRole("alert").filter({ hasText: "last admin" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Leave The Night Owls" }),
+  ).toBeDisabled();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(switcher(page, "The Night Owls")).toBeVisible();
+});
+
+test("a regular member does not get Band settings in the band picker", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto("/events");
+  await page.getByRole("button", { name: /Switch band/ }).click();
+  await expect(page.getByRole("menuitem").first()).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Band settings" }),
+  ).toHaveCount(0);
 });
 
 test("the only member must delete the band, typing its name to confirm", async ({

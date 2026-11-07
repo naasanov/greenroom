@@ -1,7 +1,7 @@
 "use client";
 
 import { gigPath } from "@/lib/gig-path";
-import { Loader2, Music2, Pencil, Trash2, X } from "lucide-react";
+import { Loader2, Music2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -36,6 +36,7 @@ import {
   useUpdateSong,
 } from "@/lib/queries/songs";
 import { SongFiles } from "./song-files";
+import { CandidatePreview } from "./candidate-preview";
 import { SmartInput } from "./smart-input";
 import { SongForm } from "./song-form";
 import {
@@ -393,6 +394,7 @@ export function SongSheet({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [typed, setTyped] = useState("");
+  const [preview, setPreview] = useState<SongCandidate | null>(null);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [pending, setPending] = useState<SongFormValues | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -407,6 +409,7 @@ export function SongSheet({
     setPrevKey(resetKey);
     setEditing(false);
     setDraft(null);
+    setPreview(null);
     setTyped("");
     setDuplicateId(null);
     setPending(null);
@@ -505,26 +508,40 @@ export function SongSheet({
   let body: React.ReactNode;
   if (adding && !draft) {
     body = (
-      <SmartInput
-        bandId={bandId}
-        initialText={initialText}
-        onPick={(c) => setDraft(draftFromCandidate(c))}
-        onManual={(text) => {
-          setTyped(text);
-          setDraft({
-            values: {
-              title: text,
-              artist: "",
-              duration: "",
-              notes: "",
-              references: [],
-            },
-            meta: EMPTY_META,
-          });
-        }}
-        onPlaylist={onImport}
-        onOpenExisting={onSelect}
-      />
+      <>
+        <div hidden={!!preview}>
+          <SmartInput
+            bandId={bandId}
+            initialText={initialText}
+            onPick={setPreview}
+            onManual={(text) => {
+              setTyped(text);
+              setDraft({
+                values: {
+                  title: text,
+                  artist: "",
+                  duration: "",
+                  notes: "",
+                  references: [],
+                },
+                meta: EMPTY_META,
+              });
+            }}
+            onPlaylist={onImport}
+            onOpenExisting={onSelect}
+          />
+        </div>
+        {preview ? (
+          <CandidatePreview
+            candidate={preview}
+            onConfirm={() => {
+              setDraft(draftFromCandidate(preview));
+              setPreview(null);
+            }}
+            onBack={() => setPreview(null)}
+          />
+        ) : null}
+      </>
     );
   } else if (adding && draft) {
     body = (
@@ -677,14 +694,24 @@ export function SongSheet({
             >
               <ShareButton path={`/songs/${songId}`} title={title} />
               {song ? (
-                <Button
-                  variant={editing ? "secondary" : "ghost"}
-                  size="icon"
-                  aria-label={editing ? "Cancel" : "Edit"}
-                  onClick={() => changeEditing(!editing)}
-                >
-                  {editing ? <X /> : <Pencil />}
-                </Button>
+                editing ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => changeEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Edit"
+                    onClick={() => changeEditing(true)}
+                  >
+                    <Pencil />
+                  </Button>
+                )
               ) : null}
             </div>
           ) : null

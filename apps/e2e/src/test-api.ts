@@ -124,6 +124,31 @@ export class TestApi {
     await this.call("post", "calendar-invites/flush", { data: { bandId } });
   }
 
+  /** Stores an inbound message so a signed webhook post can fetch it by id. */
+  async addInboundEmail(input: {
+    emailId: string;
+    from: string;
+    recipients: string[];
+    calendars: string[];
+    authFailed?: boolean;
+  }): Promise<void> {
+    await this.call("post", "email/inbound", { data: input });
+  }
+
+  /** Runs a parsed reply through the inbound handler without the webhook signature. */
+  async calendarInviteReply(input: {
+    from: string;
+    to: string;
+    ics: string;
+  }): Promise<string> {
+    const { outcome } = await this.call<{ outcome: string }>(
+      "post",
+      "calendar-invites/reply",
+      { data: input },
+    );
+    return outcome;
+  }
+
   /** Turns a user's calendar invites on or off. */
   async calendarInvitesEnabled(
     userId: string,

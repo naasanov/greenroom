@@ -80,6 +80,8 @@ export async function startWorkerServers(): Promise<() => Promise<void>> {
     API_PUBLIC_URL: API_URL,
     // Fixed 32-byte test key (base64); never used outside e2e.
     OAUTH_TOKEN_KEY: "dGVzdC1vbmx5LW9hdXRoLXRva2VuLWtleS0zMmJ5ISE=",
+    // Svix-style signing secret for the Resend inbound webhook; specs sign with the same value.
+    RESEND_WEBHOOK_SECRET: "whsec_dGVzdC1vbmx5LXJlc2VuZC13ZWJob29rLXNlY3JldA==",
   });
   const web = start(
     ["node_modules/next/dist/bin/next", "start", "-p", String(WEB_PORT)],

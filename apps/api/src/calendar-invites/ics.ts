@@ -1,6 +1,8 @@
 import { localParts } from "../events/time.js";
 
-export type IcsMethod = "REQUEST" | "CANCEL";
+/** PUBLISH is the subscription feed; REQUEST and CANCEL are the emailed invites. */
+export type IcsMethod = "REQUEST" | "CANCEL" | "PUBLISH";
+export type InviteMethod = Exclude<IcsMethod, "PUBLISH">;
 export type IcsPartstat =
   "NEEDS-ACTION" | "ACCEPTED" | "TENTATIVE" | "DECLINED";
 
@@ -32,6 +34,8 @@ export interface BuildCalendarInput {
   events: readonly IcsEvent[];
   /** Omit VTIMEZONE blocks; used to fingerprint content independent of the current year. */
   omitTimezones?: boolean;
+  /** Calendar display name for subscription feeds. */
+  name?: string;
 }
 
 export const ICS_CONTENT_TYPE = (method: IcsMethod): string =>
@@ -309,6 +313,12 @@ export function buildCalendar(input: BuildCalendarInput): string {
     "PRODID:-//Greenroom//Calendar Invites//EN",
     "CALSCALE:GREGORIAN",
     `METHOD:${input.method}`,
+    ...(input.name
+      ? [
+          `X-WR-CALNAME:${escapeText(input.name)}`,
+          `NAME:${escapeText(input.name)}`,
+        ]
+      : []),
   ];
   if (!input.omitTimezones) {
     const spans = new Map<string, [number, number]>();

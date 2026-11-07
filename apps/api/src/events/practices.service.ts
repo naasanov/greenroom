@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import {
   memberships,
   practiceOccurrenceOverrides as overridesTable,
@@ -175,7 +175,9 @@ export class PracticesService {
     key: string,
   ): Promise<PracticeOccurrence> {
     const series = await this.findSeries(bandId, seriesId);
-    const { original, override } = await this.requireOccurrence(series, key);
+    const { original, override } = await this.requireOccurrence(series, key, {
+      allowCancelled: true,
+    });
     return this.detail(series, original, override, userId);
   }
 
@@ -361,12 +363,20 @@ export class PracticesService {
       cancelled: false,
       startsAt,
       endsAt,
-      title: patch.title ?? override?.title ?? null,
+      // Values equal to the series' own are not stored, so later series edits still apply.
+      title:
+        patch.title === undefined
+          ? (override?.title ?? null)
+          : patch.title === series.title
+            ? null
+            : patch.title,
       // An empty string records "no location" for this occurrence only.
       location:
         patch.location === undefined
           ? (override?.location ?? null)
-          : (patch.location ?? ""),
+          : (patch.location ?? "") === (series.location ?? "")
+            ? null
+            : (patch.location ?? ""),
     };
     await this.db
       .insert(overridesTable)
@@ -407,6 +417,31 @@ export class PracticesService {
         await tx
           .delete(overridesTable)
           .where(eq(overridesTable.seriesId, series.id));
+      }
+      // Overrides still carrying the old series values are not deliberate; they follow the series.
+      if (patch.title !== undefined && patch.title !== series.title) {
+        await tx
+          .update(overridesTable)
+          .set({ title: null })
+          .where(
+            and(
+              eq(overridesTable.seriesId, series.id),
+              eq(overridesTable.title, series.title),
+            ),
+          );
+      }
+      if (patch.location !== undefined && patch.location !== series.location) {
+        await tx
+          .update(overridesTable)
+          .set({ location: null })
+          .where(
+            and(
+              eq(overridesTable.seriesId, series.id),
+              series.location === null
+                ? sql`false`
+                : eq(overridesTable.location, series.location),
+            ),
+          );
       }
       const [updated] = await tx
         .update(practiceSeries)
@@ -693,6 +728,8 @@ export class PracticesService {
           set: { status },
         }),
     );
+    // The member's own invite carries their answer as PARTSTAT.
+    await this.invites.series(bandId, seriesId);
     return this.detail(series, original, override, userId);
   }
 

@@ -31,6 +31,11 @@ export function LeaveBandSection({ band }: { band: BandSummary }) {
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const alone = members.data?.length === 1;
+  const lastAdmin =
+    !alone &&
+    band.role === "admin" &&
+    !!members.data &&
+    members.data.filter((m) => m.role === "admin").length <= 1;
 
   /** Awaited rather than per-call callbacks: this section remounts when the band list refreshes. */
   async function run(deleteBand: boolean) {
@@ -60,6 +65,11 @@ export function LeaveBandSection({ band }: { band: BandSummary }) {
           ? `You are the only member of ${band.name}. Leaving deletes the band and everything in it.`
           : `You will lose access to ${band.name}. Your past gigs and songs stay with the band.`}
       </p>
+      {lastAdmin && !error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {LAST_ADMIN_MESSAGE}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -68,7 +78,7 @@ export function LeaveBandSection({ band }: { band: BandSummary }) {
       <Button
         variant="destructive"
         size="lg"
-        disabled={leave.isPending || !members.data}
+        disabled={leave.isPending || !members.data || lastAdmin}
         onClick={() => {
           setError(null);
           if (alone) {

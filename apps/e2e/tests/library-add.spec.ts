@@ -11,6 +11,15 @@ import {
 } from "./library-helpers.js";
 import { apiWithCookie, connectSpotify } from "./spotify-helpers.js";
 
+/** Picks the first search result and confirms it on the preview step. */
+async function pickCandidate(page: Page) {
+  await sheet(page).getByTestId("candidate").first().click();
+  await sheet(page)
+    .getByTestId("candidate-preview")
+    .getByRole("button", { name: "Use this song" })
+    .click();
+}
+
 async function startAdd(
   page: Page,
   testApi: TestApi,
@@ -59,6 +68,15 @@ test("add via a Spotify link", async ({ page, testApi, loginAs }) => {
   await expect(candidate).toContainText("Take Me Out");
   await expect(candidate).toContainText("Franz Ferdinand");
   await candidate.click();
+  const preview = sheet(page).getByTestId("candidate-preview");
+  await expect(preview).toContainText("Take Me Out");
+  await expect(preview).toContainText("Franz Ferdinand");
+  await expect(sheet(page).getByLabel("Title")).toHaveCount(0);
+  // Back keeps the search results; confirming moves on to the form.
+  await preview.getByRole("button", { name: "Back to results" }).click();
+  await expect(preview).toHaveCount(0);
+  await expect(candidate).toBeVisible();
+  await pickCandidate(page);
 
   await expect(sheet(page).getByLabel("Title")).toHaveValue("Take Me Out");
   await expect(sheet(page).getByLabel("Artist")).toHaveValue("Franz Ferdinand");
@@ -81,7 +99,7 @@ test("add via a Spotify link", async ({ page, testApi, loginAs }) => {
 test("add via a YouTube link", async ({ page, testApi, loginAs }) => {
   await startAdd(page, testApi, loginAs);
   await smart(page).fill("https://www.youtube.com/watch?v=fakeVid0001");
-  await sheet(page).getByTestId("candidate").click();
+  await pickCandidate(page);
   await expect(sheet(page).getByLabel("Title")).toHaveValue(
     "Fake Band - Live at the Garage",
   );
@@ -100,7 +118,7 @@ test("add via search and picking a candidate", async ({
 }) => {
   await startAdd(page, testApi, loginAs);
   await smart(page).fill("seven nation");
-  await sheet(page).getByTestId("candidate").click();
+  await pickCandidate(page);
   await expect(sheet(page).getByLabel("Title")).toHaveValue(
     "Seven Nation Army",
   );
@@ -169,7 +187,7 @@ test("duplicate warning links to the song and allows add anyway", async ({
   await smart(page).fill("brightside");
   const candidate = sheet(page).getByTestId("candidate");
   await expect(candidate).toContainText("Already in your library");
-  await candidate.click();
+  await pickCandidate(page);
   await sheet(page).getByRole("button", { name: "Done" }).click();
 
   const notice = sheet(page).getByTestId("duplicate-notice");
@@ -181,7 +199,7 @@ test("duplicate warning links to the song and allows add anyway", async ({
   await sheet(page).getByRole("button", { name: "Close" }).click();
   await fabAction(page, "add-song");
   await smart(page).fill("brightside");
-  await sheet(page).getByTestId("candidate").click();
+  await pickCandidate(page);
   await sheet(page).getByRole("button", { name: "Done" }).click();
   await sheet(page)
     .getByTestId("duplicate-notice")
@@ -201,7 +219,7 @@ test("Songsterr suggestion is added with one tap", async ({
 }) => {
   await startAdd(page, testApi, loginAs);
   await smart(page).fill("brightside");
-  await sheet(page).getByTestId("candidate").click();
+  await pickCandidate(page);
   const suggestion = sheet(page).getByTestId("songsterr-suggestion");
   await expect(suggestion).toContainText("Found a tab on Songsterr. Add it?");
   await suggestion.getByRole("button", { name: "Add tab" }).click();

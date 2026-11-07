@@ -39,6 +39,7 @@ export function buildOccurrence(
     timeZone: s.timeZone,
     recurring: isRecurring(s),
     modified: o != null,
+    ...(o?.cancelled ? { cancelled: true } : {}),
   };
 }
 
@@ -51,12 +52,13 @@ export function expandSeries(
   overrides: readonly OverrideRow[],
   from: Date,
   to: Date,
+  includeCancelled = false,
 ): PracticeEvent[] {
   const byStart = new Map(overrides.map((o) => [o.originalStart.getTime(), o]));
   const seen = new Set<number>();
   const out: PracticeEvent[] = [];
   const push = (original: Date, o: OverrideRow | undefined): void => {
-    if (o?.cancelled) return;
+    if (o?.cancelled && !includeCancelled) return;
     const ev = buildOccurrence(s, original, o);
     const start = new Date(ev.startsAt);
     const end = new Date(ev.endsAt);

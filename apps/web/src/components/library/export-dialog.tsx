@@ -4,6 +4,7 @@ import { Check, ClipboardCopy } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SONG_ERROR_CODES, type ExportResult } from "@greenroom/shared";
+import { FormField } from "@/components/app/form-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -303,17 +304,19 @@ function ExportBody({
         if (name.trim()) run(name.trim());
       }}
     >
-      <Input
-        autoFocus
-        aria-label="Playlist name"
-        autoComplete="off"
-        maxLength={100}
-        value={name}
-        onChange={(e) => {
-          setName(e.target.value);
-          exportMutation.reset();
-        }}
-      />
+      <FormField label="Playlist name" htmlFor="export-playlist-name">
+        <Input
+          id="export-playlist-name"
+          autoFocus
+          autoComplete="off"
+          maxLength={100}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            exportMutation.reset();
+          }}
+        />
+      </FormField>
       {exportMutation.isError ? (
         <p
           role="alert"

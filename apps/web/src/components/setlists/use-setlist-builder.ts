@@ -114,7 +114,7 @@ export function useSetlistBuilder({
   const wide = useMediaQuery("(min-width: 768px)");
   const sheetOpen = !!sheet?.open;
   const besideEffective = beside || (wide && sheetOpen);
-  const fitsBesideAgenda = useMediaQuery("(min-width: 1300px)");
+  const fitsBesideAgenda = useMediaQuery("(min-width: 1280px)");
   const fitsAlone = useMediaQuery("(min-width: 960px)");
   const fits = besideEffective ? fitsBesideAgenda : fitsAlone;
   const mode: LibraryMode = !wide ? "stack" : fits ? "side" : "overlay";

@@ -6,10 +6,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull } from "drizzle-orm";
 import {
   bands,
   feedback,
+  gigLineup,
   gigs,
   inviteLinks,
   bandGoogleLinks,
@@ -183,7 +184,7 @@ export class BandsService {
     return rows.map(({ placeholderEmail, placeholderNotes, ...r }) => ({
       ...r,
       email: r.isPlaceholder ? (placeholderEmail ?? "") : r.email,
-      notes: r.isPlaceholder ? placeholderNotes : null,
+      notes: placeholderNotes,
       joinedAt: r.joinedAt.toISOString(),
       instruments: groupInstruments(
         instruments.filter((i) => i.userId === r.userId),
@@ -265,6 +266,23 @@ export class BandsService {
     });
   }
 
+  /** Drops a departing member from lineups of gigs after today; past gigs keep the name. */
+  private async dropFutureLineups(tx: Tx, membershipId: string): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    const future = tx
+      .select({ id: gigs.id })
+      .from(gigs)
+      .where(gt(gigs.date, today));
+    await tx
+      .delete(gigLineup)
+      .where(
+        and(
+          eq(gigLineup.membershipId, membershipId),
+          inArray(gigLineup.gigId, future),
+        ),
+      );
+  }
+
   /** Soft-removes a member; used for admin removal and for plain leaves. */
   async removeMember(bandId: string, userId: string): Promise<void> {
     await this.db.transaction(async (tx) => {
@@ -277,6 +295,7 @@ export class BandsService {
         .update(memberships)
         .set({ leftAt: new Date() })
         .where(eq(memberships.id, m.id));
+      await this.dropFutureLineups(tx, m.id);
     });
     await this.calendarSync.bandAcl(bandId);
     await this.invites.band(bandId);
@@ -333,6 +352,7 @@ export class BandsService {
       .update(memberships)
       .set({ leftAt: new Date() })
       .where(eq(memberships.id, m.id));
+    await this.dropFutureLineups(tx, m.id);
     return false;
   }
 
@@ -620,6 +640,25 @@ export class BandsService {
       .update(memberships)
       .set({ userId: to })
       .where(eq(memberships.userId, from));
+    // Roster notes survive the claim, kept in the same column on the real user.
+    const [src] = await tx
+      .select({ notes: users.placeholderNotes })
+      .from(users)
+      .where(eq(users.id, from));
+    if (src?.notes) {
+      const [dest] = await tx
+        .select({ notes: users.placeholderNotes })
+        .from(users)
+        .where(eq(users.id, to));
+      await tx
+        .update(users)
+        .set({
+          placeholderNotes: dest?.notes
+            ? `${dest.notes}\n${src.notes}`
+            : src.notes,
+        })
+        .where(eq(users.id, to));
+    }
     const have = await tx
       .select()
       .from(userInstruments)

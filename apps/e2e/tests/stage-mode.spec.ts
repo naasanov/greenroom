@@ -31,6 +31,16 @@ test("opens from a gig with title, next song and position", async ({
     "background-color",
     "rgb(0, 0, 0)",
   );
+  // The title is centred and the NEXT label stays legible on black.
+  await expect(title(page)).toHaveCSS("text-align", "center");
+  await expect(page.getByTestId("stage-next").locator("p").first()).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.getByTestId("stage-view")).toHaveCSS(
+    "overscroll-behavior-x",
+    "none",
+  );
 });
 
 test("tap advances, arrow goes back, notes show under the title", async ({

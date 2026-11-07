@@ -16,6 +16,16 @@ export function StageView({ gigId }: { gigId: string }) {
   const { snapshot, status, offlineReady } = useStageSnapshot(gigId);
   useWakeLock(true);
 
+  // Keeps an edge swipe from triggering the browser's history-back gesture.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prev = root.style.overscrollBehaviorX;
+    root.style.overscrollBehaviorX = "none";
+    return () => {
+      root.style.overscrollBehaviorX = prev;
+    };
+  }, []);
+
   const setlistId = snapshot?.setlistId;
   const count = snapshot?.songs.length ?? 0;
   const [index, setIndex] = useState(0);
@@ -78,7 +88,7 @@ export function StageView({ gigId }: { gigId: string }) {
       data-testid="stage-view"
       role="application"
       aria-label="Stage mode"
-      className="fixed inset-0 z-50 flex touch-pan-y select-none flex-col overflow-hidden bg-black text-white"
+      className="fixed inset-0 z-50 flex touch-pan-y select-none flex-col overflow-hidden overscroll-x-none bg-black text-white"
       onPointerDown={(e) => (start.current = { x: e.clientX, y: e.clientY })}
       onPointerUp={onPointerUp}
       onPointerCancel={() => (start.current = null)}
@@ -111,14 +121,14 @@ export function StageView({ gigId }: { gigId: string }) {
           <main className="flex min-h-0 flex-1 flex-col justify-center gap-6 overflow-y-auto px-6 py-6">
             <h1
               data-testid="stage-title"
-              className="text-5xl leading-tight font-bold break-words sm:text-7xl"
+              className="text-center text-5xl leading-tight font-bold break-words sm:text-7xl"
             >
               {song.title}
             </h1>
             {song.notes ? (
               <p
                 data-testid="stage-notes"
-                className="text-2xl leading-snug whitespace-pre-wrap text-neutral-200 sm:text-4xl"
+                className="text-center text-2xl leading-snug whitespace-pre-wrap text-neutral-200 sm:text-4xl"
               >
                 {song.notes}
               </p>
@@ -128,11 +138,11 @@ export function StageView({ gigId }: { gigId: string }) {
             data-testid="stage-next"
             className="border-t border-neutral-800 px-6 pt-4 pb-[max(env(safe-area-inset-bottom),1.5rem)]"
           >
-            <p className="text-xs tracking-wide text-neutral-500 uppercase">
+            <p className="text-sm font-semibold tracking-wide text-neutral-300 uppercase">
               {next ? "Next" : "End of setlist"}
             </p>
             {next ? (
-              <p className="truncate text-2xl text-neutral-300">{next.title}</p>
+              <p className="truncate text-2xl text-neutral-100">{next.title}</p>
             ) : null}
           </footer>
         </>

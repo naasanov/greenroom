@@ -134,6 +134,13 @@
       "when": 1793947134101,
       "tag": "0018_calendar_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793970705407,
+      "tag": "0019_calendar_feed_token",
+      "breakpoints": true
     }
   ]
 }

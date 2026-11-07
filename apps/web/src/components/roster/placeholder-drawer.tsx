@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   type BandMember,
   type CreatePlaceholder,
@@ -34,6 +34,7 @@ function Form({
   const [email, setEmail] = useState(member?.email ?? "");
   const [notes, setNotes] = useState(member?.notes ?? "");
   const [invalid, setInvalid] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
   const pending = create.isPending || update.isPending;
   const failed = create.isError || update.isError;
 
@@ -41,6 +42,7 @@ function Form({
     e.preventDefault();
     if (!name.trim()) {
       setInvalid(true);
+      nameRef.current?.focus();
       return;
     }
     setInvalid(false);
@@ -70,6 +72,7 @@ function Form({
       <FormField label="Name" htmlFor="placeholder-name">
         <Input
           id="placeholder-name"
+          ref={nameRef}
           value={name}
           aria-invalid={invalid}
           onChange={(e) => setName(e.target.value)}

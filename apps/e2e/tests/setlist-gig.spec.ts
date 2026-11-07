@@ -356,7 +356,7 @@ test("a library song dragged over the setlist highlights it and appends on drop"
   isMobile,
 }) => {
   test.skip(isMobile, "Drag from the library is desktop only");
-  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  // Library drag needs the side layout, which requires a viewport of 1280px or more.
   await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);
@@ -399,12 +399,46 @@ test("a library song dragged over the setlist highlights it and appends on drop"
   expect(await rowTitles(page)).toEqual([...before, "Harbor Lights"]);
 });
 
+test("at 1280px the library sits beside the setlist and drag appends", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Drag from the library is desktop only");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openGig(page, seed.gigs.upcomingClub);
+  await expect(rows(page)).toHaveCount(5);
+  const before = await rowTitles(page);
+  await openLibrary(page);
+
+  // The library is a separate panel left of the setlist, fully on screen.
+  const lib = (await librarySide(page).boundingBox())!;
+  const list = (await page.getByTestId("target-setlist").boundingBox())!;
+  expect(lib.x).toBeGreaterThanOrEqual(0);
+  expect(lib.x + lib.width).toBeLessThanOrEqual(list.x);
+  await expect(rows(page).first()).toBeVisible();
+
+  const source = (await libraryRow(page, "Harbor Lights").boundingBox())!;
+  const second = (await rows(page).nth(1).boundingBox())!;
+  await page.mouse.move(
+    source.x + source.width / 2,
+    source.y + source.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(source.x + 20, source.y + 20, { steps: 4 });
+  await page.mouse.move(second.x + second.width / 2, second.y + 8, {
+    steps: 14,
+  });
+  await page.mouse.up();
+  await expect(rows(page)).toHaveCount(6);
+  expect(await rowTitles(page)).toEqual([...before, "Harbor Lights"]);
+});
+
 test("dropping a library song outside the setlist adds nothing", async ({
   page,
   isMobile,
 }) => {
   test.skip(isMobile, "Drag from the library is desktop only");
-  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  // Library drag needs the side layout, which requires a viewport of 1280px or more.
   await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.upcomingClub);
   await expect(rows(page)).toHaveCount(5);
@@ -435,7 +469,7 @@ test("a library song can be dropped at the end of an empty setlist", async ({
   isMobile,
 }) => {
   test.skip(isMobile, "Drag from the library is desktop only");
-  // Library drag needs the side layout, which requires a viewport of 1300px or more.
+  // Library drag needs the side layout, which requires a viewport of 1280px or more.
   await page.setViewportSize({ width: 1400, height: 800 });
   await openGig(page, seed.gigs.tentative);
   await openLibrary(page);

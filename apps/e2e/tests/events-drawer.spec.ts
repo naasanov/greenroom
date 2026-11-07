@@ -14,6 +14,7 @@ import {
   eventIn,
   isoDay,
   showGigDate,
+  showWeekOf,
 } from "./events-helpers.js";
 
 let seed: BandSeedResult;
@@ -441,7 +442,7 @@ test("practice drawer has per-section buttons and no footer", async ({
     drawer.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
   await expect(
-    drawer.getByRole("button", { name: "Delete practice" }),
+    drawer.getByRole("button", { name: "Cancel practice" }),
   ).toBeVisible();
   await expect(
     drawer.getByRole("button", { name: "Share link" }),
@@ -464,7 +465,7 @@ test("editing practice details swaps only the details block inline", async ({
   ).toHaveCount(0);
   await expect(drawer.getByTestId("setlist-section")).toBeVisible();
   await expect(drawer.getByTestId("practice-when")).toHaveCount(0);
-  await drawer.getByRole("button", { name: "Cancel" }).click();
+  await drawer.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(drawer.getByTestId("practice-when")).toBeVisible();
 });
 
@@ -503,7 +504,7 @@ test("deleting a recurring practice asks for a scope", async ({ page }) => {
   const date = seed.practice.moved.startsAt.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   await dialog(page, seed.practice.title)
-    .getByRole("button", { name: "Delete practice" })
+    .getByRole("button", { name: "Cancel practice" })
     .click();
   const scope = page.getByRole("dialog", { name: "Cancel recurring event" });
   await expect(scope).toBeVisible();
@@ -623,4 +624,23 @@ test("the new gig drawer does not scroll horizontally", async ({ page }) => {
   await expect(body).toBeVisible();
   const overflow = await body.evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("a cancelled occurrence stays on the calendar and opens as cancelled", async ({
+  page,
+}) => {
+  const date = seed.practice.cancelled.originalStart.slice(0, 10);
+  await page.goto("/events");
+  await showWeekOf(page, date);
+  const chip = calendar(page).locator(".fc-event.gr-cancelled");
+  await expect(chip).toHaveCount(1);
+  await chip.click();
+  const drawer = dialog(page, seed.practice.title);
+  await expect(drawer.getByTestId("practice-cancelled")).toBeVisible();
+  await expect(
+    drawer.getByRole("button", { name: "Edit details" }),
+  ).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "Cancel practice" }),
+  ).toHaveCount(0);
 });

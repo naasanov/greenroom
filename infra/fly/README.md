@@ -170,6 +170,7 @@ API secrets (set with `fly secrets set --stage -a greenroom-fyi-api NAME=value`,
 | `YOUTUBE_API_KEY` | optional | Without it YouTube songs get no auto duration. |
 | `GITHUB_FEEDBACK_TOKEN` | optional | Fine-grained PAT, Issues write on `naasanov/greenroom`. Without it `POST /feedback` returns 503. |
 | `RESEND_API_KEY` | required for sign-in in real mode | Resend key with Sending access on `greenroom.fyi`. Without it magic-link sign-in fails. |
+| `RESEND_WEBHOOK_SECRET` | required for calendar replies | Svix signing secret (`whsec_...`) of the Resend inbound webhook; see "Calendar invite replies (Resend inbound)". Without it the webhook answers 401 and replies from calendars are not applied. |
 | `EMAIL_FROM` | optional | From address for magic-link emails; default `Greenroom <login@greenroom.fyi>`. Must be on the verified `greenroom.fyi` domain. |
 
 Non-secret values (`GITHUB_FEEDBACK_REPO` defaults to `naasanov/greenroom`) need no setting. No Sentry DSN variables exist in the code. Never set `STAGING_LOGIN_PASSCODE` on prod.
@@ -259,3 +260,20 @@ fly deploy -c infra/fly/prod.api.toml --image <registry.fly.io/greenroom-fyi-api
 ```
 
 Repeat for `greenroom-web`. Rolling the api back does not undo migrations, so keep migrations backward compatible. Backups: daily Fly volume snapshots kept 14 days (`fly volumes snapshots list <vol-id> -a greenroom-db`), restored by creating a new volume from a snapshot. Take a `pg_dump` before risky migrations: `fly proxy 5433:5432 -a greenroom-db`.
+
+## Calendar invite replies (Resend inbound)
+
+Manual one-time setup so replies sent from Google, Outlook or Apple Calendar reach the app. Nothing here is automated. Replies go to `rsvp+<token>@<EMAIL_REPLY_DOMAIN>` (default `greenroom.fyi`).
+
+1. **Pick the receiving domain.** Resend requires its MX record to have the lowest priority value on the domain, so it replaces any other mail service on the same name. If `greenroom.fyi` already receives mail (a real inbox), use a subdomain such as `reply.greenroom.fyi` instead and set `EMAIL_REPLY_DOMAIN=reply.greenroom.fyi` on the api app. The From address of invites then also uses that domain, so verify it for sending in Resend too.
+2. **Enable receiving.** Resend dashboard, Domains, open the domain (add and verify it first if it is a new subdomain), turn on the receiving toggle. A dialog shows the MX record.
+3. **Add the MX record in Cloudflare** exactly as Resend shows it: type `MX`, name the domain (or subdomain), value the host Resend gives (for example `inbound-smtp.<region>.amazonaws.com` or `receive.forge.rmta.net`; it varies per domain), priority as shown. DNS only (grey cloud). Click "I've added the record" and wait until receiving shows verified. Do not point other MX records at a lower priority.
+4. **Create the webhook.** Resend dashboard, Webhooks, Add webhook: endpoint `https://api.greenroom.fyi/webhooks/resend/inbound` (staging: the staging api URL), event `email.received`. Copy the signing secret from the webhook details page.
+5. **Set the secret** (restarts the machine, which briefly drops sessions):
+   ```sh
+   fly secrets set RESEND_WEBHOOK_SECRET=whsec_... -a greenroom-fyi-api
+   ```
+   Use `-a greenroom-staging-api` for staging. `RESEND_API_KEY` must have Full access, because the handler fetches the received message from the Receiving API (a Sending-only key cannot read it).
+6. **Verify.** Send an invite to yourself, answer it in your calendar, then check that the RSVP changed in the app. In Resend, Webhooks, the delivery log should show 200. A 401 means the secret is wrong or missing.
+
+Replies from unknown senders, forged tokens and gig invites are answered with 200 and ignored, so the log shows 200 for them too.

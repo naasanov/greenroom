@@ -216,7 +216,7 @@ export class EventsController {
     @CurrentMembership() m: BandMembership,
     @Query(new ZodPipe(listEventsQuerySchema)) q: ListEventsQuery,
   ): Promise<CalendarEvent[]> {
-    return this.events.list(m.bandId, q.from, q.to, q.type);
+    return this.events.list(m.bandId, q.from, q.to, q.type, q.includeCancelled);
   }
 }
 

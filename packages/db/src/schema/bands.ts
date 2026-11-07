@@ -65,11 +65,18 @@ export const memberships = pgTable(
     role: membershipRole("role").notNull().default("member"),
     // Drive copy of the user profile photo in this band's Profile photos folder.
     photoDriveFileId: text("photo_drive_file_id"),
+    // Secret in this member's iCal subscription URL; rotating it revokes the old URL.
+    calendarFeedToken: text("calendar_feed_token")
+      .notNull()
+      .default(
+        sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`,
+      ),
     joinedAt: tstz("joined_at").notNull().defaultNow(),
     leftAt: tstz("left_at"),
   },
   (t) => [
     index("memberships_band_id_idx").on(t.bandId),
+    uniqueIndex("memberships_calendar_feed_token_idx").on(t.calendarFeedToken),
     index("memberships_user_id_idx").on(t.userId),
     uniqueIndex("memberships_active_band_user_idx")
       .on(t.bandId, t.userId)
