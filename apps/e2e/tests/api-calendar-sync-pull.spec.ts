@@ -130,11 +130,11 @@ test("remote series edits, instance edits and cancels reach the app", async ({
     startsAt: iso(occurrence(start, 1, 20)),
     durationMinutes: 120,
   });
-  expect(
-    (
-      await ava.api.get(`${base}/occurrences/${keyOf(occurrence(start, 2))}`)
-    ).status(),
-  ).toBe(404);
+  const cancelledOcc = await ava.api.get(
+    `${base}/occurrences/${keyOf(occurrence(start, 2))}`,
+  );
+  expect(cancelledOcc.status()).toBe(200);
+  expect((await cancelledOcc.json()).cancelled).toBe(true);
   const overrides = await db.select().from(practiceOccurrenceOverrides);
   expect(overrides).toHaveLength(2);
   expect(overrides.every((o) => o.gcalInstanceEtag)).toBe(true);
@@ -221,7 +221,9 @@ test("deletes beat concurrent edits and the later app write wins", async ({
   expect(
     (await ava.api.get(`/bands/${bandId}/practices/${s1.id}`)).status(),
   ).toBe(404);
-  expect((await ava.api.get(occ(s2.id, 1))).status()).toBe(404);
+  const cancelledS2 = await ava.api.get(occ(s2.id, 1));
+  expect(cancelledS2.status()).toBe(200);
+  expect((await cancelledS2.json()).cancelled).toBe(true);
   expect(masterOf(await ev(), editedGig.id).cancelled).toBe(true);
 
   // App delete pending, Google edits: the delete wins.
