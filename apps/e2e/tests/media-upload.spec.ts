@@ -349,7 +349,8 @@ test("after a reload unfinished items say Re-add to finish; re-picking resumes",
     if (r.method() === "PUT") puts.push(r.headers()["content-range"] ?? "");
   });
   await pick(page, big);
-  await expect(t).toHaveAttribute("data-status", "done");
+  // A finished file leaves the tray once it shows up in the gallery.
+  await expect(t).toHaveCount(0);
   // Only the missing tail was sent, on the same session.
   expect(puts).toEqual([`bytes ${CHUNK}-${CHUNK + MIB - 1}/${CHUNK + MIB}`]);
   expect(await mySessions()).toHaveLength(1);

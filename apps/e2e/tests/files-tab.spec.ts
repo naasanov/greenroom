@@ -19,7 +19,9 @@ const row = (page: Page, name: string) =>
   page.locator(`[data-testid="file-row"][data-name="${name}"]:visible`);
 
 async function openMenu(page: Page, name: string) {
-  await page.getByRole("button", { name: `Actions for ${name}` }).click();
+  const trigger = page.getByRole("button", { name: `Actions for ${name}` });
+  await trigger.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await trigger.click();
 }
 
 /** New menu: a dropdown on desktop, the speed-dial FAB on phones. */
