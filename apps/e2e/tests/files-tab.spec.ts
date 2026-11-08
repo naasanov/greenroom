@@ -438,7 +438,21 @@ test("an unlinked band sees the Drive link prompt", async ({
   await testApi.reset();
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
+  const folderCalls: string[] = [];
+  const failures: string[] = [];
+  page.on("request", (r) => {
+    if (/\/files\/folder/.test(r.url())) folderCalls.push(r.url());
+  });
+  page.on("console", (m) => {
+    if (m.type() === "error" && /409/.test(m.text())) failures.push(m.text());
+  });
+  await page.goto("/events");
+  await expect(
+    page.getByRole("link", { name: "Files" }).first(),
+  ).toBeAttached();
   await page.goto("/files");
   await expect(page.getByTestId("drive-link-prompt")).toBeVisible();
   await expect(page.getByTestId("file-row")).toHaveCount(0);
+  expect(folderCalls).toEqual([]);
+  expect(failures).toEqual([]);
 });

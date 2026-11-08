@@ -369,6 +369,7 @@ export function SongSheet({
   onImport,
   onDirtyChange,
   initialText,
+  className,
 }: {
   bandId: string;
   target: SheetTarget;
@@ -384,6 +385,7 @@ export function SongSheet({
   onDirtyChange: (dirty: boolean) => void;
   /** Prefills the add flow's smart input. */
   initialText?: string;
+  className?: string;
 }) {
   const adding = target.kind === "add";
   const songId = target.kind === "song" ? target.id : null;
@@ -670,6 +672,7 @@ export function SongSheet({
   return (
     <>
       <RightSheet
+        className={className}
         open={open}
         onOpenChange={(o) => !o && onRequestClose()}
         title={title}

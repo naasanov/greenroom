@@ -171,7 +171,7 @@ function defaultsFor(
 }
 
 export type PracticeSubmit =
-  | { kind: "create"; body: CreatePractice }
+  | { kind: "create"; body: CreatePractice; copySetlistId?: string }
   | { kind: "edit"; draft: PracticeEditDraft };
 
 /**
@@ -186,6 +186,7 @@ export function PracticeForm({
   defaultDate = "",
   timeZone,
   idPrefix = "practice",
+  setlistOptions,
   submitLabel,
   onSubmit,
   onCancel,
@@ -201,6 +202,8 @@ export function PracticeForm({
   defaultDate?: string;
   timeZone: string;
   idPrefix?: string;
+  /** Create mode only: setlists the new practice can start from. */
+  setlistOptions?: { id: string; label: string }[];
   submitLabel: string;
   onSubmit: (submit: PracticeSubmit) => Promise<unknown>;
   onCancel?: () => void;
@@ -214,6 +217,7 @@ export function PracticeForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [baseline] = useState(() => defaultsFor(initial, defaultDate));
   const weekdaysTouched = useRef(!!initial);
+  const [copySetlistId, setCopySetlistId] = useState("");
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -376,6 +380,7 @@ export function PracticeForm({
           timeZone,
           recurrence: recurrenceOf(v),
         }),
+        copySetlistId: copySetlistId || undefined,
       });
     } catch (e) {
       setServerError(
@@ -573,6 +578,23 @@ export function PracticeForm({
           {...form.register("location")}
         />
       </FormField>
+
+      {!editing && setlistOptions && setlistOptions.length > 0 ? (
+        <FormField label="Setlist (optional)" htmlFor={id("setlist")}>
+          <NativeSelect
+            id={id("setlist")}
+            value={copySetlistId}
+            onChange={(e) => setCopySetlistId(e.target.value)}
+          >
+            <option value="">No setlist</option>
+            {setlistOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormField>
+      ) : null}
 
       <FormActions error={serverError ?? externalError}>
         {onCancel ? (

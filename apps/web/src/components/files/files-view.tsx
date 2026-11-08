@@ -115,7 +115,11 @@ export function FilesView({
   const integrations = useGoogleIntegrations(bandId);
   const drive = integrations.data?.drive;
   const driveReady = drive ? drive.linked && !!drive.folderId : undefined;
-  const listing = useFilesFolder(bandId, folderId, driveReady !== false);
+  const listing = useFilesFolder(
+    bandId,
+    folderId,
+    driveReady === true || integrations.isError,
+  );
   const [view, setView] = useViewChoice();
   const upload = useFilesUpload(bandId);
   const [dropTarget, setDropTarget] = useState<string | null>(null);

@@ -172,7 +172,7 @@ test("invite link: view, accept (existing and new account), idempotent", async (
   const anonymous = await anon();
   const preview = await anonymous.get(`/invites/${invite.token}`);
   expect(await preview.json()).toEqual({
-    band: { name: "The Night Owls", photoUrl: null },
+    band: { id, name: "The Night Owls", photoUrl: null },
     memberCount: 4,
   });
   expect((await anonymous.get("/invites/unknown")).status()).toBe(404);

@@ -9,6 +9,7 @@ import { AuthLayout, Brand } from "@/components/onboarding/auth-layout";
 import { Button } from "@/components/ui/button";
 import { verifyMagicLink } from "@/lib/queries";
 import { safeRedirectTo } from "@/lib/redirect";
+import { setWelcomePending } from "@/lib/welcome-pending";
 
 /** Verifies the emailed token once, then routes new users to /welcome. */
 export function CallbackView() {
@@ -24,6 +25,7 @@ export function CallbackView() {
     verifyMagicLink(token, qc).then(
       (result) => {
         const dest = safeRedirectTo(result.redirectTo);
+        if (result.isNewUser) setWelcomePending(true);
         router.replace(
           result.isNewUser
             ? `/welcome?redirectTo=${encodeURIComponent(dest)}`

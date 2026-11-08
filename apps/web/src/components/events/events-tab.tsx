@@ -18,7 +18,13 @@ import {
   EventCalendar,
   type CalendarMode,
 } from "@/components/events/event-calendar";
-import { CalendarBanner } from "@/components/google/calendar-banner";
+import { AddToCalendarButton } from "@/components/calendar-invites/add-to-calendar-button";
+import { CalendarInvitesBanner } from "@/components/calendar-invites/calendar-invites-banner";
+import { CalendarInvitesDialog } from "@/components/calendar-invites/calendar-invites-dialog";
+import {
+  markInvitesOpened,
+  takeFirstEventNudge,
+} from "@/components/calendar-invites/invite-prefs";
 import { GoogleLinkReturn } from "@/components/google/google-link-return";
 import { PublicCalendarExport } from "@/components/events/public-calendar-export";
 import { NoAccess } from "@/components/onboarding/deep-link-views";
@@ -27,7 +33,7 @@ import { useCurrentBand } from "@/lib/current-band";
 import { useDrawerStack } from "@/lib/use-drawer-stack";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { createLocalChoice } from "@/lib/use-local-choice";
-import { keys, useGig, usePracticeOccurrence } from "@/lib/queries";
+import { keys, useGig, useMe, usePracticeOccurrence } from "@/lib/queries";
 import {
   useEvents,
   useGigLinkFor,
@@ -158,6 +164,14 @@ export function EventsTab({
   const { currentBand, setCurrentBandId } = useCurrentBand();
   const bandId = currentBand?.id;
   const [mode, setMode] = useCalendarMode();
+  const meId = useMe().data?.id;
+  const [invitesOpen, setInvitesOpen] = useState(false);
+  const [nudge, setNudge] = useState(false);
+  const openInvites = () => {
+    if (meId && bandId) markInvitesOpened(meId, bandId);
+    setNudge(false);
+    setInvitesOpen(true);
+  };
 
   useEffect(() => {
     const w = window as Window & {
@@ -391,6 +405,7 @@ export function EventsTab({
   /** Hands the create drawer off to the new event's drawer and shows its date. */
   function openCreated(created: CreatedEvent) {
     if (!bandId) return;
+    if (meId && takeFirstEventNudge(meId)) setNudge(true);
     if (created.kind === "gig") {
       const { gig: made } = created;
       qc.setQueryData(keys.gig(bandId, made.id), made);
@@ -455,7 +470,12 @@ export function EventsTab({
       >
         {bandId ? (
           <>
-            <CalendarBanner bandId={bandId} />
+            <CalendarInvitesBanner
+              bandId={bandId}
+              nudge={nudge}
+              onNudgeDismiss={() => setNudge(false)}
+              onOpen={openInvites}
+            />
             <GoogleLinkReturn bandId={bandId} />
           </>
         ) : null}
@@ -477,7 +497,12 @@ export function EventsTab({
           onDayClick={openCreate}
           onEventClick={selectFromCalendar}
           headerAction={
-            bandId ? <PublicCalendarExport bandId={bandId} /> : null
+            bandId ? (
+              <>
+                <AddToCalendarButton onClick={openInvites} />
+                <PublicCalendarExport bandId={bandId} />
+              </>
+            ) : null
           }
           selectedEvent={
             sel?.kind === "gig"
@@ -487,6 +512,14 @@ export function EventsTab({
                 : null
           }
         />
+
+        {bandId ? (
+          <CalendarInvitesDialog
+            bandId={bandId}
+            open={invitesOpen}
+            onOpenChange={setInvitesOpen}
+          />
+        ) : null}
 
         {agendaOpen ? null : (
           <AgendaButton onClick={() => setAgendaOpen(true)} />

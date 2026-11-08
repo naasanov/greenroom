@@ -1,5 +1,7 @@
 import type { BandSeedResult } from "@greenroom/db";
+import { SONGS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
+import { apiAs } from "./library-helpers.js";
 import { AVA, calendar, eventIn, isoDay, pickSide } from "./events-helpers.js";
 
 let seed: BandSeedResult;
@@ -232,4 +234,30 @@ test("untouched drawer closes silently; dirty drawer asks to discard", async ({
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.getByTestId("split-viewport")).toBeHidden();
   expect(seed.gigs.upcomingClub.id).toBeTruthy();
+});
+
+test("a new practice can start from a past gig's setlist", async ({
+  page,
+  testApi,
+}) => {
+  const api = await apiAs(testApi, AVA);
+  const bandId = seed.bands.nightOwls.id;
+  const sl = await (
+    await api.get(`/bands/${bandId}/gigs/${seed.gigs.pastBar.id}/setlist`)
+  ).json();
+  await api.put(`/bands/${bandId}/setlists/${sl.id}/items`, {
+    data: { songIds: [SONGS.redLine.id] },
+  });
+  await api.dispose();
+
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const pane = await pickSide(page, "practice");
+  await pane.getByLabel("Title").fill("Setlist jam");
+  await pane.getByLabel("Date", { exact: true }).fill(isoDay(3));
+  await pane.getByLabel("Setlist (optional)").selectOption({ index: 1 });
+  await pane.getByRole("button", { name: "Create practice" }).click();
+  const dialog = page.getByRole("dialog", { name: "Setlist jam" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("setlist-row")).toHaveCount(1);
 });

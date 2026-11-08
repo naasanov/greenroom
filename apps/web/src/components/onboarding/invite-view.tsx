@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api";
 import {
   useAcceptInvite,
+  useBands,
   useInvitePlaceholders,
   useInvitePreview,
   useLinkPlaceholder,
@@ -26,6 +27,7 @@ export function InviteView() {
   const accept = useAcceptInvite(token);
   const link = useLinkPlaceholder(token);
   const placeholders = useInvitePlaceholders(token, !!me.data);
+  const bands = useBands(!!me.data);
 
   if (preview.isError) {
     const gone = isApiError(preview.error, 404);
@@ -53,7 +55,11 @@ export function InviteView() {
     );
   }
 
-  if (!preview.data || me.isLoading || (me.data && placeholders.isLoading)) {
+  if (
+    !preview.data ||
+    me.isLoading ||
+    (me.data && (placeholders.isLoading || bands.isLoading))
+  ) {
     return (
       <AuthLayout>
         <Loader2
@@ -66,6 +72,7 @@ export function InviteView() {
 
   const { band, memberCount } = preview.data;
   const here = `/invite/${token}`;
+  const alreadyIn = !!bands.data?.some((b) => b.id === band.id);
   const claimable = placeholders.data ?? [];
   const busy = accept.isPending || link.isPending;
   const failure = accept.isError ? accept.error : link.error;
@@ -89,7 +96,16 @@ export function InviteView() {
             {memberCount} {memberCount === 1 ? "member" : "members"}
           </p>
         </div>
-        {me.data && claimable.length > 0 ? (
+        {me.data && alreadyIn ? (
+          <div className="flex w-full flex-col gap-2">
+            <p className="text-sm text-muted-foreground">
+              You are already in this band.
+            </p>
+            <Button asChild size="lg">
+              <Link href="/">Open Greenroom</Link>
+            </Button>
+          </div>
+        ) : me.data && claimable.length > 0 ? (
           <div className="flex w-full flex-col gap-3 text-left">
             <h2 className="text-center text-base font-semibold">
               Is one of these you?

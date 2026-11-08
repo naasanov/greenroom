@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe, useSaveProfile } from "@/lib/queries";
 import { safeRedirectTo, signInUrl } from "@/lib/redirect";
+import { setWelcomePending } from "@/lib/welcome-pending";
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
@@ -99,7 +100,13 @@ export function WelcomeView() {
       </div>
       <div className="rounded-3xl border bg-card p-5 shadow-soft">
         {me.data ? (
-          <ProfileForm user={me.data} onDone={() => router.replace(dest)} />
+          <ProfileForm
+            user={me.data}
+            onDone={() => {
+              setWelcomePending(false);
+              router.replace(dest);
+            }}
+          />
         ) : (
           <p
             role="status"

@@ -84,8 +84,11 @@ export function sortSongs(list: SongSummary[], sort: SongSort): SongSummary[] {
     case "recent":
       return out.sort(
         (a, b) =>
-          (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0) ||
-          (a.id < b.id ? 1 : -1),
+          (a.createdAt < b.createdAt
+            ? 1
+            : a.createdAt > b.createdAt
+              ? -1
+              : 0) || (a.id < b.id ? 1 : -1),
       );
     case "title":
       return out.sort(byTitleThenId);
@@ -275,7 +278,11 @@ export function useDeleteSong(bandId: string) {
       }),
     onSuccess: (_res, songId) => {
       qc.removeQueries({ queryKey: keys.song(bandId, songId) });
-      void qc.invalidateQueries({ queryKey: songsRoot(bandId) });
+      // The deleted song's own detail query is gone; refetching it would 404.
+      void qc.invalidateQueries({
+        queryKey: songsRoot(bandId),
+        predicate: (q) => q.queryKey[3] !== songId,
+      });
     },
   });
 }

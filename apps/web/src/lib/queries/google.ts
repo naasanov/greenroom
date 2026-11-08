@@ -26,11 +26,15 @@ export const googleKeys = {
 };
 
 /** Link state of the band's Google Drive and Calendar. */
+export const googleStatusQuery = (bandId: string) => ({
+  queryKey: googleKeys.status(bandId),
+  queryFn: () => api(base(bandId), { schema: googleIntegrationsSchema }),
+});
+
 export function useGoogleIntegrations(bandId: string | undefined) {
   return useQuery({
-    queryKey: googleKeys.status(bandId ?? ""),
+    ...googleStatusQuery(bandId ?? ""),
     enabled: !!bandId,
-    queryFn: () => api(base(bandId!), { schema: googleIntegrationsSchema }),
   });
 }
 

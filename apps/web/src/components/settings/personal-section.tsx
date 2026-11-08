@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { userSchema, type UpdateProfile, type User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
+import { InvitesToggle } from "@/components/calendar-invites/calendar-invites-dialog";
 import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
 import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
@@ -183,6 +184,7 @@ export function PersonalSection({ user }: { user: User }) {
       {mine.data ? (
         <>
           <PersonalForm user={user} />
+          <InvitesToggle enabled={user.calendarInvitesEnabled} />
           <InstrumentsAutosave
             initial={[...mine.data.presets, ...mine.data.custom]}
           />

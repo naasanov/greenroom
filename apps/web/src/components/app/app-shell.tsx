@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { BandSwitcher, type BandSummary } from "@/components/app/band-switcher";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +27,34 @@ export const NAV_TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "files", label: "Files", icon: FolderOpen },
   { key: "roster", label: "Roster", icon: Users },
 ];
+
+function subscribeOnline(cb: () => void) {
+  window.addEventListener("online", cb);
+  window.addEventListener("offline", cb);
+  return () => {
+    window.removeEventListener("online", cb);
+    window.removeEventListener("offline", cb);
+  };
+}
+
+/** Thin bar shown while the browser reports no connection. */
+function OfflineBar() {
+  const online = useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
+  if (online) return null;
+  return (
+    <div
+      role="status"
+      data-testid="offline-bar"
+      className="border-b bg-muted px-3 py-1.5 text-center text-xs text-muted-foreground"
+    >
+      You are offline. Showing what was last loaded; changes will not save.
+    </div>
+  );
+}
 
 const SHOW_BOTTOM: Record<ShellLayout, string> = {
   responsive: "md:hidden",
@@ -292,6 +320,7 @@ export function AppShell({
           <ProfileButton {...profile} onClick={onProfileClick} />
         </div>
       </header>
+      <OfflineBar />
       <main
         className={cn(
           "flex-1",

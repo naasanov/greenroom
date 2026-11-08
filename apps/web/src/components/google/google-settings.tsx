@@ -31,18 +31,23 @@ function Row({
   testId,
   title,
   status,
+  description,
   detail,
   children,
 }: {
   testId: string;
   title: string;
   status: string;
+  description?: string;
   detail?: string | null;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>
       <p className="text-sm font-medium">{title}</p>
+      {description ? (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      ) : null}
       <span
         data-testid={`${testId}-status`}
         className="min-w-0 break-words text-sm text-muted-foreground"
@@ -187,7 +192,8 @@ function CalendarRow({ bandId }: { bandId: string }) {
   return (
     <Row
       testId="settings-google-calendar"
-      title="Google Calendar"
+      title="Google Calendar sync (optional)"
+      description="Pushes gigs and practices into a shared Google calendar within moments of every change, for members with Google accounts. Everyone else uses calendar invites from the Events tab."
       status={
         !cal
           ? "Loading..."
@@ -199,7 +205,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
     >
       {cal && !ready ? (
         <Button variant="outline" onClick={() => setSetup(true)}>
-          Sync to Google Calendar
+          Set up Google Calendar sync
         </Button>
       ) : null}
       {ready ? (
@@ -219,7 +225,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title="Disconnect Google Calendar?"
+        title="Turn off Google Calendar sync?"
         description="Gigs and practices stop syncing. The Google calendar stays shared with members as it is."
         confirmLabel="Disconnect"
         destructive
@@ -229,7 +235,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
   );
 }
 
-/** Admin Google area of Band settings: Drive and Calendar connection rows. */
+/** Admin Google area of Band settings: Drive and Google Calendar sync rows. */
 export function GoogleSettings({ bandId }: { bandId: string }) {
   return (
     <div

@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { magicLinkTokens, users, type Database } from "@greenroom/db";
 import type { User } from "@greenroom/shared";
+import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
@@ -18,6 +19,7 @@ export class AuthService {
     @Inject(EMAIL) private readonly email: EmailAdapter,
     private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
+    private readonly inviteService: CalendarInviteService,
   ) {}
 
   async sendMagicLink(email: string, redirectTo?: string): Promise<void> {
@@ -123,6 +125,7 @@ export class AuthService {
       displayName?: string;
       avatarUrl?: string | null;
       calendarEmail?: string | null;
+      calendarInvitesEnabled?: boolean;
     },
   ): Promise<User> {
     const set: Partial<typeof users.$inferInsert> = {};
@@ -130,6 +133,9 @@ export class AuthService {
     if (patch.avatarUrl !== undefined) set.avatarUrl = patch.avatarUrl;
     if (patch.calendarEmail !== undefined)
       set.calendarEmail = patch.calendarEmail;
+    // setEnabled writes the flag itself and queues the catch-up reconcile.
+    if (patch.calendarInvitesEnabled !== undefined)
+      await this.inviteService.setEnabled(userId, patch.calendarInvitesEnabled);
     if (Object.keys(set).length === 0) {
       const [u] = await this.db
         .select()

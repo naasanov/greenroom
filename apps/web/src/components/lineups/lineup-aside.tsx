@@ -88,7 +88,7 @@ function HistoryRow({
           className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-2xl px-3 py-2.5 text-left transition-colors outline-none hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60"
         >
           <span className="truncate text-sm font-semibold">{e.title}</span>
-          <span className="truncate text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {[
               e.venueName,
               dayLabel(e.date),

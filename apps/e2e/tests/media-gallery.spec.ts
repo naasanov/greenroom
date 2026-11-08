@@ -52,6 +52,19 @@ test("strip opens the full view, close returns to the gig drawer", async ({
   await expect(drawer).toBeVisible();
 });
 
+test("the Agenda dialog is not in the DOM under the full media page", async ({
+  page,
+}) => {
+  await page.goto(`/gigs/${m.gigId}`);
+  await page
+    .getByRole("dialog", { name: m.gigTitle })
+    .getByTestId("media-strip")
+    .click();
+  await expect(page.getByTestId("media-gallery")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Agenda" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add event" })).toHaveCount(0);
+});
+
 test("back button returns to the gig", async ({ page }) => {
   await page.goto(`/gigs/${m.gigId}`);
   await page

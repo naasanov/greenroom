@@ -6,6 +6,7 @@ export const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
   calendarEmail: z.string().nullable(),
+  calendarInvitesEnabled: z.boolean(),
   lastBandId: z.string().uuid().nullable(),
 });
 export type User = z.infer<typeof userSchema>;
@@ -38,6 +39,7 @@ export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(100).optional(),
   avatarUrl: z.string().url().max(2048).nullable().optional(),
   calendarEmail: calendarEmailSchema.optional(),
+  calendarInvitesEnabled: z.boolean().optional(),
 });
 export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 
@@ -65,3 +67,10 @@ export type DeletionPreview = z.infer<typeof deletionPreviewSchema>;
 export const ACCOUNT_ERROR_CODES = {
   lastAdmin: "ACCOUNT_LAST_ADMIN",
 } as const;
+
+/** A member's private subscription feed (https URL and its webcal twin). */
+export const calendarFeedLinkSchema = z.object({
+  url: z.string(),
+  webcalUrl: z.string(),
+});
+export type CalendarFeedLink = z.infer<typeof calendarFeedLinkSchema>;

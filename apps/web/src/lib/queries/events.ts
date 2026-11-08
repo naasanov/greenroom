@@ -183,6 +183,25 @@ export function useCreatePractice(bandId: string) {
   });
 }
 
+/** Starts a new practice series with a copy of an existing setlist from its first occurrence. */
+export async function copySetlistToPractice(
+  bandId: string,
+  series: PracticeSeries,
+  sourceSetlistId: string,
+) {
+  const key = new Date(series.dtstart)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+  await api(
+    `/bands/${bandId}/practices/${series.id}/occurrences/${key}/setlist`,
+    {
+      method: "POST",
+      body: { scope: "this_and_following", sourceSetlistId },
+    },
+  );
+}
+
 export function useUpdatePractice(
   bandId: string,
   seriesId: string,

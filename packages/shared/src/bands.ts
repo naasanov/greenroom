@@ -114,7 +114,11 @@ export const inviteLinkSchema = z.object({
 export type InviteLinkInfo = z.infer<typeof inviteLinkSchema>;
 
 export const invitePreviewSchema = z.object({
-  band: z.object({ name: z.string(), photoUrl: z.string().nullable() }),
+  band: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    photoUrl: z.string().nullable(),
+  }),
   memberCount: z.number().int(),
 });
 export type InvitePreview = z.infer<typeof invitePreviewSchema>;

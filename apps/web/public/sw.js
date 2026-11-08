@@ -1,5 +1,6 @@
-// Greenroom service worker: caches hashed build assets and per-gig stage pages.
+// Greenroom service worker: caches build assets, visited pages and per-gig stage pages.
 const SHELL_CACHE = "greenroom-shell-v1";
+const OFFLINE_PAGE = "/offline.html";
 const STAGE_PAGE = /^\/gigs\/[^/]+\/stage$/;
 const UUID_TAIL =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\/stage$)/i;
@@ -10,7 +11,15 @@ function stageKey(pathname) {
   return id ? `/gigs/${id[0]}/stage` : pathname;
 }
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.add(OFFLINE_PAGE))
+      .catch(() => {})
+      .then(() => self.skipWaiting()),
+  );
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -34,10 +43,15 @@ self.addEventListener("fetch", (event) => {
 
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(cacheFirst(request));
+  } else if (request.mode === "navigate") {
+    if (url.pathname.startsWith("/auth/") || url.pathname === OFFLINE_PAGE)
+      return;
+    const key = STAGE_PAGE.test(url.pathname)
+      ? stageKey(url.pathname)
+      : url.pathname;
+    event.respondWith(networkFirst(request, key, true));
   } else if (!STAGE_PAGE.test(url.pathname)) {
     return;
-  } else if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request, stageKey(url.pathname)));
   } else if (url.searchParams.has("_rsc")) {
     // The route payload for runtime params, stored without its changing hash.
     event.respondWith(networkFirst(request, stageKey(url.pathname) + "?rsc"));
@@ -53,15 +67,18 @@ async function cacheFirst(request) {
   return res;
 }
 
-async function networkFirst(request, key) {
+// Redirected responses are never stored; they cannot answer a navigation.
+async function networkFirst(request, key, isPage = false) {
   const cache = await caches.open(SHELL_CACHE);
   try {
     const res = await fetch(request);
-    if (res.ok) cache.put(key, res.clone()).catch(() => {});
+    if (res.ok && !res.redirected) cache.put(key, res.clone()).catch(() => {});
     return res;
   } catch (err) {
     const hit = await cache.match(key, { ignoreVary: true });
     if (hit) return hit;
+    const fallback = isPage && (await cache.match(OFFLINE_PAGE));
+    if (fallback) return fallback;
     throw err;
   }
 }

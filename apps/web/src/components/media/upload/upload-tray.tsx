@@ -54,6 +54,9 @@ export function UploadTray({
   const visible = entries.filter((e) => !hiddenKeys?.has(e.key));
   const active = visible.filter(isActive);
   const hasReadd = visible.some((e) => e.status === "readd");
+  // Entries awaiting a re-pick cannot be moved or assigned, so only Re-add applies.
+  const readdOnly =
+    visible.length > 0 && visible.every((e) => e.status === "readd");
   const hasDone = visible.some((e) => e.status === "done");
   const cancellable = visible.some((e) => e.status !== "done");
 
@@ -82,33 +85,41 @@ export function UploadTray({
     >
       <BatchBar entries={entries} className="absolute inset-x-0 top-0" />
       <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5 pb-1">
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="upload-select-all"
-          onClick={onSelectAll}
-          className="rounded-full"
-        >
-          <CheckCheck /> Select all
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="upload-folder"
-          onClick={onPickFolder}
-          className="rounded-full"
-        >
-          <FolderInput /> Folder
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="upload-song-pick"
-          onClick={onPickSong}
-          className="rounded-full"
-        >
-          <Music2 /> Song
-        </Button>
+        {readdOnly ? (
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            Pick the same files again to finish these uploads.
+          </p>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="upload-select-all"
+              onClick={onSelectAll}
+              className="rounded-full"
+            >
+              <CheckCheck /> Select all
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="upload-folder"
+              onClick={onPickFolder}
+              className="rounded-full"
+            >
+              <FolderInput /> Folder
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="upload-song-pick"
+              onClick={onPickSong}
+              className="rounded-full"
+            >
+              <Music2 /> Song
+            </Button>
+          </>
+        )}
         <div className="ml-auto flex items-center gap-1">
           {hasReadd ? (
             <Button

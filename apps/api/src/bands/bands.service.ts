@@ -507,9 +507,16 @@ export class BandsService {
     const [row] = await this.db
       .select({ n: count() })
       .from(memberships)
-      .where(and(eq(memberships.bandId, band.id), isNull(memberships.leftAt)));
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.bandId, band.id),
+          isNull(memberships.leftAt),
+          eq(users.isPlaceholder, false),
+        ),
+      );
     return {
-      band: { name: band.name, photoUrl: band.photoUrl },
+      band: { id: band.id, name: band.name, photoUrl: band.photoUrl },
       memberCount: row!.n,
     };
   }

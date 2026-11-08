@@ -103,7 +103,9 @@ export function RoutedShell({ children }: { children: ReactNode }) {
   const activeTab = tabFromPath(pathname);
   // Event deep links share one Events tab; once visited it stays mounted (hidden
   // off-tab) so returning never rebuilds the calendar.
-  const showEvents = activeTab === "events";
+  // The full-screen media page covers the tab, so the tab (and its Agenda) leaves the DOM tree.
+  const onMediaPage = /^\/gigs\/[^/]+\/media(\/|$)/.test(pathname);
+  const showEvents = activeTab === "events" && !onMediaPage;
   const [eventsVisited, setEventsVisited] = useState(false);
   if (showEvents && !eventsVisited) setEventsVisited(true);
   if (activeTab && activeTab !== lastTab) setLastTab(activeTab);

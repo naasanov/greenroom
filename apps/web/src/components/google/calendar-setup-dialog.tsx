@@ -46,7 +46,7 @@ export function CalendarSetupDialog({
       <DialogContent data-testid="calendar-setup">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            Google Calendar
+            Google Calendar sync
           </DialogTitle>
           <DialogDescription>
             Gigs and practices stay in sync with your band calendar. Members get

@@ -107,6 +107,7 @@ export async function toUser(
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,
     calendarEmail: row.calendarEmail,
+    calendarInvitesEnabled: row.calendarInvitesEnabled,
     lastBandId,
   };
 }

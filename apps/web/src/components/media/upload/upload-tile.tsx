@@ -174,7 +174,7 @@ export function UploadTile({
         {entry.status === "readd" ? (
           <span
             data-testid="upload-readd"
-            className="absolute inset-x-1 bottom-1 rounded-b-xl bg-black/65 px-2 py-0.5 text-center text-[9px] leading-tight font-medium text-white"
+            className="absolute inset-x-1 bottom-1 rounded-b-xl bg-black/65 px-2 py-0.5 text-center text-[11px] leading-tight font-medium text-white"
           >
             Re-add to finish
           </span>

@@ -119,6 +119,10 @@ export function LeaveBandSection({ band }: { band: BandSummary }) {
               its gigs, songs, and setlists. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <p className="text-sm">
+            Type <strong className="font-semibold">{band.name}</strong> below to
+            confirm.
+          </p>
           <Input
             aria-label={`Type ${band.name} to confirm`}
             placeholder={band.name}

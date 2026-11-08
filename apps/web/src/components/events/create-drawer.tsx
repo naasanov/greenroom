@@ -12,7 +12,13 @@ import {
   type PracticeSubmit,
 } from "@/components/events/practice-form";
 import { localTimeZone } from "@/components/events/time";
-import { useCreateGig, useCreatePractice } from "@/lib/queries/events";
+import {
+  copySetlistToPractice,
+  useCreateGig,
+  useCreatePractice,
+} from "@/lib/queries/events";
+import { useSetlistHistory } from "@/lib/queries/setlists";
+import { dayLabel } from "@/components/events/time";
 
 /** What the create drawer just made; the caller opens it. */
 export type CreatedEvent =
@@ -48,6 +54,11 @@ export function CreateEventDrawer({
 }) {
   const createGig = useCreateGig(bandId);
   const createPractice = useCreatePractice(bandId);
+  const history = useSetlistHistory(bandId, "", open);
+  const setlistOptions = history.data?.map((g) => ({
+    id: g.setlistId,
+    label: `Copy from ${g.title} (${dayLabel(g.date)}, ${g.songCount} ${g.songCount === 1 ? "song" : "songs"})`,
+  }));
   const [dirty, setDirty] = useState({ gig: false, practice: false });
   const [discardOpen, setDiscardOpen] = useState(false);
   const afterDiscard = useRef<(() => void) | null>(null);
@@ -105,6 +116,12 @@ export function CreateEventDrawer({
   async function savePractice(submit: PracticeSubmit) {
     if (submit.kind !== "create") return;
     const series = await createPractice.mutateAsync(submit.body);
+    if (submit.copySetlistId) {
+      // The practice already exists; a failed copy leaves it without a setlist.
+      await copySetlistToPractice(bandId, series, submit.copySetlistId).catch(
+        () => {},
+      );
+    }
     close();
     onCreated({ kind: "practice", series });
   }
@@ -130,6 +147,7 @@ export function CreateEventDrawer({
               idPrefix="practice"
               defaultDate={defaultDate}
               timeZone={timeZone}
+              setlistOptions={setlistOptions}
               submitLabel="Create practice"
               onSubmit={savePractice}
               onDirtyChange={setPracticeDirty}

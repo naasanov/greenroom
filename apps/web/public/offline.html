@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline | Greenroom</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #fafaf9;
+        color: #1c1917;
+      }
+      main {
+        max-width: 22rem;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.5rem;
+      }
+      p {
+        margin: 0 0 1.25rem;
+        color: #57534e;
+        line-height: 1.5;
+      }
+      button {
+        font: inherit;
+        padding: 0.625rem 1.25rem;
+        border-radius: 0.75rem;
+        border: 1px solid #d6d3d1;
+        background: #fff;
+        color: inherit;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1c1917;
+          color: #fafaf9;
+        }
+        p {
+          color: #a8a29e;
+        }
+        button {
+          background: #292524;
+          border-color: #44403c;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main data-testid="offline-page">
+      <h1>You are offline</h1>
+      <p>
+        This page was not saved on this device. Pages you have opened before
+        still load, and stage mode works for upcoming gigs.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
