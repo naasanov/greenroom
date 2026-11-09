@@ -3,7 +3,7 @@
 import { gigPath } from "@/lib/gig-path";
 import { Loader2, Music2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
   MediaItem,
@@ -490,6 +490,31 @@ export function SongSheet({
       { onSuccess: () => setOffer(null) },
     );
   }
+
+  // On desktop the sheet is non-modal: a press on a song row switches songs
+  // (the row handles it); a press anywhere else outside the sheet closes it.
+  const closeRef = useRef(onRequestClose);
+  useEffect(() => {
+    closeRef.current = onRequestClose;
+  });
+  const closeOnOutside = open && desktop && !adding && !editing;
+  useEffect(() => {
+    if (!closeOnOutside) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t || !t.isConnected) return;
+      if (
+        t.closest(
+          '[data-testid="right-sheet"], [data-song-select], [role="menu"], [role="listbox"], [role="alertdialog"], [data-radix-popper-content-wrapper], [role="dialog"]:not([data-vaul-drawer])',
+        )
+      ) {
+        return;
+      }
+      closeRef.current();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [closeOnOutside]);
 
   const index = songId ? siblings.indexOf(songId) : -1;
   const prevId = index > 0 ? siblings[index - 1] : undefined;

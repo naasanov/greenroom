@@ -26,6 +26,29 @@ test("opens, sends, and confirms; the issue reaches the fake", async ({
   await expect(dialog).toBeHidden();
 });
 
+test("keeps a partial draft when closed and reopened", async ({
+  page,
+  loginAs,
+  testApi,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/events");
+  const open = page.getByRole("button", { name: "Send feedback" });
+  const dialog = page.getByTestId("feedback-dialog");
+  await open.click();
+  await dialog.getByLabel("Message").fill("half a thought");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await open.click();
+  await expect(dialog.getByLabel("Message")).toHaveValue("half a thought");
+  await dialog.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByTestId("feedback-sent")).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await open.click();
+  await expect(dialog.getByLabel("Message")).toHaveValue("");
+});
+
 test("shows an error when sending fails", async ({
   page,
   loginAs,

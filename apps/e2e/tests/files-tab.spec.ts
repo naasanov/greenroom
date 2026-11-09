@@ -382,6 +382,22 @@ test("opens a file in the viewer", async ({ page }) => {
   await expect(viewer).toBeHidden();
 });
 
+test("a Google document opens in Drive in a new tab", async ({ page }) => {
+  const doc = await m.fake.external({
+    action: "add",
+    name: "Set notes",
+    parentId: rootId,
+    mimeType: "application/vnd.google-apps.document",
+    content: "doc",
+  });
+  await page.goto("/files");
+  const popup = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Open Set notes" }).click();
+  const tab = await popup;
+  expect(tab.url()).toContain(`drive.google.com/open?id=${doc.id}`);
+  await expect(page.getByTestId("file-viewer")).toBeHidden();
+});
+
 test("view mode persists across reloads and offers compact previews", async ({
   page,
 }) => {

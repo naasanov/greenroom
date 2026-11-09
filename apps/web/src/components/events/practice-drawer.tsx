@@ -219,11 +219,6 @@ function PracticeDetails({
             />
           </section>
 
-          <section aria-label="Attendees" className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
-            <AttendeeList attendees={attendees} />
-          </section>
-
           <SetlistSection
             builder={setlist}
             caption={
@@ -249,6 +244,11 @@ function PracticeDetails({
               {setlistError}
             </p>
           ) : null}
+
+          <section aria-label="Attendees" className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
+            <AttendeeList attendees={attendees} />
+          </section>
         </>
       )}
     </div>

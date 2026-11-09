@@ -131,7 +131,7 @@ Expected: band switcher (band name and photo) sits next to the profile icon on b
 Section: Multiple bands & leaving; Persistence.
 1. Open the switcher, pick the other band.
 2. Reload and open the app on another device/context signed in as the same user.
-Expected: data switches to the chosen band; last-used band is stored server-side so the other device opens on it. Switcher also contains a Band settings entry for admins (per Gate 4 notes).
+Expected: data switches to the chosen band; last-used band is stored server-side so the other device opens on it. Switcher also contains a Band settings entry. Current app behavior: the entry is shown to every member of the band, not only admins; admin-only controls inside settings remain admin-only.
 
 ### BAND-03 Deep link switches band automatically
 Tags: [needs-two-users]. Section: Multiple bands; Shareable deep links.
@@ -171,7 +171,7 @@ Expected: X's name is still listed, tagged as a former member.
 ### ROST-01 Roster tab list
 Section: Roster tab.
 1. Open the Roster tab.
-Expected: members as cards (same card style as Music Library): name, photo, instrument icons. Roster is the third tab, last in order.
+Expected: members as cards (same card style as Music Library): name, photo, instrument icons. Roster is the fourth and last tab (Events, Music Library, Files, Roster).
 
 ### ROST-02 Member detail sheet
 Section: Roster tab.
@@ -248,7 +248,7 @@ Expected: only the creator listed (admin) with invite button available.
 ### NAV-01 Tab order and default
 Section: UI / Navigation (LOCKED tabs); Files tab.
 1. Open the app signed in.
-Expected: tabs in order Events, Music Library, Roster, then Files (fourth, added 2026-11-04). App opens on Events. No separate Gigs tab. Settings is not a tab.
+Expected: tabs in order Events, Music Library, Files, then Roster (Files third, added 2026-11-04; Roster last). App opens on Events. No separate Gigs tab. Settings is not a tab.
 
 ### NAV-02 Desktop top tabs / mobile bottom bar
 Section: Tab placement.
@@ -375,7 +375,7 @@ Expected: sheet slides in from the right. Execution plan notes it opens by defau
 
 ### AGD-02 One continuous timeline with today line
 1. Open the agenda.
-Expected: past and upcoming in one list, no toggle; a today line in the same pink as the calendar's today marker; opens positioned on the today line. Scroll down: soonest to latest upcoming; scroll up: most recent to oldest past.
+Expected: past and upcoming in one list, no past/upcoming toggle (an All / Gigs / Practices control filters the list); a today line in the same pink as the calendar's today marker; opens positioned on the today line. Scroll down: soonest to latest upcoming; scroll up: most recent to oldest past.
 
 ### AGD-03 Past peek
 Expected: a half-visible card of the most recent past event is visible above the today line.
@@ -501,8 +501,8 @@ Section: Events & Gigs; Media experience.
 Expected: sections for details, setlist, lineup, media preview strip, point of contact, notes, Stage mode button, share button, edit pencil.
 
 ### EVT-02 Edit gig
-1. Press the pencil (becomes "Cancel"), change fields, Save.
-Expected: edits saved; chip updates. Setlist and lineup are edited live in the drawer and are not part of the edit form.
+1. Press the pencil, change fields, then Save changes.
+Expected: the pencil hides while editing and the footer shows Cancel / Save changes; edits saved; chip updates. Setlist and lineup are edited live in the drawer and are not part of the edit form.
 
 ### EVT-03 Cancel edit
 1. Edit then press Cancel with changes.
@@ -599,7 +599,7 @@ Expected: two thin drawers side by side (library beside the event drawer); song 
 
 ### SET-04 Phone tap-to-add fallback [mobile]
 1. Press Add songs on phone.
-Expected: library drawer opens over the gig drawer (stacked, event drawer peeking). Tap a song to append it with a check mark; tap a checked song to remove it. Done returns to the setlist.
+Expected: library drawer opens over the gig drawer (stacked, event drawer peeking). Tap a song to append it with a check mark; tap a checked song to remove it. The sheet is dismissed with a chevron (no "Done" label) and returns to the setlist.
 
 ### SET-05 Drag-to-reorder
 1. Drag a setlist row by its handle to a new position (desktop and phone).
@@ -651,8 +651,8 @@ Expected: lineup shows the entire band.
 1. Remove a member (live save). Press Add people; add them back by dragging (desktop) or tapping (phone, check marks, Done).
 Expected: same drag/tap mechanic as songs; roster drawer behaves like the library drawer.
 
-### SET-17 Copy lineup from last gig
-Expected: a "Copy from last gig" button (not the default) replaces the lineup from the most recent gig. Past-gig lineup preview available.
+### SET-17 Copy lineup from a past gig
+Expected: a "Copy from a past gig" button (not the default) opens a list of past gigs with a lineup preview; choosing one replaces the lineup. There is no one-tap "Copy from last gig". Past gigs with empty setlists are omitted from the list.
 
 ### SET-18 Setlist and lineup save live
 1. Make a change and reload without pressing Save.
@@ -664,7 +664,7 @@ Expected: each change is saved immediately.
 
 ### LIB-01 Empty state
 Section: Music Library tab (Empty state & create).
-Expected: placeholder "No music yet. Press + to add one" (verify copy); FAB in same spot as calendar.
+Expected: the spec copy is "No music yet. Press + to add one"; the app currently shows the same text joined with a dash instead of a period, which is recorded here as current behavior; FAB in same spot as calendar.
 
 ### LIB-02 FAB splits into Add song / Import playlist
 Expected: tapping + shows two options.
@@ -965,7 +965,7 @@ Expected: excessive uploads per link or IP are rejected (per-link and per-IP lim
 
 ### FILE-01 Files tab exists
 Section: Files tab.
-Expected: fourth tab "Files".
+Expected: third tab "Files" (before Roster).
 
 ### FILE-02 Unlinked state
 Expected: with no Drive linked, the tab prompts to link Drive (DRIVE-01).
@@ -1254,3 +1254,27 @@ Expected: icon-only buttons have aria-labels (Edit, Close, etc.).
 18. Practice "cancel" display (canceled chip versus removed) is unspecified.
 19. Whether the Files tab and gigs root appear when Drive is unlinked, and the exact copy of Files-specific messages, are unspecified.
 20. Spotify playlist import in fake mode versus real: only real mode exercises the User Management restriction.
+
+---
+
+# Observed behaviors
+
+Current app behavior recorded from the walkthrough (issue #35). These are documented as-is, not filed as bugs.
+
+- `/practices/:seriesId` without a date shows the calendar and opens no drawer.
+- Desktop share confirmation is an icon swap to a check, with no toast.
+- A foreign-band gig id for a signed-in multi-band user shows "This link doesn't exist or you don't have access".
+- Leave band for the only member is presented as "Delete band" with a typed-name confirm.
+- The agenda is open by default on wide screens and closed on phones.
+- "This and following" is hidden when an occurrence date changes; "This event" is hidden when recurrence changes.
+- Roster-only members appear with no response in attendee lists.
+- Fake Places only knows Bowery Ballroom, The Troubadour and Exit/In.
+- Applying an RSVP to "All events" overwrites an earlier "This event" RSVP on that occurrence.
+- The last stage song shows "END OF SETLIST" and stays put. An empty-setlist gig hides the Stage button; the direct URL shows "This gig has no setlist yet."
+- Past gigs with empty setlists are omitted from the copy-from-past-gig list.
+- Fake Spotify imports 10 demo tracks for any unknown playlist id.
+- Deleting a song removes it from all setlists after a count warning.
+- Gig sync pushes gigs from about two weeks ago forward only.
+- Demo band members count as active members for ACCT-03.
+- Disconnect Drive / Calendar exist as buttons; behavior is not exercised (DRIVE-07).
+- The details pencil hides in favor of the footer Cancel / Save changes.

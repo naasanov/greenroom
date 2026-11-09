@@ -24,7 +24,7 @@ export function PersonLine({
   const instruments = member ? memberInstruments(member) : [];
   return (
     <>
-      <MemberAvatar member={person} className="size-10" />
+      <MemberAvatar member={person} letters={2} className="size-10" />
       <span className="flex min-w-0 flex-1 flex-col text-left">
         <span className="truncate text-sm leading-tight font-semibold">
           {person.displayName}

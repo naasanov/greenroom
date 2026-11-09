@@ -47,10 +47,13 @@ function useVisualViewportHeight(active: boolean): number | null {
   return height;
 }
 
+/** Unsent text, kept at module scope so it survives closing and remounting. */
+let draft = "";
+
 /** Header icon button that opens a dialog for sending feedback as a GitHub issue. */
 export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(draft);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,6 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
-      setMessage("");
       setSent(false);
       setError(null);
     }
@@ -78,6 +80,8 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
     };
     try {
       await api("/feedback", { method: "POST", body });
+      draft = "";
+      setMessage("");
       setSent(true);
     } catch (e) {
       setError(errorText(e));
@@ -130,7 +134,10 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                 value={message}
                 maxLength={FEEDBACK_MESSAGE_MAX}
                 disabled={sending}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  draft = e.target.value;
+                  setMessage(draft);
+                }}
                 onFocus={(e) => {
                   const el = e.currentTarget;
                   setTimeout(() => el.scrollIntoView({ block: "center" }), 300);

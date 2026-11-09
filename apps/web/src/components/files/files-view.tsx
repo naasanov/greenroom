@@ -50,7 +50,7 @@ import { Breadcrumbs } from "./breadcrumbs";
 import { FileRow, FileTile, type EntryProps } from "./file-entry";
 import { FilesSkeleton } from "./files-skeleton";
 import { FileViewer } from "./file-viewer";
-import { entryHref, isProtected } from "./file-utils";
+import { driveOpenUrl, entryHref, isGoogleDoc, isProtected } from "./file-utils";
 import type { EntryActions } from "./item-menu";
 import { LinkGigDialog } from "./link-gig-dialog";
 import { LinkSongsDrawer } from "./link-songs-drawer";
@@ -169,12 +169,19 @@ export function FilesView({
     setSelected(new Set());
   };
 
+  // Google documents open in Drive; the viewer shows only if the popup is blocked.
+  const openFile = (e: FileEntry) => {
+    const tab = isGoogleDoc(e) ? window.open(driveOpenUrl(e), "_blank") : null;
+    if (tab) tab.opener = null;
+    else setViewer(e);
+  };
+
   const actions: EntryActions = {
     onOpen: (e) => {
       const href = entryHref(e);
       if (e.gig) openMediaView(router, e.gig.id);
       else if (href) router.push(href);
-      else setViewer(e);
+      else openFile(e);
     },
     onRename: (e) => {
       setNameError(null);
@@ -277,7 +284,7 @@ export function FilesView({
       menuOpen: menuId === entry.id,
       onMenuOpenChange: (open) => setMenuId(open ? entry.id : null),
       onToggle: () => toggle(entry),
-      onOpenFile: setViewer,
+      onOpenFile: openFile,
       actions,
     });
     body = (

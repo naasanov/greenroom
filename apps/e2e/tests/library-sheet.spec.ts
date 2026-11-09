@@ -148,3 +148,21 @@ test("edit mode stacks the reference label above the link", async ({
   expect(Math.abs(v.x - l.x)).toBeLessThan(2);
   expect(l.width).toBeGreaterThan(v.width * 0.6);
 });
+
+test("desktop sheet is non-modal: another song switches it, other clicks close it", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "the sheet is a full-screen overlay on mobile");
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Skyline Drive" }).click();
+  const s = sheet(page);
+  await expect(s).toContainText("Skyline Drive");
+
+  await cards(page).filter({ hasText: "Original One" }).click();
+  await expect(s).toContainText("Count in 4 bars");
+  await expect(s).toBeVisible();
+
+  await page.getByRole("heading", { name: "Music Library" }).click();
+  await expect(s).toBeHidden();
+});

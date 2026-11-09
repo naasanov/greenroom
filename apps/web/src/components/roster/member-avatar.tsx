@@ -7,9 +7,12 @@ import { cn } from "@/lib/utils";
 export function MemberAvatar({
   member,
   className,
+  letters = 1,
 }: {
   member: Pick<BandMember, "userId" | "displayName" | "avatarUrl">;
   className?: string;
+  /** How many initials the fallback shows. */
+  letters?: 1 | 2;
 }) {
   const src = member.avatarUrl;
   return (
@@ -22,9 +25,18 @@ export function MemberAvatar({
         />
       ) : null}
       <AvatarFallback
-        className={cn("text-xl font-semibold", toneFor(member.userId))}
+        className={cn(
+          "font-semibold",
+          letters === 2 ? "text-sm" : "text-xl",
+          toneFor(member.userId),
+        )}
       >
-        {member.displayName.slice(0, 1).toUpperCase()}
+        {member.displayName
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, letters)
+          .map((p) => p[0]?.toUpperCase())
+          .join("")}
       </AvatarFallback>
     </Avatar>
   );

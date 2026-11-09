@@ -195,6 +195,7 @@ export function LibraryView({ bandId }: { bandId: string }) {
               {list.map((s) => (
                 <li
                   key={s.id}
+                  data-song-select
                   onPointerEnter={() => prefetchSong(s.id)}
                   onPointerDown={() => prefetchSong(s.id)}
                   onFocus={() => prefetchSong(s.id)}

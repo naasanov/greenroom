@@ -6,6 +6,10 @@ export type PreviewKind = "image" | "video" | "audio" | "pdf" | "none";
 export const isGoogleDoc = (e: FileEntry) =>
   !!e.mimeType?.startsWith("application/vnd.google-apps.");
 
+/** Drive's own page for a file, which opens Google Docs, Sheets and Slides. */
+export const driveOpenUrl = (e: FileEntry) =>
+  `https://drive.google.com/open?id=${encodeURIComponent(e.id)}`;
+
 export function previewKind(e: FileEntry): PreviewKind {
   const m = e.mimeType ?? "";
   if (isGoogleDoc(e)) return "none";

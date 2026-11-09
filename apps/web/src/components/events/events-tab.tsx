@@ -391,9 +391,13 @@ export function EventsTab({
   }
 
   /** Agenda taps always bring the event's date into view, even when re-selecting. */
-  function selectFromAgenda(ev: CalendarEvent) {
-    pendingJump.current = ev.date;
+  function jumpTo(date: string) {
+    pendingJump.current = date;
     setJumpDate("");
+  }
+
+  function selectFromAgenda(ev: CalendarEvent) {
+    jumpTo(ev.date);
     openEvent(ev);
   }
 
@@ -413,11 +417,11 @@ export function EventsTab({
         bandId,
         gigId: made.id,
       });
-      setJumpDate(made.date);
+      jumpTo(made.date);
       go({ kind: "gig", gigId: made.id, title: made.title }, "push");
     } else {
       const { series } = created;
-      setJumpDate(series.startDate);
+      jumpTo(series.startDate);
       go(
         { kind: "practice", seriesId: series.id, date: series.startDate },
         "push",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ClipboardCopy } from "lucide-react";
+import { Check, ClipboardCopy, ExternalLink } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SONG_ERROR_CODES, type ExportResult } from "@greenroom/shared";
@@ -19,7 +19,9 @@ import { useSetlist } from "@/lib/queries/setlists";
 import { useSongPool } from "@/lib/queries/songs";
 import { pathWithout } from "@/lib/queries/spotify";
 import {
+  buildYoutubeQueue,
   connectSpotifyForExport,
+  YOUTUBE_QUEUE_MAX,
   useExportToSpotify,
   type ExportTarget,
 } from "@/lib/queries/spotify-export";
@@ -176,7 +178,7 @@ function CopyListButton({ lines }: { lines: string[] }) {
   );
 }
 
-function useCopyLines(bandId: string, target: ExportTarget): string[] {
+function useExportRows(bandId: string, target: ExportTarget) {
   const library = useSongPool(
     bandId,
     target.kind === "library" ? target.sort : "recent",
@@ -186,11 +188,67 @@ function useCopyLines(bandId: string, target: ExportTarget): string[] {
     bandId,
     target.kind === "setlist" ? target.setlistId : undefined,
   );
-  const rows =
-    target.kind === "library"
-      ? (library.data ?? [])
-      : (setlist.data?.items ?? []);
-  return rows.map((s) => (s.artist ? `${s.title} - ${s.artist}` : s.title));
+  return target.kind === "library"
+    ? (library.data ?? [])
+    : (setlist.data?.items ?? []);
+}
+
+/** Opens the songs with a YouTube link as a temporary queue, no login needed. */
+function YoutubeQueueSection({
+  rows,
+}: {
+  rows: { title: string; youtubeUrl: string | null }[];
+}) {
+  const queue = buildYoutubeQueue(rows);
+  const [opened, setOpened] = useState(false);
+  const open = () => {
+    if (!queue.url) return;
+    const tab = window.open(queue.url, "_blank");
+    if (tab) tab.opener = null;
+    setOpened(true);
+  };
+  return (
+    <div className="flex flex-col gap-2" data-testid="export-youtube">
+      <Button
+        type="button"
+        variant="outline"
+        data-testid="export-youtube-open"
+        disabled={!queue.url}
+        onClick={open}
+      >
+        <ExternalLink /> Open in YouTube Music
+      </Button>
+      <p
+        role="status"
+        data-testid="export-youtube-summary"
+        className="text-sm text-muted-foreground"
+      >
+        {queue.included === 0
+          ? "None of these songs have a YouTube link."
+          : `${opened ? "Opened" : "Includes"} ${queue.included} ${
+              queue.included === 1 ? "song" : "songs"
+            } in a temporary queue. Sign in on YouTube to save it as a playlist.`}
+      </p>
+      {queue.noLink.length > 0 ? (
+        <p
+          data-testid="export-youtube-skipped"
+          className="text-sm text-muted-foreground"
+        >
+          Skipped {queue.noLink.length} without a YouTube link:{" "}
+          {queue.noLink.join(", ")}
+        </p>
+      ) : null}
+      {queue.overflow.length > 0 ? (
+        <p
+          data-testid="export-youtube-overflow"
+          className="text-sm text-muted-foreground"
+        >
+          YouTube queues hold {YOUTUBE_QUEUE_MAX} songs. Left out:{" "}
+          {queue.overflow.join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function ExportBody({
@@ -214,7 +272,10 @@ function ExportBody({
   const [needsLogin, setNeedsLogin] = useState<"connect" | "reconnect" | null>(
     connectError ? "connect" : null,
   );
-  const copyLines = useCopyLines(bandId, target);
+  const rows = useExportRows(bandId, target);
+  const copyLines = rows.map((s) =>
+    s.artist ? `${s.title} - ${s.artist}` : s.title,
+  );
   const exportMutation = useExportToSpotify(bandId);
   const startedRef = useRef(false);
 
@@ -345,6 +406,7 @@ function ExportBody({
         <span className="h-px flex-1 bg-border" />
       </div>
       <CopyListButton lines={copyLines} />
+      <YoutubeQueueSection rows={rows} />
     </form>
   );
 }
@@ -382,7 +444,7 @@ export function ExportDialog({
           <DialogDescription>
             Creates a new private playlist in your Spotify account. Songs
             without a Spotify link are skipped. You can also copy the song list
-            as text.
+            as text or open it as a YouTube Music queue.
           </DialogDescription>
         </DialogHeader>
         {open ? (

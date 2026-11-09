@@ -274,3 +274,31 @@ test("copy shows a failure state when no clipboard path works", async ({
   await copy.click();
   await expect(copy).toHaveText("Copy failed");
 });
+
+test("library export can open a YouTube Music queue without logging in", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const youtube = dialog(page).getByTestId("export-youtube");
+  await expect(youtube.getByTestId("export-youtube-summary")).toContainText(
+    "3 songs",
+  );
+  await expect(youtube.getByTestId("export-youtube-skipped")).toContainText(
+    "Skipped 5 without a YouTube link:",
+  );
+  let queueUrl = "";
+  await page.context().route("**://www.youtube.com/**", (route) => {
+    queueUrl = route.request().url();
+    return route.fulfill({ status: 200, body: "ok" });
+  });
+  const popup = page.waitForEvent("popup");
+  await youtube.getByTestId("export-youtube-open").click();
+  await popup;
+  await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
+  expect(queueUrl).toContain("harborLights,redLine,midnightTrain");
+});

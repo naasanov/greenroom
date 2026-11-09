@@ -104,8 +104,12 @@
   margin: 0;
   padding: 0 0.125rem 0.125rem;
 }
+/* Whole-pixel row heights and gaps keep stacked chips from overlapping. */
 .gr-cal .fc .fc-daygrid-event-harness {
   margin-top: 2px;
+}
+.gr-cal .fc .fc-daygrid-event {
+  margin: 0;
 }
 .gr-cal .fc .fc-daygrid-more-link {
   margin: 0 0.25rem;
@@ -155,9 +159,11 @@
   min-width: 0;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.0625rem 0.375rem;
+  box-sizing: border-box;
+  height: 18px;
+  padding: 0 0.375rem;
   font-size: 0.6875rem;
-  line-height: 1rem;
+  line-height: 18px;
 }
 .gr-cal .gr-dot {
   width: 0.375rem;

@@ -246,6 +246,7 @@ export function SetlistSection({
                       tabIndex={0}
                       aria-label={`View ${item.title}`}
                       data-testid="setlist-row-open"
+                      data-song-select
                       onClick={() => {
                         // A drag-to-select over the name must not open the song.
                         if (window.getSelection()?.toString()) return;

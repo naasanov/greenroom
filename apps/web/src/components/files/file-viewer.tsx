@@ -1,12 +1,12 @@
 "use client";
 
-import { Download, FileQuestion, X } from "lucide-react";
+import { Download, ExternalLink, FileQuestion, X } from "lucide-react";
 import { useEffect } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { startDownload } from "@/components/media/media-download";
 import { Button } from "@/components/ui/button";
 import { filesContentUrl } from "@/lib/queries/files";
-import { isGoogleDoc, previewKind } from "./file-utils";
+import { driveOpenUrl, isGoogleDoc, previewKind } from "./file-utils";
 
 /** Full-screen preview: image, video, audio and PDF inline, anything else downloads. */
 export function FileViewer({
@@ -104,13 +104,25 @@ export function FileViewer({
             <p className="text-sm">
               {canDownload
                 ? "No preview for this file type."
-                : "This Google document can't be previewed here."}
+                : "This Google document opens in Google Drive."}
             </p>
             {canDownload ? (
               <Button variant="secondary" onClick={download}>
                 <Download /> Download
               </Button>
-            ) : null}
+            ) : (
+              <Button asChild variant="secondary">
+                <a
+                  href={driveOpenUrl(entry)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="viewer-open-drive"
+                  onClick={onClose}
+                >
+                  <ExternalLink /> Open in Google Drive
+                </a>
+              </Button>
+            )}
           </div>
         )}
       </div>
