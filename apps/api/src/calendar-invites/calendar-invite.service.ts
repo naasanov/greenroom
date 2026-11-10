@@ -139,7 +139,15 @@ export class CalendarInviteService {
   runJob(job: InviteJob): Promise<void> {
     return this.locked(async () => {
       if (!this.queue.shouldRun(job)) return;
-      await this.process(job);
+      try {
+        await this.process(job);
+      } catch (err) {
+        this.log.error(
+          `calendar invite ${job.kind} job ${job.id} failed`,
+          err instanceof Error ? err.stack : String(err),
+        );
+        throw err;
+      }
     });
   }
 
