@@ -27,7 +27,11 @@ function write(key: string, value: string) {
   listeners.forEach((l) => l());
 }
 
-type BannerState = { dismissedAt?: number; opened?: boolean };
+type BannerState = {
+  dismissedAt?: number;
+  opened?: boolean;
+  feed?: boolean;
+};
 
 function parse(raw: string | null): BannerState {
   try {
@@ -49,7 +53,7 @@ function update(key: string, patch: BannerState) {
 
 /**
  * Banner visibility for one member in one band: hidden for a week after a
- * dismiss, and hidden once the member has opened the dialog with invites on.
+ * dismiss, and hidden once invites are on or the member has opened the dialog.
  */
 export function useInvitesBanner(
   userId: string | undefined,
@@ -73,8 +77,8 @@ export function useInvitesBanner(
   const hidden =
     snapshot === "pending" ||
     snapshot.includes("d") ||
-    (snapshot.includes("o") && invitesEnabled === true) ||
-    invitesEnabled === undefined;
+    snapshot.includes("o") ||
+    invitesEnabled !== false;
   return {
     hidden,
     dismiss: () => key && update(key, { dismissedAt: Date.now() }),
@@ -91,4 +95,40 @@ export function takeFirstEventNudge(userId: string): boolean {
 /** Records that the member opened the dialog from this band's Events tab. */
 export function markInvitesOpened(userId: string, bandId: string) {
   update(bannerKey(userId, bandId), { opened: true });
+}
+
+function useBandPrefs(userId: string | undefined, bandId: string) {
+  const key = userId ? bannerKey(userId, bandId) : "";
+  const feed = useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => void listeners.delete(cb);
+    },
+    () => !!key && !!(memory.get(key) ?? parse(read(key))).feed,
+    () => false,
+  );
+  return { key, feed };
+}
+
+export type CalendarMethod = "email" | "feed" | "both" | null;
+
+/**
+ * The member's current way of getting events. Email invites are server state.
+ * The subscribe link exists for every member, so using it is remembered per
+ * band on this device from the moment its step is opened.
+ */
+export function useCalendarMethod(
+  userId: string | undefined,
+  bandId: string,
+  invitesEnabled: boolean | undefined,
+): CalendarMethod {
+  const { feed } = useBandPrefs(userId, bandId);
+  if (invitesEnabled && feed) return "both";
+  if (invitesEnabled) return "email";
+  return feed ? "feed" : null;
+}
+
+/** Remembers (or forgets) that the member uses the subscribe link in this band. */
+export function setFeedInUse(userId: string, bandId: string, inUse: boolean) {
+  update(bannerKey(userId, bandId), { feed: inUse });
 }

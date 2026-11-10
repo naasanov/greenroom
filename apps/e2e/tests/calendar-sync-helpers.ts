@@ -23,8 +23,13 @@ export async function client(testApi: TestApi, email: string) {
 export type Client = Awaited<ReturnType<typeof client>>;
 
 /** A band created by Ava; `join` adds more members through the invite link. */
-export async function newBand(testApi: TestApi) {
+/** Creates a band owned by Ava; `invites` opts every member into calendar invites. */
+export async function newBand(
+  testApi: TestApi,
+  opts: { invites?: boolean } = {},
+) {
   const ava = await client(testApi, AVA);
+  if (opts.invites) await testApi.calendarInvitesEnabled(ava.user.id, true);
   const band = await (
     await ava.api.post("/bands", { data: { name: "The Foxes" } })
   ).json();
@@ -34,6 +39,7 @@ export async function newBand(testApi: TestApi) {
     const invite = await (await ava.api.get(`/bands/${bandId}/invite`)).json();
     const res = await c.api.post(`/invites/${invite.token}/accept`);
     expect(res.status()).toBe(200);
+    if (opts.invites) await testApi.calendarInvitesEnabled(c.user.id, true);
     return c;
   };
   return { ava, bandId, join };

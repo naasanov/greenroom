@@ -43,7 +43,12 @@ const mk = async (
 ) => {
   const [u] = await db
     .insert(users)
-    .values({ email: e, displayName: e.split("@")[0]!, ...extra })
+    .values({
+      email: e,
+      displayName: e.split("@")[0]!,
+      calendarInvitesEnabled: true,
+      ...extra,
+    })
     .returning();
   await db.insert(memberships).values({ bandId, userId: u!.id });
   return u!;

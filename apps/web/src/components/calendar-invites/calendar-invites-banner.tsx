@@ -34,7 +34,7 @@ export function CalendarInvitesBanner({
       <p className="min-w-0 flex-1 text-sm">
         {nudge
           ? "Nice, your first event is in. Want it in your calendar too?"
-          : "Get gigs and practices in your calendar."}
+          : "Optional: get gigs and practices in your calendar, by email invite or a subscribe link."}
       </p>
       <Button size="sm" onClick={onOpen}>
         Add to your calendar

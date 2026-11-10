@@ -34,6 +34,7 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 | Files tab | FILE-01 to FILE-16 | 16 |
 | Google Drive linking | DRIVE-01 to DRIVE-08 (+DRIVE-01R) | 9 |
 | Google Calendar sync | GCAL-01 to GCAL-09 (+GCAL-02R) | 10 |
+| Calendar invites | CINV-01 to CINV-05 | 5 |
 | Public gig calendar | PUB-01 to PUB-08 | 8 |
 | Settings (personal and band) | SETT-01 to SETT-11 | 11 |
 | Account deletion | ACCT-01 to ACCT-05 | 5 |
@@ -1089,6 +1090,29 @@ Expected: Google RSVP sync is not supported (post 2026-10-30 update); see Ambigu
 
 ### GCAL-09 Non-admin cannot connect
 Tags: [needs-two-users].
+
+---
+
+# Calendar invites
+
+### CINV-01 Opt-in default and choice
+1. As a new member, open Events and press Add to your calendar (toolbar or the optional banner).
+Expected: invites are off. The dialog shows two cards, Email invites and Subscribe link, each with a one-sentence tradeoff. Nothing is emailed.
+
+### CINV-02 Email invites
+1. Choose Email invites. Optionally enter a different email. Press Turn on email invites.
+Expected: invites turn on and the calendar email is stored. Gigs and practices arrive as standard invites; RSVPs flow back. Turn off invites stops sends.
+
+### CINV-03 Subscribe link
+1. Choose Subscribe link.
+Expected: private feed URL with copy, open in calendar app, reset link (with confirmation) and per-app instructions. Back returns to the choice.
+
+### CINV-04 Reopening
+Expected: with invites on, the dialog opens on the email step; after using the link step it opens on the link step; Back switches methods.
+
+### CINV-05 Settings row
+1. Open Settings, Personal.
+Expected: a Calendar row shows Off, Email invites or Subscribe link, with a button that opens the same dialog.
 
 ---
 

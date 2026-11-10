@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, Copy, ExternalLink, Mail, Rss } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { FormField } from "@/components/app/form-field";
@@ -13,58 +13,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useCalendarFeed,
   useRotateCalendarFeed,
   useSaveCalendarPrefs,
 } from "@/lib/queries/calendar-invites";
 import { useMe } from "@/lib/queries";
+import {
+  setFeedInUse,
+  useCalendarMethod,
+} from "@/components/calendar-invites/invite-prefs";
 
 export const ADD_TO_CALENDAR_LABEL = "Add to your calendar";
 
-/** Opt-out switch; saves immediately. */
-export function InvitesToggle({ enabled }: { enabled: boolean }) {
-  const save = useSaveCalendarPrefs();
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <Label
-          htmlFor="calendar-invites-toggle"
-          className="text-sm font-medium"
-        >
-          Email me calendar invites
-        </Label>
-        <p className="text-xs text-muted-foreground">
-          Every gig and practice arrives as a standard invite you can accept in
-          any calendar app, and updates itself when the event changes.
-        </p>
-      </div>
-      <Switch
-        id="calendar-invites-toggle"
-        data-testid="calendar-invites-toggle"
-        checked={enabled}
-        disabled={save.isPending}
-        onCheckedChange={(next) =>
-          save.mutate({ calendarInvitesEnabled: next })
-        }
-      />
-    </div>
-  );
-}
-
-function CalendarEmailField({
+function EmailStep({
+  enabled,
   current,
   signIn,
 }: {
+  enabled: boolean;
   current: string;
   signIn: string;
 }) {
   const save = useSaveCalendarPrefs();
   const [value, setValue] = useState(current);
   const [invalid, setInvalid] = useState(false);
-  const dirty = value.trim().toLowerCase() !== current;
+  const dirty = value.trim() !== current;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,17 +48,27 @@ function CalendarEmailField({
       return;
     }
     setInvalid(false);
-    save.mutate({ calendarEmail: next === "" ? null : next });
+    save.mutate({
+      calendarInvitesEnabled: true,
+      calendarEmail: next === "" ? null : next,
+    });
   }
 
   return (
-    <form noValidate onSubmit={submit}>
-      <FormField
-        label="Calendar email"
-        htmlFor="calendar-invites-email"
-        hint="Invites go here. Leave empty to use your sign-in email."
-      >
-        <div className="flex gap-2">
+    <div className="flex flex-col gap-4" data-testid="calendar-step-email">
+      <form noValidate onSubmit={submit} className="flex flex-col gap-4">
+        <p className="text-sm">
+          Invites go to{" "}
+          <span data-testid="calendar-account-email" className="font-medium">
+            {current || signIn}
+          </span>
+          .
+        </p>
+        <FormField
+          label="Use a different email (optional)"
+          htmlFor="calendar-invites-email"
+          hint="For a calendar on another address, such as Outlook."
+        >
           <Input
             id="calendar-invites-email"
             type="email"
@@ -98,25 +82,47 @@ function CalendarEmailField({
               setInvalid(false);
             }}
           />
+          {invalid ? (
+            <p role="alert" className="text-sm text-destructive">
+              Enter a valid email address.
+            </p>
+          ) : save.isError ? (
+            <p role="alert" className="text-sm text-destructive">
+              We could not save this. Please try again.
+            </p>
+          ) : null}
+        </FormField>
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="submit"
-            variant="outline"
-            disabled={save.isPending || !dirty}
+            data-testid="calendar-invites-save"
+            disabled={save.isPending || (enabled && !dirty)}
           >
-            Save
+            {enabled ? "Save email" : "Turn on email invites"}
           </Button>
+          {enabled ? (
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="calendar-invites-off"
+              disabled={save.isPending}
+              onClick={() => save.mutate({ calendarInvitesEnabled: false })}
+            >
+              Turn off invites
+            </Button>
+          ) : null}
         </div>
-        {invalid ? (
-          <p role="alert" className="text-sm text-destructive">
-            Enter a valid email address.
-          </p>
-        ) : save.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            We could not save your calendar email. Please try again.
-          </p>
-        ) : null}
-      </FormField>
-    </form>
+      </form>
+      {enabled ? (
+        <p
+          role="status"
+          data-testid="calendar-invites-on"
+          className="text-xs text-muted-foreground"
+        >
+          Email invites are on. Accept them in any calendar app.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -148,15 +154,10 @@ function FeedSection({ bandId }: { bandId: string }) {
 
   return (
     <section className="flex flex-col gap-3" data-testid="calendar-feed">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">
-          Or subscribe with a private link
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          Your calendar app checks this link for changes. It is only for you, so
-          do not share it. Updates can take a few hours to show up.
-        </p>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Add this link to your calendar app. It is only for you, so do not share
+        it. Updates can take a few hours to show up.
+      </p>
       <Input
         readOnly
         aria-label="Calendar feed link"
@@ -209,7 +210,138 @@ function FeedSection({ bandId }: { bandId: string }) {
   );
 }
 
-/** The single "Add to your calendar" dialog: invites, calendar email and the private feed. */
+function ChoiceCard({
+  testId,
+  icon,
+  title,
+  body,
+  current,
+  onClick,
+}: {
+  testId: string;
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  current: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      className="flex items-start gap-3 rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      <span className="mt-0.5 text-muted-foreground">{icon}</span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="text-sm font-medium">
+          {title}
+          {current ? (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              In use
+            </span>
+          ) : null}
+        </span>
+        <span className="text-xs text-muted-foreground">{body}</span>
+      </span>
+    </button>
+  );
+}
+
+type Step = "choice" | "email" | "feed";
+
+/**
+ * Two-step flow. A member already using a method opens straight onto its
+ * step (email wins when both are in use) and can go Back to switch.
+ */
+function CalendarFlow({ bandId }: { bandId: string }) {
+  const me = useMe().data!;
+  const method = useCalendarMethod(me.id, bandId, me.calendarInvitesEnabled);
+  const [step, setStep] = useState<Step>(
+    method === "email" || method === "both"
+      ? "email"
+      : method === "feed"
+        ? "feed"
+        : "choice",
+  );
+  const usesEmail = method === "email" || method === "both";
+  const usesFeed = method === "feed" || method === "both";
+
+  const back = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      data-testid="calendar-back"
+      className="-ml-2 w-fit"
+      onClick={() => setStep("choice")}
+    >
+      <ArrowLeft />
+      Back
+    </Button>
+  );
+
+  if (step === "email") {
+    return (
+      <div className="flex flex-col gap-4">
+        {back}
+        <EmailStep
+          enabled={me.calendarInvitesEnabled}
+          current={me.calendarEmail ?? ""}
+          signIn={me.email}
+        />
+      </div>
+    );
+  }
+  if (step === "feed") {
+    return (
+      <div className="flex flex-col gap-4">
+        {back}
+        <FeedSection bandId={bandId} />
+        {usesFeed ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid="calendar-feed-stop"
+            className="w-fit"
+            onClick={() => {
+              setFeedInUse(me.id, bandId, false);
+              setStep("choice");
+            }}
+          >
+            I no longer use this link
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <ChoiceCard
+        testId="calendar-choice-email"
+        icon={<Mail className="size-5" />}
+        title="Email invites"
+        body="Each gig and practice arrives as a standard invite you accept in any calendar app. Your RSVPs flow back to Greenroom, and changes arrive by email."
+        current={usesEmail}
+        onClick={() => setStep("email")}
+      />
+      <ChoiceCard
+        testId="calendar-choice-feed"
+        icon={<Rss className="size-5" />}
+        title="Subscribe link"
+        body="Every event shows up in your calendar on its own, with nothing to accept. It is read-only, RSVPs do not flow back, and calendar apps refresh it slowly."
+        current={usesFeed}
+        onClick={() => {
+          setFeedInUse(me.id, bandId, true);
+          setStep("feed");
+        }}
+      />
+    </div>
+  );
+}
+
+/** The "Add to your calendar" dialog: pick email invites or a subscribe link, then set it up. */
 export function CalendarInvitesDialog({
   bandId,
   open,
@@ -229,21 +361,11 @@ export function CalendarInvitesDialog({
         <DialogHeader>
           <DialogTitle>{ADD_TO_CALENDAR_LABEL}</DialogTitle>
           <DialogDescription>
-            Get your band&apos;s gigs and practices in the calendar you already
-            use.
+            Optional. Pick how you want your band&apos;s gigs and practices to
+            reach the calendar you already use.
           </DialogDescription>
         </DialogHeader>
-        {me ? (
-          <div className="flex flex-col gap-5">
-            <InvitesToggle enabled={me.calendarInvitesEnabled} />
-            <CalendarEmailField
-              key={me.calendarEmail ?? ""}
-              current={me.calendarEmail ?? ""}
-              signIn={me.email}
-            />
-            <FeedSection bandId={bandId} />
-          </div>
-        ) : null}
+        {me ? <CalendarFlow bandId={bandId} /> : null}
       </DialogContent>
     </Dialog>
   );

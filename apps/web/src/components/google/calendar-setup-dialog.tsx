@@ -49,8 +49,8 @@ export function CalendarSetupDialog({
             Google Calendar sync
           </DialogTitle>
           <DialogDescription>
-            Gigs and practices stay in sync with your band calendar. Members get
-            the calendar shared by email and accept it once.
+            Gigs and practices stay in sync with a Greenroom-owned Google
+            calendar. Members are added as readers and accept the share once.
           </DialogDescription>
         </DialogHeader>
         {setup.isError ? (

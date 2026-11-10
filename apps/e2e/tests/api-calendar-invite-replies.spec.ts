@@ -76,7 +76,7 @@ async function post(headers: Record<string, string>, body: string) {
 }
 
 async function setup(testApi: Parameters<typeof newBand>[0]) {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   const ben = await join(BEN);
   const start = nextTuesday(7);
   const series = await createPractice(ava.api, bandId, start, {

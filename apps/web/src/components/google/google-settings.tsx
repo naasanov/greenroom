@@ -193,7 +193,7 @@ function CalendarRow({ bandId }: { bandId: string }) {
     <Row
       testId="settings-google-calendar"
       title="Google Calendar sync (optional)"
-      description="Pushes gigs and practices into a shared Google calendar within moments of every change, for members with Google accounts. Everyone else uses calendar invites from the Events tab."
+      description="Keeps a Greenroom-owned Google calendar in sync within moments of every change. Members are added as readers and accept the share once. RSVPs stay in the app."
       status={
         !cal
           ? "Loading..."

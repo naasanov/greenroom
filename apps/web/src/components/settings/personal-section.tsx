@@ -7,7 +7,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { userSchema, type UpdateProfile, type User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
-import { InvitesToggle } from "@/components/calendar-invites/calendar-invites-dialog";
+import { CalendarInvitesRow } from "@/components/settings/calendar-invites-row";
 import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
 import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
@@ -95,7 +95,7 @@ function PersonalForm({ user }: { user: User }) {
       <FormField
         label="Calendar email"
         htmlFor="settings-calendar-email"
-        hint="Gig and practice invites go here. Leave empty to use your sign-in email."
+        hint="Where calendar invites go if you turn them on. Leave empty to use your sign-in email."
       >
         <Input
           id="settings-calendar-email"
@@ -152,7 +152,13 @@ function ProfilePhotoRow({ user }: { user: User }) {
 }
 
 /** Name, photo, instruments, and sign out. */
-export function PersonalSection({ user }: { user: User }) {
+export function PersonalSection({
+  user,
+  bandId,
+}: {
+  user: User;
+  bandId?: string;
+}) {
   const mine = useMyInstruments();
   const signOut = useSignOut();
 
@@ -184,7 +190,13 @@ export function PersonalSection({ user }: { user: User }) {
       {mine.data ? (
         <>
           <PersonalForm user={user} />
-          <InvitesToggle enabled={user.calendarInvitesEnabled} />
+          {bandId ? (
+            <CalendarInvitesRow
+              userId={user.id}
+              bandId={bandId}
+              invitesEnabled={user.calendarInvitesEnabled}
+            />
+          ) : null}
           <InstrumentsAutosave
             initial={[...mine.data.presets, ...mine.data.custom]}
           />

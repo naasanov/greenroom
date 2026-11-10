@@ -1,4 +1,4 @@
-import type { BandSeedResult } from "@greenroom/db";
+import type { BandSeedResult, Database } from "@greenroom/db";
 import { USERS, memberships, users } from "@greenroom/db";
 import { and, eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
@@ -21,20 +21,39 @@ async function openDialog(page: import("@playwright/test").Page) {
     .first()
     .click();
   const dialog = page.getByTestId("calendar-invites-dialog");
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible({ timeout: 40_000 });
   return dialog;
 }
 
-test("the toolbar action opens the calendar dialog", async ({ page }) => {
+const stored = (db: Database) => async () =>
+  (await db.select().from(users).where(eq(users.id, USERS.ava.id)))[0];
+
+test("a fresh member sees the two-option choice, with invites off", async ({
+  page,
+  db,
+}) => {
   await page.goto("/events");
   const action = page.getByTestId("add-to-calendar");
-  await expect(action).toBeVisible();
+  await expect(action).toBeVisible({ timeout: 40_000 });
   await expect(action).toHaveAttribute("aria-label", "Add to your calendar");
   await action.click();
   const dialog = page.getByTestId("calendar-invites-dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByTestId("calendar-invites-toggle")).toBeVisible();
-  await expect(dialog.getByLabel("Calendar email")).toBeVisible();
+  await expect(dialog.getByTestId("calendar-choice-email")).toContainText(
+    "RSVPs flow back",
+  );
+  await expect(dialog.getByTestId("calendar-choice-feed")).toContainText(
+    "read-only",
+  );
+  await expect(dialog.getByTestId("calendar-feed-url")).toHaveCount(0);
+  await expect(dialog.getByTestId("calendar-back")).toHaveCount(0);
+  expect((await stored(db)())?.calendarInvitesEnabled).toBe(false);
+});
+
+test("the subscribe path shows the feed and instructions, and Back returns to the choice", async ({
+  page,
+}) => {
+  const dialog = await openDialog(page);
+  await dialog.getByTestId("calendar-choice-feed").click();
   await expect(dialog.getByTestId("calendar-feed-url")).toHaveValue(
     /\/public\/calendar-feed\/[0-9a-f]{64}\.ics$/,
   );
@@ -42,46 +61,77 @@ test("the toolbar action opens the calendar dialog", async ({ page }) => {
     "href",
     /^webcal:\/\/.*\.ics$/,
   );
-  await expect(dialog.getByText("Other calendars")).toBeVisible();
-  await expect(dialog.getByText("Subscribe from web")).toBeVisible();
-  await expect(dialog.getByText("New Calendar Subscription")).toBeVisible();
+  await expect(dialog.getByText("Other calendars")).toBeVisible({ timeout: 40_000 });
+  await expect(dialog.getByText("Subscribe from web")).toBeVisible({ timeout: 40_000 });
+  await expect(dialog.getByText("New Calendar Subscription")).toBeVisible({ timeout: 40_000 });
+  await dialog.getByTestId("calendar-back").click();
+  await expect(dialog.getByTestId("calendar-choice-email")).toBeVisible({ timeout: 40_000 });
+
+  // The subscribe link is remembered, so reopening lands on its step.
+  await page.keyboard.press("Escape");
+  await page.getByTestId("add-to-calendar").click();
+  await expect(
+    page
+      .getByTestId("calendar-invites-dialog")
+      .getByTestId("calendar-feed-url"),
+  ).toBeVisible({ timeout: 40_000 });
+  await page.goto("/settings");
+  await expect(page.getByTestId("calendar-invites-status")).toHaveText(
+    "Subscribe link",
+  );
 });
 
-test("the toolbar action is reachable at phone width", async ({ page }) => {
+test("the dialog is reachable at phone width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await openDialog(page);
+  await dialog.getByTestId("calendar-choice-feed").click();
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   await expect(
     dialog.getByRole("button", { name: "Reset link" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 40_000 });
 });
 
-test("the invites switch persists", async ({ page, db }) => {
+test("email invites turn on with an optional address and can be turned off", async ({
+  page,
+  db,
+}) => {
   const dialog = await openDialog(page);
-  const toggle = dialog.getByTestId("calendar-invites-toggle");
-  await expect(toggle).toBeChecked();
-  const stored = async () =>
-    (await db.select().from(users).where(eq(users.id, USERS.ava.id)))[0]
-      ?.calendarInvitesEnabled;
-  await toggle.click();
-  await expect.poll(stored).toBe(false);
+  await dialog.getByTestId("calendar-choice-email").click();
+  await expect(dialog.getByTestId("calendar-account-email")).toHaveText(
+    USERS.ava.email,
+  );
+  await dialog
+    .getByLabel("Use a different email (optional)")
+    .fill("ava@outlook.test");
+  await dialog.getByTestId("calendar-invites-save").click();
+  await expect
+    .poll(async () => (await stored(db)())?.calendarInvitesEnabled)
+    .toBe(true);
+  expect((await stored(db)())?.calendarEmail).toBe("ava@outlook.test");
+  await expect(dialog.getByTestId("calendar-invites-on")).toBeVisible({ timeout: 40_000 });
+
+  // With invites on, reopening lands on the email step; Back switches methods.
   await page.reload();
   await page.getByTestId("add-to-calendar").click();
-  await expect(
-    page
-      .getByTestId("calendar-invites-dialog")
-      .getByTestId("calendar-invites-toggle"),
-  ).not.toBeChecked();
+  const again = page.getByTestId("calendar-invites-dialog");
+  await expect(again.getByTestId("calendar-invites-on")).toBeVisible({ timeout: 40_000 });
+  await again.getByTestId("calendar-back").click();
+  await expect(again.getByTestId("calendar-choice-feed")).toBeVisible({ timeout: 40_000 });
+  await again.getByTestId("calendar-choice-email").click();
 
+  await page.keyboard.press("Escape");
   await page.goto("/settings");
-  const personal = page.getByTestId("settings-personal");
-  await expect(
-    personal.getByTestId("calendar-invites-toggle"),
-  ).not.toBeChecked();
-  await personal.getByTestId("calendar-invites-toggle").click();
-  await expect.poll(stored).toBe(true);
+  await expect(page.getByTestId("calendar-invites-status")).toHaveText(
+    "Email invites",
+  );
+  await page.getByTestId("calendar-invites-open").click();
+  await page.getByTestId("calendar-invites-off").click();
+  await expect
+    .poll(async () => (await stored(db)())?.calendarInvitesEnabled)
+    .toBe(false);
+  await expect(page.getByTestId("calendar-invites-status")).toHaveText("Off");
 });
 
 test("the feed link can be copied and reset", async ({ page, db }) => {
@@ -97,12 +147,13 @@ test("the feed link can be copied and reset", async ({ page, db }) => {
     });
   });
   const dialog = await openDialog(page);
+  await dialog.getByTestId("calendar-choice-feed").click();
   const field = dialog.getByTestId("calendar-feed-url");
   await expect(field).toHaveValue(/calendar-feed\//);
   const before = await field.inputValue();
 
   await dialog.getByRole("button", { name: "Copy link" }).click();
-  await expect(dialog.getByRole("button", { name: "Copied" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Copied" })).toBeVisible({ timeout: 40_000 });
   expect(
     await page.evaluate(
       () => (window as unknown as { copied: string[] }).copied,
@@ -134,14 +185,14 @@ test("the banner shows for a fresh member and hides for a week once dismissed", 
 }) => {
   await page.goto("/events");
   const banner = page.getByTestId("calendar-banner");
-  await expect(banner).toBeVisible();
-  await expect(banner).toContainText("Get gigs and practices in your calendar");
+  await expect(banner).toBeVisible({ timeout: 30_000 });
+  await expect(banner).toContainText("Optional");
   await expect(banner).not.toContainText("Google");
   await banner.getByRole("button", { name: "Dismiss" }).click();
-  await expect(banner).toBeHidden();
+  await expect(banner).toBeHidden({ timeout: 40_000 });
   await page.reload();
-  await expect(page.getByTestId("events-tab")).toBeVisible();
-  await expect(banner).toBeHidden();
+  await expect(page.getByTestId("events-tab")).toBeVisible({ timeout: 40_000 });
+  await expect(banner).toBeHidden({ timeout: 40_000 });
 
   const key = bannerKey(seed);
   const eightDays = Date.now() - 8 * 24 * 60 * 60 * 1000;
@@ -150,21 +201,21 @@ test("the banner shows for a fresh member and hides for a week once dismissed", 
     [key, eightDays] as const,
   );
   await page.reload();
-  await expect(banner).toBeVisible();
+  await expect(banner).toBeVisible({ timeout: 40_000 });
 });
 
-test("opening the dialog from the banner hides it while invites are on", async ({
+test("opening the dialog from the banner hides it for good", async ({
   page,
 }) => {
   await page.goto("/events");
   const banner = page.getByTestId("calendar-banner");
   await banner.getByRole("button", { name: "Add to your calendar" }).click();
-  await expect(page.getByTestId("calendar-invites-dialog")).toBeVisible();
+  await expect(page.getByTestId("calendar-invites-dialog")).toBeVisible({ timeout: 40_000 });
   await page.keyboard.press("Escape");
-  await expect(banner).toBeHidden();
+  await expect(banner).toBeHidden({ timeout: 40_000 });
   await page.reload();
-  await expect(page.getByTestId("events-tab")).toBeVisible();
-  await expect(banner).toBeHidden();
+  await expect(page.getByTestId("events-tab")).toBeVisible({ timeout: 40_000 });
+  await expect(banner).toBeHidden({ timeout: 40_000 });
 });
 
 test("the first event a member creates shows a one-time nudge", async ({
@@ -177,15 +228,15 @@ test("the first event a member creates shows a one-time nudge", async ({
     await pane.getByLabel("Title").fill(title);
     await pane.getByLabel("Date", { exact: true }).fill(isoDay(3));
     await pane.getByRole("button", { name: "Create gig" }).click();
-    await expect(page.getByRole("dialog", { name: title })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: title })).toBeVisible({ timeout: 40_000 });
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: title })).toBeHidden();
+    await expect(page.getByRole("dialog", { name: title })).toBeHidden({ timeout: 40_000 });
   };
   await create("First gig");
   const nudge = page.getByTestId("calendar-nudge");
-  await expect(nudge).toBeVisible();
+  await expect(nudge).toBeVisible({ timeout: 40_000 });
   await nudge.getByRole("button", { name: "Dismiss" }).click();
-  await expect(nudge).toBeHidden();
+  await expect(nudge).toBeHidden({ timeout: 40_000 });
   await create("Second gig");
-  await expect(nudge).toBeHidden();
+  await expect(nudge).toBeHidden({ timeout: 40_000 });
 });

@@ -26,7 +26,7 @@ const sorted = (list: CalendarInviteEmail[]): string[] =>
 test("a new gig sends one REQUEST per active member and none to roster-only members", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   await join(BEN);
   const res = await ava.api.post(`/bands/${bandId}/placeholders`, {
     data: { displayName: "Roster Rick", email: "rick@example.com" },
@@ -76,7 +76,7 @@ test("a new gig sends one REQUEST per active member and none to roster-only memb
 });
 
 test("an all-day gig uses VALUE=DATE", async ({ testApi }) => {
-  const { ava, bandId } = await newBand(testApi);
+  const { ava, bandId } = await newBand(testApi, { invites: true });
   const date = dateIn(30);
   await createGig(ava.api, bandId, {
     title: "Festival",
@@ -93,7 +93,7 @@ test("an all-day gig uses VALUE=DATE", async ({ testApi }) => {
 test("editing a gig bumps SEQUENCE with the same UID, and a no-op edit sends nothing", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   await join(BEN);
   const gig = await createGig(ava.api, bandId, { title: "Old Name" });
   await testApi.calendarInvitesFlush(bandId);
@@ -128,7 +128,7 @@ test("editing a gig bumps SEQUENCE with the same UID, and a no-op edit sends not
 test("deleting a gig sends a CANCEL, and past gigs are never sent", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   await join(BEN);
   await createGig(ava.api, bandId, { title: "Ancient", date: dateIn(-5) });
   const gig = await createGig(ava.api, bandId, { title: "Doomed" });
@@ -157,7 +157,7 @@ test("deleting a gig sends a CANCEL, and past gigs are never sent", async ({
 test("a practice series carries an RRULE, and occurrence edits and cancels update the same UID", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   await join(BEN);
   const start = nextTuesday(7);
   const series = await createPractice(ava.api, bandId, start, {
@@ -222,7 +222,7 @@ test("a practice series carries an RRULE, and occurrence edits and cancels updat
 test("a joining member gets the upcoming events and a leaving member gets CANCELs", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   await createGig(ava.api, bandId, { title: "Past", date: dateIn(-5) });
   const gig = await createGig(ava.api, bandId, { title: "Upcoming gig" });
   const series = await createPractice(ava.api, bandId, nextTuesday(7));
@@ -261,7 +261,7 @@ test("a joining member gets the upcoming events and a leaving member gets CANCEL
 test("opting out stops sends, and opting back in catches up on missed events only", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   const ben = await join(BEN);
   await createGig(ava.api, bandId, { title: "Before opt-out" });
   await testApi.calendarInvitesFlush(bandId);
@@ -289,7 +289,7 @@ test("opting out stops sends, and opting back in catches up on missed events onl
 test("a calendar email override receives the invites and the sign-in address is cancelled", async ({
   testApi,
 }) => {
-  const { ava, bandId, join } = await newBand(testApi);
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
   const ben = await join(BEN);
   const gig = await createGig(ava.api, bandId, { title: "Override gig" });
   await testApi.calendarInvitesFlush(bandId);

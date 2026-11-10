@@ -31,7 +31,7 @@ export function SettingsView() {
       </div>
 
       {currentBand ? <GoogleLinkReturn bandId={currentBand.id} /> : null}
-      <PersonalSection user={me} />
+      <PersonalSection user={me} bandId={currentBand?.id} />
       {currentBand?.role === "admin" ? (
         <BandSection key={currentBand.id} band={currentBand} />
       ) : null}
