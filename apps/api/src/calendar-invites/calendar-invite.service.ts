@@ -42,6 +42,8 @@ type InviteRow = typeof calendarInvites.$inferSelect;
 const DAY_MS = 86_400_000;
 /** Series count as upcoming when the rule yields an occurrence within this window. */
 const HORIZON_DAYS = 800;
+/** Only the next few occurrences get RSVP-only RECURRENCE-ID components, keeping invites small. */
+const RSVP_COMPONENT_LIMIT = 8;
 const EPOCH = new Date(0);
 
 const RSVP_PARTSTAT: Record<string, IcsPartstat> = {
@@ -571,6 +573,7 @@ export class CalendarInviteService {
           );
         const master0 = masterPartstat(r.userId);
         const answered = upcomingStarts
+          .slice(0, RSVP_COMPONENT_LIMIT)
           .filter(
             (d) =>
               !overrideAt.has(d.getTime()) && rsvpOf(r.userId, d) !== master0,

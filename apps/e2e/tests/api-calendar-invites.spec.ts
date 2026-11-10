@@ -219,6 +219,32 @@ test("a practice series carries an RRULE, and occurrence edits and cancels updat
   expect(ics(cancels[0]!)).toContain("STATUS:CANCELLED");
 });
 
+test("a weekly series with one answered occurrence stays within the component cap", async ({
+  testApi,
+}) => {
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
+  const ben = await join(BEN);
+  const start = nextTuesday(7);
+  const series = await createPractice(ava.api, bandId, start, {
+    title: "Weekly practice",
+  });
+  const sid = series.id as string;
+  const rsvp = await ben.api.put(
+    `/bands/${bandId}/practices/${sid}/occurrences/${keyOf(occurrence(start, 0))}/rsvp`,
+    { data: { status: "going", scope: "this" } },
+  );
+  expect(rsvp.ok()).toBe(true);
+  await testApi.calendarInvitesFlush(bandId);
+  const sent = await testApi.calendarInvitesFor(BEN, true);
+  expect(sent).toHaveLength(1);
+  const text = ics(sent[0]!);
+  expect(text).toContain("PARTSTAT=ACCEPTED");
+  // 1 master + at most 8 RSVP components, never one per occurrence in the horizon.
+  const events = text.match(/BEGIN:VEVENT/g)!.length;
+  expect(events).toBeGreaterThan(1);
+  expect(events).toBeLessThanOrEqual(9);
+});
+
 test("a joining member gets the upcoming events and a leaving member gets CANCELs", async ({
   testApi,
 }) => {
