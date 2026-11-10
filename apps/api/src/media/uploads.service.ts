@@ -348,7 +348,12 @@ export class UploadsService implements OnModuleInit {
     if (!row.driveFileId) return false;
     const res = await this.structure.drive
       .getFile(ctx.token, row.driveFileId)
-      .catch(() => null);
+      .catch((err: unknown) => {
+        this.log.warn(
+          `drive file check failed session=${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return null;
+      });
     return res?.status === "ok" && !res.file.trashed;
   }
 

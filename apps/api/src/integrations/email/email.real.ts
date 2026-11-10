@@ -80,7 +80,10 @@ export class RealEmailAdapter implements EmailAdapter {
     );
     if (res.status === 404) return null;
     if (!res.ok) {
-      throw new Error(`Resend received email fetch failed with ${res.status}`);
+      const detail = await res.text().catch(() => "");
+      throw new Error(
+        `Resend received email fetch failed with ${res.status}: ${detail.slice(0, 200)}`,
+      );
     }
     const body = (await res.json()) as {
       from?: string;

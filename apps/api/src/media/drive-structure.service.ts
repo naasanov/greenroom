@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Inject,
+  Logger,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -46,6 +47,7 @@ export const NOT_LINKED = {
 /** Owns the band's Drive folder layout: root pointers and per-gig folders. */
 @Injectable()
 export class DriveStructureService {
+  private readonly log = new Logger(DriveStructureService.name);
   private gigLocks = new Map<string, Promise<string>>();
 
   constructor(
@@ -101,7 +103,12 @@ export class DriveStructureService {
       const found = token
         ? await this.drive
             .getFile(token, band.driveRootFolderId)
-            .catch(() => null)
+            .catch((err: unknown) => {
+              this.log.warn(
+                `root folder lookup failed bandId=${bandId}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+              return null;
+            })
         : null;
       if (found?.status === "ok") folderName = found.file.name;
     }
@@ -223,9 +230,12 @@ export class DriveStructureService {
       }
       let pending = memo.get(id);
       if (!pending) {
-        pending = this.drive
-          .getFile(token, id)
-          .catch(() => ({ status: "not-found" }) as DriveFileResult);
+        pending = this.drive.getFile(token, id).catch((err: unknown) => {
+          this.log.warn(
+            `folder lookup failed folderId=${id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return { status: "not-found" } as DriveFileResult;
+        });
         memo.set(id, pending);
       }
       const found = await pending;

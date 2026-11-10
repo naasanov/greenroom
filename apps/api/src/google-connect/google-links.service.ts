@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import {
   bandGoogleLinks,
@@ -46,6 +46,7 @@ export type LinkCompleteResult =
 
 @Injectable()
 export class GoogleLinksService {
+  private readonly log = new Logger(GoogleLinksService.name);
   private refreshing = new Map<string, Promise<string | null>>();
 
   constructor(
@@ -157,7 +158,11 @@ export class GoogleLinksService {
         redirectUri: googleLinkRedirectUri(),
         state,
       });
-    } catch {
+    } catch (err) {
+      this.log.error(
+        `google link code exchange failed band=${row.bandId} service=${service}: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       return fail("exchange_failed");
     }
     if (res.status !== "ok") return fail("exchange_failed");
@@ -198,8 +203,10 @@ export class GoogleLinksService {
     if (link) {
       try {
         await this.google.revokeToken(decryptToken(link.refreshTokenEncrypted));
-      } catch {
-        // Best effort.
+      } catch (err) {
+        this.log.warn(
+          `google token revoke failed band=${bandId} service=${service}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
     await this.removeLink(bandId, service);
@@ -262,6 +269,9 @@ export class GoogleLinksService {
       decryptToken(row.refreshTokenEncrypted),
     );
     if (res.status === "invalid-grant") {
+      this.log.warn(
+        `google refresh token revoked, unlinking band=${bandId} service=${service}`,
+      );
       await this.removeLink(bandId, service);
       return null;
     }

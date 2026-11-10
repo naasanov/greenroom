@@ -21,10 +21,14 @@ const GITHUB_URL =
 async function loadPlan() {
   try {
     const res = await fetch(RAW_URL, { next: { revalidate: 60 } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`status page: plan fetch failed status=${res.status}`);
+      return null;
+    }
     const plan = parsePlan(await res.text());
     return plan.phases.length > 0 ? plan : null;
-  } catch {
+  } catch (err) {
+    console.error("status page: plan load errored", err);
     return null;
   }
 }
@@ -35,9 +39,13 @@ const SETUP_URL =
 async function loadSetupDoc(): Promise<SetupSection[]> {
   try {
     const res = await fetch(SETUP_URL, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error(`status page: setup doc fetch failed status=${res.status}`);
+      return [];
+    }
     return parseSetupDoc(await res.text());
-  } catch {
+  } catch (err) {
+    console.error("status page: setup doc load errored", err);
     return [];
   }
 }

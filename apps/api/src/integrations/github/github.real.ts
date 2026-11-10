@@ -31,7 +31,10 @@ export class RealGithubAdapter implements GithubAdapter {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
-      throw new Error(`GitHub issue creation failed with ${res.status}`);
+      const detail = await res.text().catch(() => "");
+      throw new Error(
+        `GitHub issue creation failed with ${res.status} repo=${repo}: ${detail.slice(0, 300)}`,
+      );
     }
     const data = (await res.json()) as { number: number; html_url: string };
     return { number: data.number, url: data.html_url };

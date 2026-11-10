@@ -1,5 +1,7 @@
+import { Logger } from "@nestjs/common";
 import type { SongsterrAdapter } from "./songsterr.adapter.js";
 
+const log = new Logger("SongsterrAdapter");
 const SEARCH_URL = "https://www.songsterr.com/api/songs";
 const TIMEOUT_MS = 5000;
 
@@ -41,7 +43,10 @@ export class RealSongsterrAdapter implements SongsterrAdapter {
         `${SEARCH_URL}?pattern=${encodeURIComponent(pattern)}`,
         { signal: AbortSignal.timeout(TIMEOUT_MS) },
       );
-      if (!res.ok) return null;
+      if (!res.ok) {
+        log.warn(`tab search failed status=${res.status}`);
+        return null;
+      }
       const hits = (await res.json()) as SongsterrHit[];
       if (!Array.isArray(hits)) return null;
       const hit = hits.find((h) => {
@@ -58,7 +63,10 @@ export class RealSongsterrAdapter implements SongsterrAdapter {
       return {
         url: `https://www.songsterr.com/a/wsa/${slug}-tab-s${hit.id as number}`,
       };
-    } catch {
+    } catch (err) {
+      log.warn(
+        `tab search errored: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return null;
     }
   }

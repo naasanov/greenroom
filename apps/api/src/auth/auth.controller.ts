@@ -11,6 +11,7 @@ import {
   UnauthorizedException,
   UseGuards,
   Inject,
+  Logger,
 } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import type { Request, Response } from "express";
@@ -44,6 +45,8 @@ const STATE_COOKIE_TTL_MS = 10 * 60 * 1000;
 
 @Controller("auth")
 export class AuthController {
+  private readonly log = new Logger(AuthController.name);
+
   constructor(
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
@@ -125,7 +128,10 @@ export class AuthController {
       code,
       redirectUri: `${apiPublicUrl()}/auth/google/callback`,
     });
-    if (exchanged.status !== "ok") return fail("invalid_code");
+    if (exchanged.status !== "ok") {
+      this.log.warn("google sign-in code rejected");
+      return fail("invalid_code");
+    }
     const found = await this.auth.findOrCreateByGoogle(exchanged.profile);
     if (!found) return fail("account_conflict");
 

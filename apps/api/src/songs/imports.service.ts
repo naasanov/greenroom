@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Inject,
+  Logger,
   Injectable,
   NotFoundException,
   type OnModuleInit,
@@ -54,6 +55,7 @@ const MEMORY_TTL_MS = 60 * 60 * 1000;
  */
 @Injectable()
 export class ImportsService implements OnModuleInit {
+  private readonly log = new Logger(ImportsService.name);
   private live = new Map<
     string,
     { bandId: string; progress: ImportProgress; expires: number }
@@ -238,7 +240,10 @@ export class ImportsService implements OnModuleInit {
       });
       index.add({ id, ...probe });
       progress.added++;
-    } catch {
+    } catch (err) {
+      this.log.warn(
+        `playlist track import failed bandId=${bandId} trackId=${t.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       progress.failed++;
     }
   }

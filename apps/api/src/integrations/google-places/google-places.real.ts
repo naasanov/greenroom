@@ -1,9 +1,11 @@
+import { Logger } from "@nestjs/common";
 import type {
   GooglePlacesAdapter,
   PlaceDetailsResult,
   PlacePrediction,
 } from "./google-places.adapter.js";
 
+const log = new Logger("GooglePlacesAdapter");
 const BASE_URL = "https://places.googleapis.com/v1";
 const TIMEOUT_MS = 5000;
 const MAX_PREDICTIONS = 5;
@@ -111,10 +113,16 @@ export class RealGooglePlacesAdapter implements GooglePlacesAdapter {
           signal: AbortSignal.timeout(TIMEOUT_MS),
         },
       );
-      if (!res.ok) return null;
+      if (!res.ok) {
+        log.warn(`photo lookup failed status=${res.status}`);
+        return null;
+      }
       const uri = asRecord(await res.json()).photoUri;
       return typeof uri === "string" && uri ? uri : null;
-    } catch {
+    } catch (err) {
+      log.warn(
+        `photo lookup errored: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return null;
     }
   }

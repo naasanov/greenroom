@@ -139,15 +139,8 @@ export class CalendarInviteService {
   runJob(job: InviteJob): Promise<void> {
     return this.locked(async () => {
       if (!this.queue.shouldRun(job)) return;
-      try {
-        await this.process(job);
-      } catch (err) {
-        this.log.error(
-          `calendar invite ${job.kind} job ${job.id} failed`,
-          err instanceof Error ? err.stack : String(err),
-        );
-        throw err;
-      }
+      // A thrown error is logged with its stack by the JobsService worker wrapper.
+      await this.process(job);
     });
   }
 
@@ -637,6 +630,9 @@ export class CalendarInviteService {
         await fn();
       } catch (err) {
         failure ??= err;
+        this.log.warn(
+          `calendar invite send failed ${plan.kind}=${plan.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     };
 

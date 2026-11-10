@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import type {
   BuildAuthUrlInput,
   ExchangeCodeResult,
@@ -5,6 +6,7 @@ import type {
   RefreshResult,
 } from "./google-oauth.adapter.js";
 
+const log = new Logger("GoogleOAuthAdapter");
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
@@ -84,8 +86,12 @@ export class RealGoogleOAuthAdapter implements GoogleOAuthAdapter {
     });
     if (!res.ok || !res.body.access_token) {
       // 4xx means the code itself was rejected; anything else is an outage.
-      if (res.status >= 400 && res.status < 500)
+      if (res.status >= 400 && res.status < 500) {
+        log.warn(
+          `code exchange rejected status=${res.status} error=${String(res.body.error)}`,
+        );
         return { status: "invalid-code" };
+      }
       throw new Error(`Google token exchange failed (${res.status})`);
     }
     const info = await fetch(USERINFO_URL, {
@@ -134,8 +140,10 @@ export class RealGoogleOAuthAdapter implements GoogleOAuthAdapter {
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ token }),
       });
-    } catch {
-      // Best effort.
+    } catch (err) {
+      log.warn(
+        `token revoke failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

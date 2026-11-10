@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { APP_FILTER } from "@nestjs/core";
+import { ExceptionLoggingFilter } from "./common/exception-logging.filter.js";
 import { AccountModule } from "./account/account.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { BandsModule } from "./bands/bands.module.js";
@@ -49,5 +51,6 @@ import { TestingModule } from "./testing/testing.module.js";
     ...(stagingLoginEnabled() ? [StagingLoginModule] : []),
   ],
   controllers: [HealthController],
+  providers: [{ provide: APP_FILTER, useClass: ExceptionLoggingFilter }],
 })
 export class AppModule {}

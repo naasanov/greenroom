@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { oauthConnections, oauthStates, type Database } from "@greenroom/db";
 import { SONG_ERROR_CODES } from "@greenroom/shared";
@@ -31,6 +31,7 @@ export type CompleteResult =
 
 @Injectable()
 export class SpotifyConnectionsService {
+  private readonly log = new Logger(SpotifyConnectionsService.name);
   private refreshing = new Map<string, Promise<string | null>>();
 
   constructor(
@@ -117,7 +118,10 @@ export class SpotifyConnectionsService {
       code,
       redirectUri: spotifyRedirectUri(),
     });
-    if (res.status !== "ok") return { ok: false, redirectTo: row.redirectTo };
+    if (res.status !== "ok") {
+      this.log.warn(`spotify code exchange rejected status=${res.status}`);
+      return { ok: false, redirectTo: row.redirectTo };
+    }
     const { tokens, profile } = res;
     const values = {
       scopes: tokens.scopes,
@@ -171,6 +175,9 @@ export class SpotifyConnectionsService {
       decryptToken(row.refreshTokenEncrypted),
     );
     if (res.status === "invalid-grant") {
+      this.log.warn(
+        `spotify refresh token revoked, disconnecting user=${userId}`,
+      );
       await this.disconnect(userId);
       return null;
     }

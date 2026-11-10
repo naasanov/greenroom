@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import {
   parseIsoDuration,
   parseYoutubeId,
@@ -5,6 +6,7 @@ import {
   type YoutubeVideoResult,
 } from "./youtube.adapter.js";
 
+const log = new Logger("YoutubeAdapter");
 const OEMBED_URL = "https://www.youtube.com/oembed";
 const VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos";
 const TIMEOUT_MS = 5000;
@@ -26,7 +28,15 @@ export class RealYoutubeAdapter implements YoutubeAdapter {
         `${OEMBED_URL}?url=${encodeURIComponent(canonical)}&format=json`,
         { signal: AbortSignal.timeout(TIMEOUT_MS) },
       );
-      if (!res.ok) return { status: "not-found" };
+      if (!res.ok) {
+        // 401/403/404 mean private, removed or unembeddable; other statuses are upstream trouble.
+        if (![401, 403, 404].includes(res.status)) {
+          log.warn(
+            `oEmbed lookup failed videoId=${videoId} status=${res.status}`,
+          );
+        }
+        return { status: "not-found" };
+      }
       const data = (await res.json()) as OEmbed;
       if (typeof data.title !== "string" || !data.title) {
         return { status: "not-found" };
@@ -45,8 +55,11 @@ export class RealYoutubeAdapter implements YoutubeAdapter {
           durationSeconds: await this.duration(videoId),
         },
       };
-    } catch {
+    } catch (err) {
       // Timeouts and network failures read as "no result".
+      log.warn(
+        `oEmbed lookup errored videoId=${videoId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return { status: "not-found" };
     }
   }
@@ -60,13 +73,19 @@ export class RealYoutubeAdapter implements YoutubeAdapter {
         `${VIDEOS_URL}?part=contentDetails&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(key)}`,
         { signal: AbortSignal.timeout(TIMEOUT_MS) },
       );
-      if (!res.ok) return null;
+      if (!res.ok) {
+        log.warn(`videos.list failed videoId=${videoId} status=${res.status}`);
+        return null;
+      }
       const data = (await res.json()) as {
         items?: { contentDetails?: { duration?: unknown } }[];
       };
       const iso = data.items?.[0]?.contentDetails?.duration;
       return typeof iso === "string" ? parseIsoDuration(iso) : null;
-    } catch {
+    } catch (err) {
+      log.warn(
+        `videos.list errored videoId=${videoId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return null;
     }
   }

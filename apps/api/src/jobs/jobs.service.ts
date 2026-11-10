@@ -53,7 +53,16 @@ export class JobsService implements OnModuleInit, OnApplicationShutdown {
       { pollingIntervalSeconds: 0.5, ...options.work },
       async (jobs) => {
         const job = jobs[0]!;
-        return handler(job.data, job);
+        try {
+          return await handler(job.data, job);
+        } catch (err) {
+          // pg-boss records the failure in its own table only; surface it in the app log.
+          this.log.error(
+            `job failed queue=${queue} id=${job.id} data=${JSON.stringify(job.data).slice(0, 300)}: ${err instanceof Error ? err.message : String(err)}`,
+            err instanceof Error ? err.stack : undefined,
+          );
+          throw err;
+        }
       },
     );
   }
