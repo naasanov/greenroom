@@ -33,7 +33,12 @@ import {
   inviteJobKey,
   type InviteJob,
 } from "./calendar-invite.queue.js";
-import { replyAddress, replyDomain, type InviteKind } from "./reply-token.js";
+import {
+  INVITES_LOCAL_PART,
+  replyAddress,
+  replyDomain,
+  type InviteKind,
+} from "./reply-token.js";
 import { rsvpLinkUrls, type RsvpLinks } from "./rsvp-link.js";
 
 type GigRow = typeof gigs.$inferSelect;
@@ -44,6 +49,8 @@ const DAY_MS = 86_400_000;
 const HORIZON_DAYS = 800;
 /** Only the next few occurrences get RSVP-only RECURRENCE-ID components, keeping invites small. */
 const RSVP_COMPONENT_LIMIT = 8;
+/** A band catch-up sends new invites only for this many of the soonest upcoming events. */
+const CATCH_UP_LIMIT = 5;
 const EPOCH = new Date(0);
 
 const RSVP_PARTSTAT: Record<string, IcsPartstat> = {
@@ -77,6 +84,8 @@ interface EventPlan {
   when: string;
   where: string | null;
   link: string;
+  /** Start of the soonest upcoming occurrence, used to rank events for the catch-up cap. */
+  nextStart: Date;
   /** True when the event is gone and every recipient gets a CANCEL. */
   cancelled: boolean;
   events(r: Recipient, sequence: number, method: IcsMethod): IcsEvent[];
@@ -305,17 +314,31 @@ export class CalendarInviteService {
       .select()
       .from(practiceSeries)
       .where(eq(practiceSeries.bandId, bandId));
-    let failure: unknown;
+    const plans: EventPlan[] = [];
     for (const g of gigRows) {
-      try {
-        await this.applyGig(g, ctx);
-      } catch (err) {
-        failure ??= err;
-      }
+      const p = this.gigPlan(g, ctx);
+      if (p) plans.push(p);
     }
     for (const s of seriesRows) {
+      const p = await this.seriesPlan(s, ctx);
+      if (p) plans.push(p);
+    }
+    // Only the soonest live events may open new invites; updates and cancels are never capped.
+    const allowed = new Set(
+      plans
+        .filter((p) => !p.cancelled)
+        .sort(
+          (a, b) =>
+            a.nextStart.getTime() - b.nextStart.getTime() ||
+            a.id.localeCompare(b.id),
+        )
+        .slice(0, CATCH_UP_LIMIT)
+        .map((p) => `${p.kind}:${p.id}`),
+    );
+    let failure: unknown;
+    for (const p of plans) {
       try {
-        await this.applySeries(s, ctx);
+        await this.apply(p, ctx, allowed.has(`${p.kind}:${p.id}`));
       } catch (err) {
         failure ??= err;
       }
@@ -410,6 +433,7 @@ export class CalendarInviteService {
       when: whenLabel(start, g.timeZone, allDay, g.date),
       where: base.location ?? null,
       link,
+      nextStart: start,
       cancelled: g.deletedAt != null,
       events: (r, sequence) => [
         {
@@ -536,6 +560,9 @@ export class CalendarInviteService {
       when: whenLabel(new Date(first.startsAt), s.timeZone, false),
       where: s.location,
       link,
+      nextStart: recurring
+        ? (upcomingStarts[0] ?? new Date(first.startsAt))
+        : new Date(first.startsAt),
       cancelled: s.deletedAt != null || cancelledOneOff,
       events: (r, sequence, method) => {
         if (!recurring) {
@@ -609,6 +636,7 @@ export class CalendarInviteService {
   private async apply(
     plan: EventPlan,
     ctx: { bandName: string; members: Recipient[] },
+    allowNew = true,
   ): Promise<void> {
     const rows = await this.db
       .select()
@@ -656,6 +684,7 @@ export class CalendarInviteService {
         const row = byKey.get(r.key);
         const hash = this.fingerprint(plan, r);
         if (row && !row.cancelledAt && row.lastPayloadHash === hash) continue;
+        if (!allowNew && (!row || row.cancelledAt)) continue;
         await attempt(() =>
           this.send(plan, ctx.bandName, r, row, "REQUEST", hash),
         );
@@ -695,7 +724,6 @@ export class CalendarInviteService {
         : row && !row.cancelledAt
           ? "Updated invitation"
           : "Invitation";
-    const organizer = replyAddress(plan.kind, plan.id);
     const lead =
       method === "CANCEL"
         ? `${plan.title} has been canceled.`
@@ -742,7 +770,7 @@ export class CalendarInviteService {
       html,
       ics,
       method,
-      from: `"${bandName.replace(/["<>\r\n]/g, "")} via Greenroom" <${organizer}>`,
+      from: `"${bandName.replace(/["<>\r\n]/g, "")} via Greenroom" <${INVITES_LOCAL_PART}@${replyDomain()}>`,
     });
     this.log.log(`calendar invite ${method} sent for ${plan.kind} ${plan.id}`);
     const values = {

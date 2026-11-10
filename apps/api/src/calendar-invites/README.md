@@ -10,13 +10,17 @@ Every change enqueues a reconcile job through `CalendarInviteQueue` (never throw
 - Event deleted, or recipient no longer a member or recipient address changed: `METHOD:CANCEL` (`STATUS:CANCELLED`, `SEQUENCE` + 1, row `cancelled_at` set). A later REQUEST to the same address continues the sequence.
 - Unchanged content (`last_payload_hash` equal): nothing is sent.
 
-Hooks: gig create, update, delete enqueue `gig`; practice create, edit (any scope), occurrence cancel, series or `this_and_following` delete enqueue `series` (a split enqueues both series); member join, leave, removal, claimed roster entry and account deletion enqueue `band`; a calendar email change enqueues `band` for each of the user's bands. A `band` job reconciles every upcoming gig and every practice series of the band.
+Hooks: gig create, update, delete enqueue `gig`; practice create, edit (any scope), occurrence cancel, series or `this_and_following` delete enqueue `series` (a split enqueues both series); member join, leave, removal, claimed roster entry and account deletion enqueue `band`; a calendar email change enqueues `band` for each of the user's bands. A `band` job reconciles every upcoming gig and every practice series of the band, with the catch-up cap below.
 
 Only upcoming events are considered: gig date today or later (in the gig zone); a series whose rule yields an occurrence within 800 days; a one-off by its (possibly moved) start. Past events are never sent or cancelled.
 
 ## Recipients
 
-Active members that are not roster-only, at `users.calendar_email` else `users.email`, deduplicated case-insensitively. Each recipient gets their own email with one `ATTENDEE` (`PARTSTAT=NEEDS-ACTION`, `RSVP=TRUE`; override and one-off occurrences use the member's current RSVP). Invites are opt-in via `users.calendar_invites_enabled` (default false): a member who has not enabled them is skipped entirely (no sends, no cancels). Enabling enqueues a `band` job, which sends only events whose content differs from what they last received, plus events they never got.
+Active members that are not roster-only, at `users.calendar_email` else `users.email`, deduplicated case-insensitively. Each recipient gets their own email with one `ATTENDEE` (`PARTSTAT=NEEDS-ACTION`, `RSVP=TRUE`; override and one-off occurrences use the member's current RSVP). Invites are opt-in via `users.calendar_invites_enabled` (default false): a member who has not enabled them is skipped entirely (no sends, no cancels). Enabling enqueues a `band` job, which sends only events whose content differs from what they last received, plus events they never got, within the catch-up cap.
+
+## Catch-up cap
+
+The `band` job (member opts in, joins, or an address changes) builds plans for every upcoming gig and series, ranks the live ones by start (a series by its next upcoming occurrence) and lets new invites go out only for the first `CATCH_UP_LIMIT` (5). A new invite is one with no `calendar_invites` row for the recipient or a cancelled row. Updates and CANCELs to invites a recipient already holds are never capped. Events past the cap are not sent by the catch-up and stay available through the subscription feed; per-event `gig` and `series` jobs are uncapped, so later creates and edits arrive normally.
 
 ## Content
 
@@ -24,7 +28,7 @@ Active members that are not roster-only, at `users.calendar_email` else `users.e
 
 ## Organizer and reply token
 
-`ORGANIZER` is `rsvp+<token>@EMAIL_REPLY_DOMAIN` and the email From uses the same address, so Gmail sees sender and organizer match. The token (`reply-token.ts`) is stateless: kind char (`g` gig, `p` series) + event uuid hex + 20 hex chars of HMAC-SHA256 (key from `INVITE_TOKEN_SECRET`, else `OAUTH_TOKEN_KEY`), lowercase so mail systems cannot break it. `parseInviteToken` / `tokenFromAddress` verify it for the inbound wave; the sender address identifies the member.
+`ORGANIZER` is the per-event `rsvp+<token>@EMAIL_REPLY_DOMAIN` so replies route. The email From is the stable `"<Band> via Greenroom" <invites@EMAIL_REPLY_DOMAIN>` (`INVITES_LOCAL_PART`), so mail apps ask to trust one sender instead of one per event. Inbound handling reads only the reply recipient and the replying member's address, never the outbound From. The token (`reply-token.ts`) is stateless: kind char (`g` gig, `p` series) + event uuid hex + 20 hex chars of HMAC-SHA256 (key from `INVITE_TOKEN_SECRET`, else `OAUTH_TOKEN_KEY`), lowercase so mail systems cannot break it. `parseInviteToken` / `tokenFromAddress` verify it for the inbound wave; the sender address identifies the member.
 
 ## Email transport
 

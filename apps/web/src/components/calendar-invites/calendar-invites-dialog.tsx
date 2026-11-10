@@ -62,7 +62,8 @@ function EmailStep({
           <span data-testid="calendar-account-email" className="font-medium">
             {current || signIn}
           </span>
-          .
+          . Your next 5 events arrive by email now, and the subscribe link shows
+          the full schedule.
         </p>
         <FormField
           label="Use a different email (optional)"

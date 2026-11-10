@@ -73,6 +73,8 @@ test("a new gig sends one REQUEST per active member and none to roster-only memb
     ),
   );
   expect(m.ics).toContain("\r\n");
+  // The From is one stable sender; only the ORGANIZER carries the per-event token.
+  expect(m.from).toMatch(/^".+ via Greenroom" <invites@greenroom\.fyi>$/);
 });
 
 test("an all-day gig uses VALUE=DATE", async ({ testApi }) => {
@@ -282,6 +284,26 @@ test("a joining member gets the upcoming events and a leaving member gets CANCEL
   const rejoined = await testApi.calendarInvitesFor(undefined, true);
   expect(sorted(rejoined)).toEqual([BEN, BEN]);
   expect(rejoined.every((m) => ics(m).includes("SEQUENCE:2"))).toBe(true);
+});
+
+test("opting in catches up on only the next 5 events, nearest first", async ({
+  testApi,
+}) => {
+  const { ava, bandId, join } = await newBand(testApi, { invites: true });
+  const ben = await join(BEN);
+  await testApi.calendarInvitesEnabled(ben.user.id, false);
+  for (let i = 7; i >= 1; i--) {
+    await createGig(ava.api, bandId, { title: `Gig ${i}`, date: dateIn(i) });
+  }
+  await testApi.calendarInvitesFlush(bandId);
+  await testApi.calendarInvitesFor(undefined, true);
+
+  await testApi.calendarInvitesEnabled(ben.user.id, true);
+  await testApi.calendarInvitesFlush(bandId);
+  const sent = (await testApi.calendarInvitesFor(BEN, true)).map(
+    (m) => /SUMMARY:(.+)/.exec(ics(m))![1],
+  );
+  expect(sent.sort()).toEqual(["Gig 1", "Gig 2", "Gig 3", "Gig 4", "Gig 5"]);
 });
 
 test("opting out stops sends, and opting back in catches up on missed events only", async ({

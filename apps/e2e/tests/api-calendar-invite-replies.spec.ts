@@ -26,9 +26,9 @@ const stamp = (d: Date): string =>
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}Z$/, "Z");
 
-/** `rsvp+<token>@domain` from the From header of a sent invite. */
+/** `rsvp+<token>@domain` from the ORGANIZER of a sent invite. */
 const replyAddressOf = (m: CalendarInviteEmail): string =>
-  /<(rsvp\+[^>]+)>/.exec(m.from ?? "")![1]!;
+  /ORGANIZER[^:]*:mailto:(rsvp\+\S+)/.exec(unfold(m.ics))![1]!;
 
 function replyIcs(
   seriesId: string,

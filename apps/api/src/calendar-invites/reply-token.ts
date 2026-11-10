@@ -49,6 +49,9 @@ export function parseInviteToken(
   };
 }
 
+/** Stable local part of the From address on invite emails, so mail apps see one sender. */
+export const INVITES_LOCAL_PART = "invites";
+
 /** Per-event reply address used as ORGANIZER: `rsvp+<token>@<domain>`. */
 export const replyAddress = (kind: InviteKind, eventId: string): string =>
   `rsvp+${inviteToken(kind, eventId)}@${replyDomain()}`;
