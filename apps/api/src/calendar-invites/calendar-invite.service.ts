@@ -276,6 +276,7 @@ export class CalendarInviteService {
   private async process(job: InviteJob): Promise<void> {
     // Marked done first: a failure is retried by pg-boss, and edits made meanwhile re-add the job.
     this.queue.done(job);
+    this.log.log(`calendar invite ${job.kind} job ${job.id} started`);
     try {
       if (job.kind === "gig") await this.reconcileGig(job.bandId, job.id);
       else if (job.kind === "series") {
@@ -736,6 +737,7 @@ export class CalendarInviteService {
       method,
       from: `"${bandName.replace(/["<>\r\n]/g, "")} via Greenroom" <${organizer}>`,
     });
+    this.log.log(`calendar invite ${method} sent for ${plan.kind} ${plan.id}`);
     const values = {
       bandId: plan.bandId,
       kind: plan.kind,
