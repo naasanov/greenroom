@@ -1,7 +1,7 @@
 import { request as pwRequest, type APIRequestContext } from "@playwright/test";
 import { API_URL } from "../src/env.js";
 import { expect } from "../src/fixtures.js";
-import type { FakeCalendarEvent, TestApi } from "../src/test-api.js";
+import type { TestApi } from "../src/test-api.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Json = Record<string, any>;
@@ -22,7 +22,6 @@ export async function client(testApi: TestApi, email: string) {
 
 export type Client = Awaited<ReturnType<typeof client>>;
 
-/** A band created by Ava; `join` adds more members through the invite link. */
 /** Creates a band owned by Ava; `invites` opts every member into calendar invites. */
 export async function newBand(
   testApi: TestApi,
@@ -43,18 +42,6 @@ export async function newBand(
     return c;
   };
   return { ava, bandId, join };
-}
-
-export async function setupCalendar(
-  api: APIRequestContext,
-  bandId: string,
-): Promise<Json> {
-  const res = await api.post(
-    `/bands/${bandId}/integrations/google/calendar/setup`,
-    { data: { timeZone: "UTC" } },
-  );
-  expect(res.status(), await res.text()).toBe(200);
-  return res.json();
 }
 
 /** YYYY-MM-DD, `offset` days from today (UTC). */
@@ -119,46 +106,4 @@ export async function createPractice(
   });
   expect(res.status(), await res.text()).toBe(201);
   return res.json();
-}
-
-export const masterOf = (
-  events: FakeCalendarEvent[],
-  appId: string,
-): FakeCalendarEvent => {
-  const e = events.find(
-    (x) => x.privateProperties["greenroomId"] === appId && !x.recurringEventId,
-  );
-  if (!e) throw new Error(`No Google event for ${appId}`);
-  return e;
-};
-
-export const instanceOf = (
-  events: FakeCalendarEvent[],
-  masterId: string,
-  start: Date,
-): FakeCalendarEvent | undefined =>
-  events.find(
-    (x) =>
-      x.recurringEventId === masterId &&
-      !!x.originalStart &&
-      new Date(x.originalStart).getTime() === start.getTime(),
-  );
-
-/** Sorted emails of the reader rules on a fake calendar's ACL. */
-export async function readersOf(
-  testApi: TestApi,
-  calendarId: string,
-): Promise<string[]> {
-  return (await testApi.calendarAcl(calendarId))
-    .filter((r) => r.role === "reader")
-    .map((r) => r.email)
-    .sort();
-}
-
-/** Set up and return the calendar id for a band. */
-export async function connect(
-  api: APIRequestContext,
-  bandId: string,
-): Promise<string> {
-  return (await setupCalendar(api, bandId))["calendarId"] as string;
 }

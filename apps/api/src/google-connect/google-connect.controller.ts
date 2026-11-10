@@ -84,9 +84,6 @@ export class GoogleConnectController {
     @Res() res: Response,
   ): Promise<void> {
     const parsed = parseService(service);
-    // Calendar is owned by the server-held bot account, so it has no sign-in.
-    if (parsed === "calendar")
-      throw new NotFoundException("Calendar does not use a Google sign-in");
     const url = await this.links.start(
       user.id,
       bandId,

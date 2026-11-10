@@ -5,7 +5,6 @@ import { NestFactory } from "@nestjs/core";
 import {
   EMAIL,
   GITHUB,
-  GOOGLE_CALENDAR,
   GOOGLE_DRIVE,
   GOOGLE_OAUTH,
   GOOGLE_PLACES,
@@ -20,7 +19,6 @@ import {
   IntegrationsModule,
   type EmailAdapter,
   type GithubAdapter,
-  type GoogleCalendarAdapter,
   type GoogleDriveAdapter,
   type GoogleOAuthAdapter,
   type GooglePlacesAdapter,
@@ -28,11 +26,6 @@ import {
   type SpotifyAdapter,
   type YoutubeAdapter,
 } from "../index.js";
-import {
-  buildEventBody,
-  instanceId,
-  mapCalendarEvent,
-} from "../google-calendar/google-calendar.mapping.js";
 import {
   chunkContentRange,
   parseReceivedBytes,
@@ -56,7 +49,6 @@ async function main(): Promise<void> {
   assert.ok(app.get(GOOGLE_DRIVE));
   const oauth = app.get<GoogleOAuthAdapter>(GOOGLE_OAUTH);
   const drive = app.get<GoogleDriveAdapter>(GOOGLE_DRIVE);
-  const cal = app.get<GoogleCalendarAdapter>(GOOGLE_CALENDAR);
   const places = app.get<GooglePlacesAdapter>(GOOGLE_PLACES);
   const spotify = app.get<SpotifyAdapter>(SPOTIFY);
   const yt = app.get<YoutubeAdapter>(YOUTUBE);
@@ -141,130 +133,11 @@ async function main(): Promise<void> {
   reg.googleDrive.externalDelete(fileId);
   assert.equal((await drive.getFile(TOKEN, fileId)).status, "not-found");
 
-  // calendar: etags, instance, ACL sharing, sync token expiry
-  const { calendarId } = await cal.createCalendar(TOKEN, {
-    summary: "Band",
-    timeZone: "UTC",
-  });
-  const baseline = await cal.listChanges(TOKEN, calendarId);
-  assert.equal(baseline.status, "ok");
-  if (baseline.status !== "ok") throw new Error("unreachable");
-  const ev = await cal.createEvent(TOKEN, calendarId, {
-    summary: "Practice",
-    start: "2026-11-03T19:00:00Z",
-    end: "2026-11-03T21:00:00Z",
-    recurrence: ["RRULE:FREQ=WEEKLY;BYDAY=TU"],
-  });
-  const upd = await cal.updateEvent(TOKEN, calendarId, ev.id, {
-    location: "Garage",
-  });
-  assert.ok(upd.status === "ok" && upd.event.etag !== ev.etag);
-  assert.equal(
-    (
-      await cal.updateEvent(
-        TOKEN,
-        calendarId,
-        ev.id,
-        { location: "Y" },
-        ev.etag,
-      )
-    ).status,
-    "etag-mismatch",
-  );
-  const inst = await cal.patchInstance(
-    TOKEN,
-    calendarId,
-    ev.id,
-    "2026-11-10T19:00:00Z",
-    { cancelled: true },
-  );
-  assert.ok(inst.status === "ok" && inst.event.cancelled);
-  assert.equal(
-    (await cal.shareCalendar(TOKEN, calendarId, "A@x.test")).status,
-    "shared",
-  );
-  assert.equal(
-    (await cal.shareCalendar(TOKEN, calendarId, "a@x.test")).status,
-    "already-shared",
-  );
-  assert.equal(
-    (await cal.shareCalendar(TOKEN, calendarId, "z@no-google.test")).status,
-    "rejected",
-  );
-  const rules = await cal.listAclRules(TOKEN, calendarId);
-  assert.ok(rules.some((r) => r.role === "owner"));
-  const rule = rules.find((r) => r.email === "A@x.test");
-  assert.equal(rule?.role, "reader");
-  assert.equal(
-    (await cal.deleteAclRule(TOKEN, calendarId, rule!.id)).status,
-    "ok",
-  );
-  assert.equal(
-    (await cal.deleteAclRule(TOKEN, calendarId, rule!.id)).status,
-    "not-found",
-  );
-  const delta = await cal.listChanges(
-    TOKEN,
-    calendarId,
-    baseline.nextSyncToken,
-  );
-  assert.ok(delta.status === "ok");
-  if (delta.status === "ok") {
-    assert.ok(delta.events.some((x) => x.id === ev.id));
-  }
-  reg.googleCalendar.expireSyncTokens(calendarId);
-  assert.equal(
-    (await cal.listChanges(TOKEN, calendarId, baseline.nextSyncToken)).status,
-    "sync-token-expired",
-  );
-  assert.equal((await cal.deleteEvent(TOKEN, calendarId, ev.id)).status, "ok");
-
-  // calendar: all-day, private props, instance ids, simulation helpers
-  const day = await cal.createEvent(TOKEN, calendarId, {
-    summary: "Festival",
-    start: "2026-12-01",
-    end: "2026-12-02",
-    allDay: true,
-    privateProperties: { greenroomKind: "gig", greenroomId: "g1" },
-  });
-  assert.ok(day.allDay && day.privateProperties.greenroomId === "g1");
-  assert.ok(day.updated.length > 0);
-  assert.equal(reg.googleCalendar.lastAccessToken, TOKEN);
-  const weekly = await cal.createEvent(TOKEN, calendarId, {
-    summary: "Weekly",
-    start: "2026-11-03T19:00:00Z",
-    end: "2026-11-03T20:00:00Z",
-    timeZone: "UTC",
-    recurrence: ["RRULE:FREQ=WEEKLY"],
-  });
-  assert.equal(weekly.recurrence.length, 1);
-  assert.equal(
-    instanceId("abc", "2026-11-10T19:00:00Z"),
-    "abc_20261110T190000Z",
-  );
-  assert.equal(
-    instanceId("abc", "2026-11-10T14:00:00-05:00"),
-    "abc_20261110T190000Z",
-  );
-  assert.equal(instanceId("abc", "2026-11-10"), "abc_20261110");
-  const body = buildEventBody({ start: "2026-12-01", end: "2026-12-02" });
-  assert.equal(body.start?.date, "2026-12-01");
   assert.equal(parseReceivedBytes("bytes=0-262143"), 262144);
   assert.equal(parseReceivedBytes(null), 0);
   assert.equal(chunkContentRange(0, 9, 10), "bytes 0-9/10");
   assert.equal(chunkContentRange(0, -1, 0), "bytes */0");
   assert.equal(thumbnailUrl("https://x.test/a=s220"), "https://x.test/a=s400");
-  const mapped = mapCalendarEvent({
-    id: "e",
-    status: "cancelled",
-    start: { date: "2026-12-01" },
-    end: { date: "2026-12-02" },
-    originalStartTime: { date: "2026-12-01" },
-    extendedProperties: { private: { a: "b" } },
-  });
-  assert.ok(
-    mapped.cancelled && mapped.allDay && mapped.privateProperties.a === "b",
-  );
 
   // drive: external changes and thumbnails
   const tokenBefore = await drive.getStartPageToken(TOKEN);

@@ -1,6 +1,6 @@
 # Greenroom
 
-A web app that is a small band's home base: gigs and practices on a shared calendar (two-way Google Calendar sync), setlists built from a song library (Spotify/YouTube/manual), roster, gig media stored in Google Drive, stage mode, and a public gig calendar. Domain: `greenroom.fyi` (Cloudflare). Repo: `naasanov/greenroom` (public).
+A web app that is a small band's home base: gigs and practices on a shared calendar (calendar invites by email and a subscribe feed), setlists built from a song library (Spotify/YouTube/manual), roster, gig media stored in Google Drive, stage mode, and a public gig calendar. Domain: `greenroom.fyi` (Cloudflare). Repo: `naasanov/greenroom` (public).
 
 ## Your role: orchestrator
 

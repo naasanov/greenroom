@@ -41,7 +41,6 @@ import {
 } from "@greenroom/shared";
 import { webUrl } from "../auth/auth.constants.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -72,7 +71,6 @@ const toSummary = (
 export class BandsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
-    private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
   ) {}
 
@@ -297,7 +295,6 @@ export class BandsService {
         .where(eq(memberships.id, m.id));
       await this.dropFutureLineups(tx, m.id);
     });
-    await this.calendarSync.bandAcl(bandId);
     await this.invites.band(bandId);
   }
 
@@ -310,7 +307,6 @@ export class BandsService {
       this.leaveInTx(tx, bandId, userId, deleteBand),
     );
     if (!bandDeleted) {
-      await this.calendarSync.bandAcl(bandId);
       await this.invites.band(bandId);
     }
   }
@@ -550,7 +546,6 @@ export class BandsService {
       return toSummary(band, "member");
     });
     if (joined) {
-      await this.calendarSync.bandAcl(band.id);
       await this.invites.band(band.id);
     }
     return summary;
@@ -631,7 +626,6 @@ export class BandsService {
       return toSummary(band, "member");
     });
     if (joined) {
-      await this.calendarSync.bandAcl(band.id);
       await this.invites.band(band.id);
     }
     return summary;

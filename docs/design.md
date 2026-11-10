@@ -7,26 +7,24 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 # Goals
 - Be the band's home for structured info (gigs, practices, setlists, media) alongside the group chat. **Revised:** the group chat stays the main communication channel; the app does not try to replace it.
-- Calendar integration (Google Calendar / general calendar) to track gigs and practices.
+- Calendar integration through standard iCalendar invites and a subscribe feed (see Calendar invites) to track gigs and practices.
 - Media handling tied to gigs: flyers, photos from gigs, and videos from gigs — the kind of content currently scattered across the group chat or an infrequently used Google Drive. Intended for posting to socials.
 - Google Drive integration for media.
 
 # Key Design Decisions
 - Media should not be stored in the app itself; delegate storage to Google Drive if possible.
-- Two-way sync with Google Calendar (see Practices).
-- Calendar sync conflict resolution: last-write-wins, resolved via stored sync tokens/etags per event (not raw cross-system timestamp comparison, to avoid clock skew between Google and our server). Store Google's etag/updated token per event plus our own app-side updated-at column; on each sync, check whether Google's token still matches the last one we saw to detect which side wrote last.
-- Deletes: delete always wins (a delete on either side beats a concurrent edit). Accidental deletes are handled app-side later via soft delete / undo window if needed, not by weakening the rule.
+- Calendar delivery is provider-neutral iCalendar by email and a subscribe feed (see Calendar invites). Google Calendar sync was removed 2026-11-10.
 
 # Practices
 - Recurring practices.
 - In the app you set the practice, and everyone gets an invite and RSVPs (going / maybe / not going).
-- You can mark that you're not making a practice from the app, and that updates Google Calendar.
-- You can also decline on Google Calendar, and that updates the app (two-way sync).
-- **RSVP display (in the practice drawer):** one attendee list, Google Calendar style, not separate lists. Going members show a check icon; not-going members show an X and sort to the bottom. **"Maybe" is supported** (maps to Google's tentative status) with a question-mark icon. Sort order: going, maybe, no response (neutral/no icon), then not going at the bottom. **RSVPing on a recurring practice asks which occurrences it applies to** (this event, this and following, all events), the same picker as edit and cancel; non-recurring practices RSVP immediately.
-- **RSVPs mirror Google Calendar's native RSVP system:** each member's response maps to the attendee response status on the Calendar event (accepted / tentative / declined / needs action), so the same check marks show in Google Calendar and in the app, synced both ways.
+- You can mark that you're not making a practice from the app, and the change reaches your calendar through the invite email.
+- You can also decline from your calendar app, and the reply updates the app (see Calendar invites).
+- **RSVP display (in the practice drawer):** one attendee list, Google Calendar style, not separate lists. Going members show a check icon; not-going members show an X and sort to the bottom. **"Maybe" is supported** (maps to the iCalendar tentative status) with a question-mark icon. Sort order: going, maybe, no response (neutral/no icon), then not going at the bottom. **RSVPing on a recurring practice asks which occurrences it applies to** (this event, this and following, all events), the same picker as edit and cancel; non-recurring practices RSVP immediately.
+- **RSVPs map to iCalendar participation status:** accepted, tentative, declined, needs action; replies from calendar clients flow back to the app (see Calendar invites).
 - Practices are cancelable.
 - A single practice can be moved to a different day without moving the rest of the recurring series.
-- **Editing or canceling a recurring practice works like Google Calendar:** when you change details (time, location, etc.) or cancel, you're asked to apply it to "This event," "This and following events," or "All events." For edits the question comes when you save, not when you tap Edit; if the recurrence itself changed, "This event" is not offered (decided 2026-10-24). This maps cleanly onto RRULE/Calendar sync. (Setlists keep their own "this and following" rule described under Practice form fields.)
+- **Editing or canceling a recurring practice works like Google Calendar:** when you change details (time, location, etc.) or cancel, you're asked to apply it to "This event," "This and following events," or "All events." For edits the question comes when you save, not when you tap Edit; if the recurrence itself changed, "This event" is not offered (decided 2026-10-24). This maps cleanly onto RRULE and iCalendar `RECURRENCE-ID` instances. (Setlists keep their own "this and following" rule described under Practice form fields.)
 
 # Open Questions
 - (Resolved) Delegating media storage entirely to Google Drive: yes, see Storage, Upload Brokering, and Linking Google Drive.
@@ -189,7 +187,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
   - Recurring practices: each occurrence has its own setlist, but they're linked with "this and following" behavior. Changing the setlist on one occurrence (e.g. 10/4) applies that setlist to that occurrence and every later one in the series; earlier occurrences are untouched (past practices keep a record of what was worked on).
   - Conflict rule: by default the change overwrites forward. If any later occurrence has its own custom (individually edited) setlist, warn first, e.g. "10/18 has its own setlist. Replace it or keep it?" No prompt when there's nothing custom to lose.
   - **Keep vs. replace (decided 2026-10-25):** an occurrence has its own setlist when someone changed the setlist on it. "Keep" means the new setlist runs from the edited occurrence until the next occurrence with its own setlist, which keeps its setlist from there on; "Replace" runs the new setlist forward and drops the later ones. The prompt shows once, on the first setlist change in that drawer.
-  - Recurrence must map to what Google Calendar's API can represent (it uses the RRULE recurrence standard). Mirror RRULE's supported options rather than inventing custom recurrence that can't round-trip through Calendar sync.
+  - Recurrence is limited to what RRULE and iCalendar can represent. Mirror RRULE's supported options rather than inventing custom recurrence that can't be sent in calendar invites.
 - **Event drawers sit on the right on desktop (decided 2026-10-24):** the create, gig, and practice drawers rise from the bottom in the right part of the screen, directly left of the FAB/agenda buttons, or directly left of the agenda sheet when it is open. Drawer titles are centered.
 - Bottom-drawer pattern throughout: chosen deliberately — thumb-reachable, touch/mobile-friendly, feels native when pulling the app up at a venue. Flow reveals only the next decision at each step (no wall of fields).
 - **Close control and simple controls use icons (decided 2026-11-03):** simple header controls in sheets, drawers, and panels are icon buttons with an aria-label, not text. Edit is a pencil (aria-label "Edit"; it becomes a text "Cancel" while editing). Every bottom drawer and phone-stacked side drawer closes with a down chevron, and the wide-screen side panel and right sheets close with an X; all are aria-label "Close", never "Done". Primary form actions (Save, Create gig, Discard) stay text.
@@ -329,7 +327,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 
 ## Band settings (admins only)
 - Band name and photo.
-- Google Drive and Google Calendar connections.
+- Google Drive connection.
 - Public gig calendar link, with copy and reset buttons.
 - **Band profile for the public page:** social links (e.g. Instagram, TikTok, YouTube, Spotify), contact info (e.g. a booking email), and a free-form bio. These show at the top of the public gig calendar page alongside the band name and photo.
 
@@ -373,7 +371,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Files added directly in the Drive folder outside the app DO show up in the app (via the changes poller), landing in the matching folder section, or Unsorted if they're not in a known folder.
 
 # Calendar invites (decided 2026-11-06)
-Supersedes the service-account calendar sharing below. Calendar delivery is provider-neutral: members get standard iCalendar invites by email (iMIP, RFC 6047), so it works in Google, Outlook, Apple and any client that understands invites.
+Supersedes the former Google Calendar sync. Calendar delivery is provider-neutral: members get standard iCalendar invites by email (iMIP, RFC 6047), so it works in Google, Outlook, Apple and any client that understands invites.
 - **Opt-in, two methods (decided 2026-11-10).** Calendar invites are off by default (`users.calendar_invites_enabled` defaults to false and was reset for everyone when this shipped). A member chooses between email invites and the subscribe link; both are optional.
 - **Invite emails.** For members who turned them on, every practice and gig sends each active member an email with a `text/calendar` part (`METHOD:REQUEST`, stable `UID` per event or series, `ORGANIZER`, one `ATTENDEE` per member, `SEQUENCE` bumped on every change). Edits resend the same `UID` with a higher `SEQUENCE`, cancels send `METHOD:CANCEL`. Recurring practices carry `RRULE` plus `VTIMEZONE`, with `RECURRENCE-ID` instances for per-occurrence edits and cancellations. Sent through Resend from greenroom.fyi, with `ORGANIZER` on that domain.
 - **Recipients:** each member's calendar email (personal setting, defaults to the sign-in email). Gig invites go to all active members (as decided 2026-10-27), practice invites to all active members. Roster-only members are never emailed.
@@ -383,35 +381,25 @@ Supersedes the service-account calendar sharing below. Calendar delivery is prov
 - **Naming and discoverability:** the feature is "Add to your calendar" / "Calendar invites", never "Google Calendar". An action in the Events toolbar next to Today and the month arrows opens one dialog; the same dialog opens from the Calendar row in personal settings. The Events banner is worded as optional and returns until the member has turned invites on or opened the dialog (dismiss hides it for a week); a one-time nudge appears after the first event is created.
 - **Two-step dialog:** step 1 offers two cards, Email invites (standard invite you accept in any calendar app, RSVPs flow back, changes arrive by email) and Subscribe link (events appear automatically, read-only, no RSVPs, slow refresh). Step 2 for email shows the account email, an optional different email for invites (for example Outlook), a button that turns invites on and stores the calendar email, and a way to turn invites off. Step 2 for the link shows the feed URL with copy, open in app, reset, and per-app instructions. Both steps after the first have a Back button.
 - **Reopening:** a member with invites on opens straight onto the email step; a member who has opened the link step (remembered per band on the device) opens onto the link step; otherwise the choice. Back always returns to the choice so they can switch.
-- **Google Calendar sync (service account) is retired as the default.** It stays available behind Band settings only for bands that want near-instant calendar updates. It is optional: a Greenroom-owned Google calendar is kept in sync within moments of every change, members are added as readers and accept the share once, and RSVPs stay in the app. Its data and endpoints are untouched until a later cleanup.
-
-# Linking Google Calendar
-- **Superseded 2026-11-06 by "Calendar invites" above.** Kept for history.
-- **Update 2026-10-30:** the calendar is owned by a Google service account, which cannot invite attendees. Events carry no attendees; the calendar is shared with each member (at their calendar email) as a reader and they accept it once. RSVPs stay in the app and Google RSVP sync is not supported. The bullets below describe the earlier invite design where they mention attendees or two-way RSVPs.
-- Same lazy pattern as Drive: the Events tab works fully without Google Calendar. An unlinked band shows a small banner on the Events tab offering to connect (also available in Band settings).
-- On connect, the app creates a **new dedicated calendar named after the band** in the connecting account, rather than writing into anyone's personal calendar.
-- Every practice and gig on that calendar invites band members as attendees by email. Members RSVP from their own Google Calendar, which is what drives the two-way decline/RSVP sync.
-- **Gig invites go to all active members (decided 2026-10-27),** not only the lineup. Gig RSVPs stay out of the app; any answers on gig events in Google are ignored. A member who answers a whole recurring practice series in Google gets that answer on every occurrence they have not answered individually.
-- **Calendar email (decided 2026-10-22):** each user has an optional "calendar email" in personal settings, and invites go there instead of the sign-in email. This covers members on other calendars (e.g. Outlook): they get standard invites that update automatically and RSVP from their own calendar, with replies flowing back through Google. Subscribing to the band calendar is not the main path because it has no per-person RSVP.
-- Ownership follows the same rule as Drive: the band chooses whose account (dedicated band account or a member's).
+- **Google Calendar sync (service account) was removed (2026-11-10).** The service-account shared calendar, its Band settings row and setup dialog, and its API are gone. The calendar-sync database tables and columns remain in the schema, unused.
 
 # Multiple bands & leaving
 - A user can belong to multiple bands. A **band switcher** (band name + photo) sits at the top of the screen next to the profile icon, on both desktop and mobile (mobile tabs are in the bottom bar). Deep links automatically switch to the band the linked resource belongs to.
 - **Leaving:** "Leave band" button in settings. Past lineups keep the person's name so the band's history stays intact.
 - **Last admin:** can't leave until they promote someone else to admin. If they're the only member left, leaving means deleting the band.
-- **Delete account (decided 2026-11-05):** a "Delete account" button in personal settings (type-to-confirm). It leaves every band, and deletes any band where the user is the only active member (roster-only members don't count). If the user is the last admin of a band that has other active members, deletion is blocked and lists those bands (promote someone or remove the members first). Drive files and the band's Google Calendar are never deleted. Past lineups keep the person's name. The user's sessions, Google/Spotify links, profile photo, and personal data are removed.
+- **Delete account (decided 2026-11-05):** a "Delete account" button in personal settings (type-to-confirm). It leaves every band, and deletes any band where the user is the only active member (roster-only members don't count). If the user is the last admin of a band that has other active members, deletion is blocked and lists those bands (promote someone or remove the members first). Drive files are never deleted. Past lineups keep the person's name. The user's sessions, Google/Spotify links, profile photo, and personal data are removed.
 
 ## Tech Stack: Libraries
 Principle: if a well-maintained library already does it, use it rather than building from scratch.
 - **Calendar UI:** FullCalendar (month/week views, all-day row, date click, RRULE plugin).
-- **Recurrence:** rrule library on both frontend and backend; RRULE strings are the stored format, which matches Google Calendar.
+- **Recurrence:** rrule library on both frontend and backend; RRULE strings are the stored format, which matches iCalendar.
 - **Components:** shadcn/ui (Radix primitives, code is owned and customizable). Bottom drawers via Vaul (shadcn Drawer).
 - **Drag and drop:** dnd-kit for setlists and lineups.
 - **Data fetching:** TanStack Query (React Query) from day one for caching, retries, and optimistic updates.
 - **Database access:** Drizzle ORM for type-safe queries and migrations.
-- **Background jobs:** pg-boss (Postgres-backed queue, no Redis) for the Drive changes poller, Calendar sync, and other async work.
+- **Background jobs:** pg-boss (Postgres-backed queue, no Redis) for the Drive changes poller, calendar invite delivery, and other async work.
 - **Forms:** React Hook Form with Zod resolvers, reusing the shared Zod schemas.
-- **Google APIs:** official googleapis Node client for Drive and Calendar.
+- **Google APIs:** official googleapis Node client for Drive.
 - **Time zones:** date-fns with date-fns-tz.
 - **Error tracking:** Sentry on frontend and backend.
 - **Email (magic links):** Resend.

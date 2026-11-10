@@ -3,7 +3,6 @@ import { AccountModule } from "./account/account.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { BandsModule } from "./bands/bands.module.js";
 import { CalendarInviteModule } from "./calendar-invites/calendar-invite.module.js";
-import { CalendarSyncModule } from "./calendar-sync/calendar-sync.module.js";
 import { DatabaseModule } from "./db/db.module.js";
 import { EventsModule } from "./events/events.module.js";
 import { FeedbackModule } from "./feedback/feedback.module.js";
@@ -36,7 +35,6 @@ import { TestingModule } from "./testing/testing.module.js";
     SongsModule,
     SpotifyConnectModule,
     GoogleConnectModule,
-    CalendarSyncModule,
     CalendarInviteModule,
     SetlistsModule,
     LineupsModule,

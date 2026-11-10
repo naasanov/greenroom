@@ -1,11 +1,10 @@
 import { z } from "zod";
 
-export const googleServiceSchema = z.enum(["drive", "calendar"]);
+export const googleServiceSchema = z.enum(["drive"]);
 export type GoogleService = z.infer<typeof googleServiceSchema>;
 
 export const GOOGLE_SERVICE_SCOPES: Record<GoogleService, string> = {
   drive: "https://www.googleapis.com/auth/drive",
-  calendar: "https://www.googleapis.com/auth/calendar",
 };
 
 export const googleLinkStatusSchema = z.object({
@@ -20,9 +19,6 @@ export type GoogleLinkStatus = z.infer<typeof googleLinkStatusSchema>;
 
 export const googleIntegrationsSchema = z.object({
   drive: googleLinkStatusSchema.extend({ folderId: z.string().nullable() }),
-  calendar: googleLinkStatusSchema.extend({
-    calendarId: z.string().nullable(),
-  }),
 });
 export type GoogleIntegrations = z.infer<typeof googleIntegrationsSchema>;
 

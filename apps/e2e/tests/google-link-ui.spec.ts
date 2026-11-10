@@ -1,6 +1,5 @@
 import type { BandSeedResult } from "@greenroom/db";
-import { bands, USERS } from "@greenroom/db";
-import { eq } from "drizzle-orm";
+import { USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { fakeGoogleConsent } from "./google-helpers.js";
 
@@ -9,71 +8,6 @@ let seed: BandSeedResult;
 test.beforeEach(async ({ testApi, loginAs }) => {
   seed = await testApi.seed("band");
   await loginAs(USERS.ava.email);
-});
-
-test("sync calendar from settings, then manage it", async ({
-  page,
-  db,
-  testApi,
-}) => {
-  await page.goto("/settings");
-  const row = page.getByTestId("settings-google-calendar");
-  await expect(row.getByText("Google Calendar sync (optional)")).toBeVisible();
-  await row
-    .getByRole("button", { name: "Set up Google Calendar sync" })
-    .click();
-  const setup = page.getByTestId("calendar-setup");
-  await expect(setup.getByText("Your band calendar is ready.")).toBeVisible();
-  await setup.getByRole("button", { name: "Done" }).click();
-
-  // Members get the calendar shared as readers; events carry no attendees.
-  const [band] = await db
-    .select()
-    .from(bands)
-    .where(eq(bands.id, seed.bands.nightOwls.id));
-  const calendarId = band!.calendarId!;
-  const readers = (await testApi.calendarAcl(calendarId))
-    .filter((r) => r.role === "reader")
-    .map((r) => r.email);
-  expect(readers).toContain(USERS.ava.email);
-  expect(readers).toContain(USERS.ben.email);
-  for (const e of await testApi.calendarEvents(calendarId)) {
-    expect(e).not.toHaveProperty("attendees");
-  }
-
-  await page.reload();
-  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Syncing with Google Calendar",
-  );
-  await expect(row.getByText(/Last synced/)).toBeVisible();
-
-  await row.getByRole("button", { name: "Disconnect" }).click();
-  await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Disconnect" })
-    .click();
-  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Not synced",
-  );
-});
-
-test("sync calendar from settings without any Google sign-in", async ({
-  page,
-}) => {
-  await page.goto("/settings");
-  const row = page.getByTestId("settings-google-calendar");
-  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Not synced",
-  );
-  await row
-    .getByRole("button", { name: "Set up Google Calendar sync" })
-    .click();
-  const setup = page.getByTestId("calendar-setup");
-  await expect(setup.getByText("Your band calendar is ready.")).toBeVisible();
-  await setup.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByTestId("settings-google-calendar-status")).toHaveText(
-    "Syncing with Google Calendar",
-  );
 });
 
 test("non-admins do not see band settings", async ({

@@ -37,8 +37,6 @@ unset DB_PW
 
 Read it back later with `security find-generic-password -s GREENROOM_STAGING_DB_PASSWORD -w`.
 
-Optional API secret `CALENDAR_SA_KEY` is the base64 of the JSON key of the service account `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com`, which owns band calendars (scope `calendar`). Stage it from a laptop with `fly secrets set -a greenroom-staging-api CALENDAR_SA_KEY="$(base64 -w0 key.json)"` (on macOS `base64 -i key.json | tr -d '\n'`), then delete the key file. Without it, calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED` in real mode.
-
 ## 3. Deploy: db, then api, then web
 
 ```sh
@@ -166,7 +164,6 @@ API secrets (set with `fly secrets set --stage -a greenroom-fyi-api NAME=value`,
 | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | yes | Spotify app credentials. |
 | `GOOGLE_PLACES_API_KEY` | yes | Venue search and photos. |
 | `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER` | yes for Drive folder picking | Without them the picker config returns nulls and the Drive picker cannot open. |
-| `CALENDAR_SA_KEY` | yes for calendar setup | Base64 one-line JSON key of `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` (see the staging note above). Without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. |
 | `YOUTUBE_API_KEY` | optional | Without it YouTube songs get no auto duration. |
 | `GITHUB_FEEDBACK_TOKEN` | optional | Fine-grained PAT, Issues write on `naasanov/greenroom`. Without it `POST /feedback` returns 503. |
 | `RESEND_API_KEY` | required for sign-in in real mode | Resend key with Sending access on `greenroom.fyi`. Without it magic-link sign-in fails. |

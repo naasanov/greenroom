@@ -207,7 +207,7 @@ export interface PracticeSeries {
   bandId: string;
   title: string;
   location: string | null;
-  /** RRULE line without DTSTART, as sent to Google Calendar, e.g. `RRULE:FREQ=WEEKLY;BYDAY=TU`. */
+  /** RRULE line without DTSTART, as stored, e.g. `RRULE:FREQ=WEEKLY;BYDAY=TU`. */
   rrule: string;
   recurrence: Recurrence;
   /** Local date and time of the first occurrence in `timeZone`. */

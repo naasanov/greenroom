@@ -22,7 +22,6 @@ import {
 import { decryptToken } from "../common/token-crypto.js";
 import { BandsService } from "../bands/bands.service.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
   GOOGLE_OAUTH,
@@ -41,7 +40,6 @@ export class AccountService {
     @Inject(GOOGLE_OAUTH) private readonly google: GoogleOAuthAdapter,
     private readonly bandsService: BandsService,
     private readonly photos: ProfilePhotosService,
-    private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
   ) {}
 
@@ -168,7 +166,6 @@ export class AccountService {
     const deleted = new Set(result.deleteBands.map((b) => b.id));
     await Promise.all(
       result.leaveBands.map(async (b) => {
-        await this.calendarSync.bandAcl(b.id).catch(() => undefined);
         await this.invites.band(b.id);
       }),
     );

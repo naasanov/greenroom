@@ -53,8 +53,7 @@ export default function PrivacyPage() {
           <p>
             When a band links Google Drive, Greenroom reads and writes files in
             the folder the band picked, to store and show gig media and profile
-            photos. When a band links Google Calendar, Greenroom creates a band
-            calendar and keeps events and RSVPs in sync.
+            photos.
           </p>
           <p>
             Tokens are stored encrypted on our servers and used only for these

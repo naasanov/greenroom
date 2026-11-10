@@ -18,7 +18,6 @@ const BASE = `/bands/${BAND}/integrations/google`;
 const CALLBACK = "/integrations/google/callback";
 const SCOPE = {
   drive: "https://www.googleapis.com/auth/drive",
-  calendar: "https://www.googleapis.com/auth/calendar",
 } as const;
 
 async function clientFor(
@@ -33,7 +32,7 @@ async function clientFor(
 
 async function start(
   api: APIRequestContext,
-  service: "drive" | "calendar",
+  service: "drive",
   redirectTo = "/band/media",
 ) {
   const res = await api.get(`${BASE}/${service}/start`, {
@@ -70,13 +69,6 @@ test("link, status, picker config, replay, role checks, and unlink", async ({
       linkedBy: null,
       linkedAt: null,
       folderId: null,
-    },
-    calendar: {
-      linked: false,
-      email: null,
-      linkedBy: null,
-      linkedAt: null,
-      calendarId: null,
     },
   });
   const noPicker = await ava.get(`${BASE}/drive/picker-config`);
@@ -118,7 +110,6 @@ test("link, status, picker config, replay, role checks, and unlink", async ({
     folderId: null,
   });
   expect(linked.drive.linkedAt).toEqual(expect.any(String));
-  expect(linked.calendar.linked).toBe(false);
 
   const [row] = await db.select().from(bandGoogleLinks);
   expect(row!.scopes).toContain(SCOPE.drive);
@@ -142,37 +133,21 @@ test("link, status, picker config, replay, role checks, and unlink", async ({
   expect(replay.searchParams.get("google")).toBe("error");
   expect(replay.searchParams.get("reason")).toBe("invalid_state");
 
-  // Calendar has no sign-in; it counts as linked once the band has a calendar.
-  expect(
-    (await ava.get(`${BASE}/calendar/start`, { maxRedirects: 0 })).status(),
-  ).toBe(404);
-  expect((await (await ava.get(BASE)).json()).calendar).toMatchObject({
-    linked: false,
-    calendarId: null,
-  });
-
-  // Unlinking drive needs an admin and leaves calendar alone.
+  // Unlinking drive needs an admin.
   await db
     .update(bands)
-    .set({ driveRootFolderId: "folder-1", calendarId: "cal-1" })
+    .set({ driveRootFolderId: "folder-1" })
     .where(eq(bands.id, BAND));
   const both = await (await ava.get(BASE)).json();
   expect(both.drive.email).toBe("band@example.com");
-  expect(both.calendar).toMatchObject({
-    linked: true,
-    calendarId: "cal-1",
-    email: null,
-  });
   expect((await ben.delete(`${BASE}/drive`)).status()).toBe(403);
   expect((await ava.delete(`${BASE}/drive`)).status()).toBe(204);
   expect((await ava.delete(`${BASE}/drive`)).status()).toBe(204);
   const after = await (await ava.get(BASE)).json();
   expect(after.drive).toMatchObject({ linked: false, folderId: null });
-  expect(after.calendar.linked).toBe(true);
   const [cleared] = await db.select().from(bands).where(eq(bands.id, BAND));
   expect(cleared!.driveRootFolderId).toBeNull();
   expect(cleared!.driveLinkedByUserId).toBeNull();
-  expect(cleared!.calendarId).toBe("cal-1");
 
   await ava.dispose();
   await ben.dispose();
@@ -224,7 +199,6 @@ test("non-members get 404 on every band route", async ({ testApi }) => {
   const calls = [
     await cleo.get(foreign),
     await cleo.get(`${foreign}/drive/start`, { maxRedirects: 0 }),
-    await cleo.get(`${foreign}/calendar/start`, { maxRedirects: 0 }),
     await cleo.get(`${foreign}/drive/picker-config`),
     await cleo.delete(`${foreign}/drive`),
   ];

@@ -24,15 +24,10 @@ import { sessionCookieName } from "../auth/auth.constants.js";
 import { CalendarInviteInboundService } from "../calendar-invites/calendar-invite-inbound.service.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
-import { CalendarSyncService } from "../calendar-sync/calendar-sync.service.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
   DriveAncestryCache,
   FakeIntegrationsRegistry,
-  type CalendarAclRule,
-  type CalendarEvent,
-  type CalendarEventPatch,
   type FakeIssue,
   type SentCalendarInvite,
   type SentMagicLink,
@@ -48,8 +43,6 @@ export class TestingController {
     private readonly registry: FakeIntegrationsRegistry,
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
-    private readonly calendarSync: CalendarSyncService,
-    private readonly calendarQueue: CalendarSyncQueue,
     private readonly driveCache: DriveAncestryCache,
     private readonly invites: CalendarInviteService,
     private readonly inviteQueue: CalendarInviteQueue,
@@ -62,7 +55,6 @@ export class TestingController {
     await resetDatabase(this.db);
     this.registry.resetAll();
     this.driveCache.clear();
-    this.calendarQueue.reset();
     this.inviteQueue.reset();
     return { ok: true };
   }
@@ -77,7 +69,6 @@ export class TestingController {
     }
     this.registry.resetAll();
     this.driveCache.clear();
-    this.calendarQueue.reset();
     this.inviteQueue.reset();
     return seedScenario(this.db, body.scenario);
   }
@@ -221,117 +212,5 @@ export class TestingController {
     trackIds: string[];
   }[] {
     return this.registry.spotify.createdPlaylists();
-  }
-
-  // ---- Google Calendar sync ----
-
-  /** Applies every pending app-to-Google push now (one band, or all). */
-  @Post("calendar/flush")
-  @HttpCode(200)
-  async calendarFlush(
-    @Body() body: { bandId?: string },
-  ): Promise<{ ok: true }> {
-    await this.calendarSync.flush(body?.bandId);
-    return { ok: true };
-  }
-
-  /** Runs one pull pass for the band (Google to app), then flushes pending pushes. */
-  @Post("calendar/sync")
-  @HttpCode(200)
-  async calendarSyncPass(
-    @Body() body: { bandId?: string },
-  ): Promise<{ ok: true }> {
-    if (!body?.bandId) throw new BadRequestException("bandId is required");
-    await this.calendarSync.syncBand(body.bandId);
-    return { ok: true };
-  }
-
-  /** Name and time zone a fake calendar was created with. */
-  @Get("calendar/info")
-  calendarInfo(
-    @Query("calendarId") calendarId: string,
-  ): { summary: string; timeZone: string } | null {
-    return this.registry.googleCalendar.calendarInfo(calendarId) ?? null;
-  }
-
-  /** Every event stored in a fake calendar, cancelled ones included. */
-  @Get("calendar/events")
-  calendarEvents(@Query("calendarId") calendarId: string): CalendarEvent[] {
-    return this.registry.googleCalendar.listEvents(calendarId);
-  }
-
-  @Post("calendar/simulate/edit")
-  @HttpCode(200)
-  calendarEdit(
-    @Body()
-    b: {
-      calendarId: string;
-      eventId: string;
-      patch: CalendarEventPatch;
-    },
-  ): { ok: true } {
-    this.registry.googleCalendar.simulateExternalEdit(
-      b.calendarId,
-      b.eventId,
-      b.patch,
-    );
-    return { ok: true };
-  }
-
-  @Post("calendar/simulate/instance-edit")
-  @HttpCode(200)
-  calendarInstanceEdit(
-    @Body()
-    b: {
-      calendarId: string;
-      recurringEventId: string;
-      originalStart: string;
-      patch: CalendarEventPatch & { cancelled?: boolean };
-    },
-  ): { ok: true } {
-    this.registry.googleCalendar.simulateInstanceEdit(
-      b.calendarId,
-      b.recurringEventId,
-      b.originalStart,
-      b.patch,
-    );
-    return { ok: true };
-  }
-
-  @Post("calendar/simulate/delete")
-  @HttpCode(200)
-  calendarDelete(@Body() b: { calendarId: string; eventId: string }): {
-    ok: true;
-  } {
-    this.registry.googleCalendar.simulateExternalDelete(
-      b.calendarId,
-      b.eventId,
-    );
-    return { ok: true };
-  }
-
-  /** Current ACL rules of a fake calendar, owner included. */
-  @Post("calendar/acl")
-  @HttpCode(200)
-  calendarAcl(@Body() b: { calendarId: string }): CalendarAclRule[] {
-    return this.registry.googleCalendar.aclRules(b.calendarId);
-  }
-
-  /** Simulates the owner sharing the calendar by hand in the Google UI. */
-  @Post("calendar/simulate/acl-rule")
-  @HttpCode(200)
-  calendarSimulateAcl(@Body() b: { calendarId: string; email: string }): {
-    ok: true;
-  } {
-    this.registry.googleCalendar.simulateAclRule(b.calendarId, b.email);
-    return { ok: true };
-  }
-
-  /** Makes every sync token issued so far report as expired. */
-  @Post("calendar/expire-sync-tokens")
-  @HttpCode(200)
-  calendarExpireTokens(@Body() b: { calendarId: string }): { ok: true } {
-    this.registry.googleCalendar.expireSyncTokens(b.calendarId);
-    return { ok: true };
   }
 }

@@ -14,7 +14,6 @@
       [
         "agenda-member.spec.ts",
         "agenda-timeline.spec.ts",
-        "api-calendar-sync-pull.spec.ts",
         "api-feedback.spec.ts",
         "api-files-uploads.spec.ts",
         "api-lineups.spec.ts",
@@ -63,7 +62,6 @@
         "upload-links.spec.ts"
       ],
       [
-        "api-calendar-sync.spec.ts",
         "api-drive.spec.ts",
         "api-media-download.spec.ts",
         "api-media-poller.spec.ts",
@@ -125,7 +123,6 @@
         "song-media.spec.ts"
       ],
       [
-        "api-calendar-sync-pull.spec.ts",
         "api-drive.spec.ts",
         "api-files.spec.ts",
         "api-media-download.spec.ts",
@@ -157,7 +154,6 @@
       ],
       [
         "agenda-member.spec.ts",
-        "api-calendar-sync.spec.ts",
         "api-events.spec.ts",
         "api-google-connect.spec.ts",
         "api-songs.spec.ts",
@@ -180,8 +176,6 @@
       "agenda-drawer.spec.ts": 12.9,
       "agenda-member.spec.ts": 12.4,
       "agenda-timeline.spec.ts": 14.8,
-      "api-calendar-sync-pull.spec.ts": 2,
-      "api-calendar-sync.spec.ts": 2.1,
       "api-drive.spec.ts": 0.7,
       "api-events.spec.ts": 4,
       "api-feedback.spec.ts": 0.4,
@@ -254,8 +248,6 @@
       "agenda-drawer.spec.ts": 20.4,
       "agenda-member.spec.ts": 36.8,
       "agenda-timeline.spec.ts": 40.1,
-      "api-calendar-sync-pull.spec.ts": 0.3,
-      "api-calendar-sync.spec.ts": 0.4,
       "api-drive.spec.ts": 0.2,
       "api-events.spec.ts": 1.2,
       "api-feedback.spec.ts": 0.3,

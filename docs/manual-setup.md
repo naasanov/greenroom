@@ -12,13 +12,12 @@ Every secret goes into the macOS Keychain on the dev Mac under the exact env var
 3. Tell the orchestrator which names you added. It copies them into `.env` and the Fly apps.
 
 ## Google Cloud project
-Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue type-ahead (Places).
+Used for Google sign-in, Drive, the Drive folder Picker, and the venue type-ahead (Places).
 
 1. Go to https://console.cloud.google.com, signed in as the Google account that should own the project (ideally the band's shared account).
 2. Create a project: project picker (top left) > **New project** > name it `Greenroom` > **Create**. Make sure it is selected afterwards.
 3. Enable the APIs: **APIs & Services > Library**, search for each and click **Enable**:
    - Google Drive API
-   - Google Calendar API
    - Google Picker API
    - Places API (New) (not the legacy "Places API")
    - Places needs a billing account on the project: **Billing > Link a billing account**. The monthly free credit covers a band's usage.
@@ -44,8 +43,6 @@ Used for Google sign-in, Drive, Calendar, the Drive folder Picker, and the venue
    - Name `Greenroom browser (Picker)`. Application restrictions: **Websites**, add `https://staging.greenroom.fyi/*`, `https://greenroom.fyi/*`, `http://localhost:3000/*`. API restrictions: only **Google Picker API**. Save.
    - Store it as `GOOGLE_PICKER_API_KEY`.
 8. Copy the project number: **IAM & Admin > Settings** > **Project number** (digits only, not the project ID). Store it as `GOOGLE_PROJECT_NUMBER`.
-
-Band calendars are owned by a Google service account, not a member. Use `greenroom-calendar@greenroom-fyi.iam.gserviceaccount.com` in the `greenroom-fyi` project and make sure the **Google Calendar API** is enabled there. Create a JSON key for the account (**IAM & Admin > Service accounts > Keys > Add key**), base64 it onto one line (`base64 -w0 key.json`), and stage it as the Fly secret `CALENDAR_SA_KEY` with `fly secrets set -a greenroom-staging-api CALENDAR_SA_KEY=<base64>`; delete the key file afterwards. The variable is optional: without it calendar setup answers `409 CALENDAR_BOT_NOT_CONFIGURED`. Members receive the calendar as a share by email (no domain-wide delegation is needed). Keychain name: `CALENDAR_SA_KEY`.
 
 Optional: enable **YouTube Data API v3** and store a server key restricted to it as `YOUTUBE_API_KEY` (lets YouTube songs get their duration automatically).
 

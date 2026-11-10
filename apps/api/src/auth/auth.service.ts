@@ -5,7 +5,6 @@ import { magicLinkTokens, users, type Database } from "@greenroom/db";
 import type { User } from "@greenroom/shared";
 import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { EMAIL, type EmailAdapter } from "../integrations/index.js";
 import { MAGIC_LINK_TTL_MS, webUrl } from "./auth.constants.js";
@@ -17,7 +16,6 @@ export class AuthService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(EMAIL) private readonly email: EmailAdapter,
-    private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
     private readonly inviteService: CalendarInviteService,
   ) {}
@@ -149,7 +147,6 @@ export class AuthService {
       .where(eq(users.id, userId))
       .returning();
     if (patch.calendarEmail !== undefined) {
-      await this.calendarSync.userAcl(userId);
       await this.invites.user(userId);
     }
     return await toUser(this.db, updated!);

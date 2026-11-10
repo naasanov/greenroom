@@ -8,7 +8,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { gigLineup, gigs, memberships, type Database } from "@greenroom/db";
 import type { CreateGig, Gig, UpdateGig } from "@greenroom/shared";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { addDays, isValidTimeZone, localTime, zonedInstant } from "./time.js";
 
@@ -122,7 +121,6 @@ function formOf(g: GigRow): GigForm {
 export class GigsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
-    private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
   ) {}
 
@@ -167,7 +165,6 @@ export class GigsService {
       }
       return gig!;
     });
-    await this.calendarSync.gig(bandId, row.id);
     await this.invites.gig(bandId, row.id);
     return toGig(row);
   }
@@ -194,7 +191,6 @@ export class GigsService {
       .set(toColumns(merged))
       .where(eq(gigs.id, gigId))
       .returning();
-    await this.calendarSync.gig(bandId, gigId);
     await this.invites.gig(bandId, gigId);
     return toGig(row!);
   }
@@ -206,7 +202,6 @@ export class GigsService {
       .update(gigs)
       .set({ deletedAt: new Date() })
       .where(eq(gigs.id, gigId));
-    await this.calendarSync.gig(bandId, gigId);
     await this.invites.gig(bandId, gigId);
   }
 }

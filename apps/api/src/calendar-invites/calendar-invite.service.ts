@@ -14,7 +14,7 @@ import {
 } from "@greenroom/db";
 import { gigSlugId } from "@greenroom/shared";
 import { webUrl } from "../auth/auth.constants.js";
-import { gigInput } from "../calendar-sync/calendar-sync.mapping.js";
+import { gigInput } from "./gig-event.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
   buildCalendar,

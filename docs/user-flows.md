@@ -7,7 +7,7 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 - Each flow: ID, title, tags, design section, steps, expected results. Run every flow on desktop and on phone unless it is tagged only [desktop] or [mobile]. Untagged viewport means both.
 - Tags: [desktop], [mobile], [real-google], [real-spotify], [needs-two-users], [destructive] (deletes or leaves things; use throwaway data).
 - Fake mode (staging default per execution plan Gate 2 notes): sign in with the staging passcode (STAGING_LOGIN_PASSCODE), Google Drive/Calendar/Picker/Spotify/Songsterr/GitHub are fakes. The Picker is a stand-in folder list, Drive is in-memory (resets when the API restarts), thumbnails are grey placeholders. Flows without [real-google] or [real-spotify] work in fake mode.
-- [real-google] flows need a real Google account (Sign in with Google, Drive consent, real Picker, real Calendar). [real-spotify] flows need a real Spotify account listed in the Spotify app's User Management.
+- [real-google] flows need a real Google account (Sign in with Google, Drive consent, real Picker). [real-spotify] flows need a real Spotify account listed in the Spotify app's User Management.
 - Needs two users: use two browser contexts (two passcode accounts).
 - Referenced design.md sections are named by their headings.
 
@@ -33,7 +33,6 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 | Public upload links | UPL-01 to UPL-07 | 7 |
 | Files tab | FILE-01 to FILE-16 | 16 |
 | Google Drive linking | DRIVE-01 to DRIVE-08 (+DRIVE-01R) | 9 |
-| Google Calendar sync | GCAL-01 to GCAL-09 (+GCAL-02R) | 10 |
 | Calendar invites | CINV-01 to CINV-05 | 5 |
 | Public gig calendar | PUB-01 to PUB-08 | 8 |
 | Settings (personal and band) | SETT-01 to SETT-11 | 11 |
@@ -41,9 +40,9 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 | Feedback widget | FB-01 to FB-03 | 3 |
 | Cross-cutting | XC-01 to XC-10 | 10 |
 
-Total: 273 flows.
+Total: 263 flows.
 
-Flows needing real accounts: DRIVE-01 to DRIVE-04 real variants, GCAL-01 to GCAL-03 real variants, MEDIA-23, SPOT-02 to SPOT-08, AUTH-03 (Google sign-in), plus any flow tagged [real-google] or [real-spotify] below. Everything else runs in fake mode with passcode sign-in.
+Flows needing real accounts: DRIVE-01 to DRIVE-04 real variants, MEDIA-23, SPOT-02 to SPOT-08, AUTH-03 (Google sign-in), plus any flow tagged [real-google] or [real-spotify] below. Everything else runs in fake mode with passcode sign-in.
 
 ---
 
@@ -64,7 +63,7 @@ Expected: a link-sent confirmation; the link signs the user in. A used or garbag
 ### AUTH-03 Sign in with Google [real-google]
 Section: Login.
 1. Click "Sign in with Google" and complete Google consent.
-Expected: signed in with basic scopes only (no Drive or Calendar scope requested at sign-in, no "unverified app" screen for plain sign-in). Google profile photo or initials used as avatar until Drive is linked.
+Expected: signed in with basic scopes only (no Drive scope requested at sign-in, no "unverified app" screen for plain sign-in). Google profile photo or initials used as avatar until Drive is linked.
 
 ### AUTH-04 Signup does not auto-create or auto-join a band
 Section: Auth & Onboarding.
@@ -157,7 +156,7 @@ Expected: blocked with a message that someone else must be promoted to admin fir
 ### BAND-07 Only member leaving deletes the band [destructive]
 Section: Multiple bands & leaving.
 1. As the only remaining member, press "Leave band".
-Expected: the flow states that leaving means deleting the band and requires confirmation; band is deleted. Drive files and Google Calendar remain.
+Expected: the flow states that leaving means deleting the band and requires confirmation; band is deleted. Drive files remain.
 
 ### BAND-08 Former member shown in past lineups
 Tags: [needs-two-users]. Section: Multiple bands & leaving; Setlists/Lineup.
@@ -570,7 +569,7 @@ Expected: applies immediately with no scope question; list re-sorts.
 Expected: picker: this event, this and following, all events; the answer is applied accordingly (check other occurrences).
 
 ### RSVP-04 Mark not making a practice
-Expected: "not going" is available from the app; in real Calendar mode this should update Google (but see Ambiguities: later update says Google RSVP sync is unsupported).
+Expected: "not going" is available from the app; the change reaches the member's calendar through the invite email (see CINV flows).
 
 ### RSVP-05 Members see each other's RSVPs
 Tags: [needs-two-users].
@@ -1056,43 +1055,6 @@ Expected: no enforcement of dedicated vs personal account.
 
 ---
 
-# Google Calendar sync
-
-### GCAL-01 Unlinked banner on Events
-Section: Linking Google Calendar.
-Expected: dismissible banner offering "Sync to Google Calendar"; Events works fully without it; also in Band settings.
-
-### GCAL-02 Connect (fake)
-1. Press Sync to Google Calendar (admin).
-Expected: dedicated calendar named after the band is created; existing gigs and practices pushed; Band settings shows "last synced".
-
-### GCAL-02R Connect real [real-google]
-Expected: calendar owned by the service account; members added to the calendar ACL as readers at their calendar email (sign-in email fallback); each accepts once. No attendees on events.
-
-### GCAL-03 Edit in app propagates
-Expected: change an event's time in the app, appears in Google after the sync interval. [real-google] for the real check.
-
-### GCAL-04 Edit in Google propagates [real-google]
-Expected: pulled every minute; last-write-wins using etags; delete wins on either side.
-
-### GCAL-05 Recurrence round-trip [real-google]
-Expected: a recurring practice, an overridden occurrence, and a canceled occurrence appear correctly in Google (instance exceptions).
-
-### GCAL-06 Delete wins
-Expected: delete in Google beats concurrent edit in app and vice versa.
-
-### GCAL-07 Calendar email
-Section: Calendar email.
-Expected: personal settings field, default sign-in email; shares go there.
-
-### GCAL-08 RSVPs stay in the app
-Expected: Google RSVP sync is not supported (post 2026-10-30 update); see Ambiguities.
-
-### GCAL-09 Non-admin cannot connect
-Tags: [needs-two-users].
-
----
-
 # Calendar invites
 
 ### CINV-01 Opt-in default and choice
@@ -1169,7 +1131,7 @@ Expected: updates in the switcher.
 Expected: social links (Instagram, TikTok, YouTube, Spotify), booking email, bio; shown on the public page.
 
 ### SETT-07 Google connections in Band settings
-Covered by DRIVE-01, GCAL-02.
+Covered by DRIVE-01.
 
 ### SETT-08 Public calendar link in Band settings
 Covered by PUB-01.
@@ -1258,26 +1220,25 @@ Expected: icon-only buttons have aria-labels (Edit, Close, etc.).
 
 # Ambiguities (design doc unclear or conflicting)
 
-1. Google Calendar: the "Linking Google Calendar" section still describes attendees, RSVP from Google, gig invites to all members, and two-way RSVP sync, but the 2026-10-30 update says events carry no attendees and Google RSVP sync is unsupported. Practices section also says marking "not going" updates Google. Which applies to RSVP-04 and GCAL-08?
-2. "RSVP/availability on gigs: skipped" versus the Calendar section's gig invites to all active members. Gig RSVPs ignored in Google.
-3. Setlist "Keep vs Replace" prompt details and what "Replace" does to later custom setlists when earlier occurrences are edited are described only partially.
-4. Deep link `/practices/:seriesId` without `date` for a recurring series is unspecified.
-5. Deep link to a resource in a band the user does not belong to: UX unspecified.
-6. Invalid, expired, or reset invite link error behavior is unspecified.
-7. Deleting a song that is in setlists: whether it is removed from setlists is not stated (only that a warning shows and media is unlinked).
-8. Library drag: "drag into the setlist at a position" (execution plan 4.1) versus "append-only library drag" (Gate 3 notes).
-9. Stage mode on the last song, on an empty setlist, and behavior when tapping Stage mode with no setlist is unspecified.
-10. Roster-only members in practice attendee lists and RSVPs are unspecified.
-11. Dark mode: only stage mode is specified dark; app-wide dark mode is not described.
-12. Discard-changes confirm is marked "Flag (maybe, not now)" in Exiting the drawer but later sections treat it as present (Drawers are non-modal).
-13. Agenda opening by default (Gate 3 notes) versus "opened via a floating button" (design).
-14. Non-admin experience at the unlinked Drive prompt (who can link) is unspecified; Band settings is admin-only.
-15. Disconnecting or changing the linked Drive folder or Calendar is not described (only the gigs root can be changed).
-16. Public upload link CAPTCHA and malware scanning are optional safeguards and flagged as not built; testers should not expect them.
-17. Calendar month cell overflow behavior for many events is unspecified.
-18. Practice "cancel" display (canceled chip versus removed) is unspecified.
-19. Whether the Files tab and gigs root appear when Drive is unlinked, and the exact copy of Files-specific messages, are unspecified.
-20. Spotify playlist import in fake mode versus real: only real mode exercises the User Management restriction.
+1. "RSVP/availability on gigs: skipped" versus the Calendar section's gig invites to all active members. Gig RSVP replies from calendars are ignored.
+2. Setlist "Keep vs Replace" prompt details and what "Replace" does to later custom setlists when earlier occurrences are edited are described only partially.
+3. Deep link `/practices/:seriesId` without `date` for a recurring series is unspecified.
+4. Deep link to a resource in a band the user does not belong to: UX unspecified.
+5. Invalid, expired, or reset invite link error behavior is unspecified.
+6. Deleting a song that is in setlists: whether it is removed from setlists is not stated (only that a warning shows and media is unlinked).
+7. Library drag: "drag into the setlist at a position" (execution plan 4.1) versus "append-only library drag" (Gate 3 notes).
+8. Stage mode on the last song, on an empty setlist, and behavior when tapping Stage mode with no setlist is unspecified.
+9. Roster-only members in practice attendee lists and RSVPs are unspecified.
+10. Dark mode: only stage mode is specified dark; app-wide dark mode is not described.
+11. Discard-changes confirm is marked "Flag (maybe, not now)" in Exiting the drawer but later sections treat it as present (Drawers are non-modal).
+12. Agenda opening by default (Gate 3 notes) versus "opened via a floating button" (design).
+13. Non-admin experience at the unlinked Drive prompt (who can link) is unspecified; Band settings is admin-only.
+14. Disconnecting or changing the linked Drive folder is not described (only the gigs root can be changed).
+15. Public upload link CAPTCHA and malware scanning are optional safeguards and flagged as not built; testers should not expect them.
+16. Calendar month cell overflow behavior for many events is unspecified.
+17. Practice "cancel" display (canceled chip versus removed) is unspecified.
+18. Whether the Files tab and gigs root appear when Drive is unlinked, and the exact copy of Files-specific messages, are unspecified.
+19. Spotify playlist import in fake mode versus real: only real mode exercises the User Management restriction.
 
 ---
 

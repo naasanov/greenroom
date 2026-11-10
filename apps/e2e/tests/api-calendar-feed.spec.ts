@@ -8,7 +8,7 @@ import {
   newBand,
   nextTuesday,
   occurrence,
-} from "./calendar-sync-helpers.js";
+} from "./calendar-helpers.js";
 
 test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
 

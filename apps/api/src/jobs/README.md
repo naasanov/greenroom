@@ -6,20 +6,20 @@
 
 ```ts
 @Injectable()
-export class SyncService implements OnModuleInit {
+export class DigestService implements OnModuleInit {
   constructor(private readonly jobs: JobsService) {}
 
   async onModuleInit() {
     // Creates the queue (idempotent) and starts a worker. Handler gets the job data.
     await this.jobs.register<{ bandId: string }, { synced: number }>(
-      "calendar-sync",
+      "band-digest",
       async (data, job) => ({ synced: 0 }),
       { queue: { retryLimit: 0 } },
     );
   }
 
   enqueue(bandId: string) {
-    return this.jobs.send("calendar-sync", { bandId });
+    return this.jobs.send("band-digest", { bandId });
   }
 }
 ```

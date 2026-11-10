@@ -11,4 +11,4 @@ Deletion runs in one transaction: bands in `deleteBands` are deleted and the res
 
 The `users` row is kept and anonymized (unique placeholder email, no Google sub, avatar, or calendar email) because memberships and past lineups point at it; `display_name` stays so lineup history keeps the name. Signing in again with the old email creates a fresh account.
 
-After commit, best effort and never failing the request: calendar ACL refresh for left bands, trashing the Drive copies of the profile photo, and revoking Google refresh tokens. Drive files and Google Calendars are never deleted.
+After commit, best effort and never failing the request: calendar invite refresh for left bands, trashing the Drive copies of the profile photo, and revoking Google refresh tokens. Drive files are never deleted.

@@ -31,7 +31,6 @@ import {
   type UpdatePractice,
 } from "@greenroom/shared";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
-import { CalendarSyncQueue } from "../calendar-sync/calendar-sync.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { copyItems } from "../setlists/items.js";
 import { resolveAssignment, startsHere } from "./assignment.js";
@@ -42,7 +41,7 @@ import {
   type SeriesRow,
 } from "./occurrences.js";
 import {
-  assertGcalRepresentable,
+  assertSupportedRrule,
   buildRrule,
   firstOccurrence,
   isOccurrence,
@@ -105,7 +104,6 @@ const notFound = (): NotFoundException =>
 export class PracticesService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
-    private readonly calendarSync: CalendarSyncQueue,
     private readonly invites: CalendarInviteQueue,
   ) {}
 
@@ -256,7 +254,7 @@ export class PracticesService {
       throw new BadRequestException("Unknown time zone");
     }
     const rrule = buildRrule(body.recurrence, body.startDate, body.timeZone);
-    assertGcalRepresentable(rrule);
+    assertSupportedRrule(rrule);
     const first = firstOccurrence(
       rrule,
       body.startDate,
@@ -277,7 +275,6 @@ export class PracticesService {
         createdByUserId: userId,
       })
       .returning();
-    await this.calendarSync.series(bandId, row!.id);
     await this.invites.series(bandId, row!.id);
     return toSeries(row!);
   }
@@ -299,7 +296,6 @@ export class PracticesService {
 
     if (patch.scope === "this") {
       await this.editThis(series, original, override, patch);
-      await this.calendarSync.occurrence(bandId, series.id, original);
       await this.invites.series(bandId, series.id);
       const fresh = await this.findOverride(series.id, original);
       return {
@@ -315,8 +311,6 @@ export class PracticesService {
       ? await this.splitAndEdit(series, original, patch)
       : await this.editAll(series, patch);
 
-    await this.calendarSync.series(bandId, series.id);
-    if (splits) await this.calendarSync.series(bandId, result.series.id);
     await this.invites.series(bandId, series.id);
     if (splits) await this.invites.series(bandId, result.series.id);
 
@@ -404,7 +398,7 @@ export class PracticesService {
     const rrule = patch.recurrence
       ? buildRrule(patch.recurrence, startDate, tz)
       : series.rrule;
-    assertGcalRepresentable(rrule);
+    assertSupportedRrule(rrule);
     const first = firstOccurrence(rrule, startDate, startTime, tz);
     if (!first) throw new BadRequestException("Recurrence has no occurrences");
     const scheduleChanged =
@@ -479,7 +473,7 @@ export class PracticesService {
       : total !== null
         ? withCount(series.rrule, total - kept.length)
         : series.rrule;
-    assertGcalRepresentable(newRrule);
+    assertSupportedRrule(newRrule);
     const first = firstOccurrence(newRrule, startDate, startTime, tz);
     if (!first) throw new BadRequestException("Recurrence has no occurrences");
     const scheduleChanged =
@@ -641,7 +635,6 @@ export class PracticesService {
           target: [overridesTable.seriesId, overridesTable.originalStart],
           set: { cancelled: true },
         });
-      await this.calendarSync.occurrence(bandId, seriesId, original);
       await this.invites.series(bandId, seriesId);
       return;
     }
@@ -651,7 +644,6 @@ export class PracticesService {
         .update(practiceSeries)
         .set({ deletedAt: new Date() })
         .where(eq(practiceSeries.id, seriesId));
-      await this.calendarSync.series(bandId, seriesId);
       await this.invites.series(bandId, seriesId);
       return;
     }
@@ -687,7 +679,6 @@ export class PracticesService {
           ),
         );
     });
-    await this.calendarSync.series(bandId, seriesId);
     await this.invites.series(bandId, seriesId);
   }
 

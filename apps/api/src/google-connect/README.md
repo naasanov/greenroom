@@ -1,6 +1,6 @@
 # Google connect
 
-Per-band linking of Google Drive. (Google Calendar is not linked per user: band calendars are owned by a server-held service account, see `calendar-sync`. Old `calendar` link rows are ignored.) A link is a Google sign-in for whichever account the band chooses (a band account or a member's personal one); it can differ from the account used to sign into Greenroom. One link per band and service (`band_google_links`, unique on `band_id + service`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
+Per-band linking of Google Drive. A link is a Google sign-in for whichever account the band chooses (a band account or a member's personal one); it can differ from the account used to sign into Greenroom. One link per band and service (`band_google_links`, unique on `band_id + service`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
 
 Scopes requested: `openid email` plus `https://www.googleapis.com/auth/drive` (service `drive`), with `access_type=offline`, `prompt=consent select_account`, `include_granted_scopes=false`. Shared types and Zod schemas: `packages/shared/src/google.ts`.
 
@@ -9,10 +9,10 @@ All routes need a session except the callback. Non-members get 404 on band route
 
 | Route | Behavior |
 | --- | --- |
-| `GET /bands/:bandId/integrations/google` | Any member. `{ drive: GoogleLinkStatus & { folderId }, calendar: GoogleLinkStatus & { calendarId } }` (calendar is `linked` when `bands.calendar_id` is set; its `email`, `linkedBy`, `linkedAt` are null) where `GoogleLinkStatus = { linked, email, linkedBy: { userId, displayName } \| null, linkedAt }`. `folderId` / `calendarId` come from `bands.drive_root_folder_id` / `bands.calendar_id`. |
-| `GET /bands/:bandId/integrations/google/:service/start?redirectTo=<path>` | Any member. `302` to Google (404 for `calendar`, which has no sign-in). Full-page navigation, not fetch. `redirectTo` must be a same-site relative path, else `/`. Unknown service is 404. |
+| `GET /bands/:bandId/integrations/google` | Any member. `{ drive: GoogleLinkStatus & { folderId } }` where `GoogleLinkStatus = { linked, email, linkedBy: { userId, displayName } \| null, linkedAt }`. `folderId` comes from `bands.drive_root_folder_id`. |
+| `GET /bands/:bandId/integrations/google/:service/start?redirectTo=<path>` | Any member. `302` to Google. Full-page navigation, not fetch. `redirectTo` must be a same-site relative path, else `/`. Unknown service is 404. |
 | `GET /integrations/google/callback?code&state[&error]` | Public; authorized by `state`. Redirect URI is `${API_PUBLIC_URL}/integrations/google/callback`. See below. |
-| `DELETE /bands/:bandId/integrations/google/:service` | Band admins only (403 for other members). `204`, idempotent. `drive`: revokes the refresh token (best effort), deletes the link, and clears `drive_root_folder_id` + `drive_linked_by_user_id`. `calendar`: clears `calendar_id` + `calendar_linked_by_user_id` plus all Google event ids and sync state (calendar; no token is revoked and link rows are untouched). |
+| `DELETE /bands/:bandId/integrations/google/:service` | Band admins only (403 for other members). `204`, idempotent. `drive`: revokes the refresh token (best effort), deletes the link, and clears `drive_root_folder_id` + `drive_linked_by_user_id`. |
 | `GET /bands/:bandId/integrations/google/drive/picker-config` | Any member. `{ accessToken, developerKey, appId, fake }` for the Google Picker; `developerKey` is `GOOGLE_PICKER_API_KEY`, `appId` is `GOOGLE_PROJECT_NUMBER` (both null when unset), `fake` is `INTEGRATIONS_MODE === "fake"`. `409 { code: "GOOGLE_NOT_LINKED" }` when Drive is not linked. |
 
 ## Return params

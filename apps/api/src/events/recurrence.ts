@@ -34,7 +34,7 @@ const formatUntil = (d: Date): string =>
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}Z$/, "Z");
 
-/** `UNTIL=` clause for an instant, in the UTC form Google Calendar requires. */
+/** `UNTIL=` clause for an instant, in UTC form. */
 export const untilClause = (d: Date): string => `UNTIL=${formatUntil(d)}`;
 
 /**
@@ -84,8 +84,8 @@ export function buildRrule(
   return RRULE_PREFIX + parts.join(";");
 }
 
-/** Throws unless the rule uses only features Google Calendar can round-trip. */
-export function assertGcalRepresentable(rrule: string): void {
+/** Throws unless the rule uses only the supported recurrence features. */
+export function assertSupportedRrule(rrule: string): void {
   if (!rrule.startsWith(RRULE_PREFIX)) throw unsupported("Not an RRULE line");
   let opts: ReturnType<typeof RRule.parseString>;
   try {

@@ -4,8 +4,6 @@ import { RealEmailAdapter } from "./email/email.real.js";
 import { FakeIntegrationsRegistry } from "./fake-registry.js";
 import { GITHUB } from "./github/github.adapter.js";
 import { RealGithubAdapter } from "./github/github.real.js";
-import { GOOGLE_CALENDAR } from "./google-calendar/google-calendar.adapter.js";
-import { RealGoogleCalendarAdapter } from "./google-calendar/google-calendar.real.js";
 import { DriveAncestryCache } from "./google-drive/drive-ancestry-cache.js";
 import { withAncestryInvalidation } from "./google-drive/google-drive.invalidating.js";
 import { GOOGLE_DRIVE } from "./google-drive/google-drive.adapter.js";
@@ -50,7 +48,6 @@ const providers: Provider[] = [
         cache,
       ),
   },
-  bind(GOOGLE_CALENDAR, (r) => r.googleCalendar, RealGoogleCalendarAdapter),
   bind(GOOGLE_PLACES, (r) => r.googlePlaces, RealGooglePlacesAdapter),
   bind(SPOTIFY, (r) => r.spotify, RealSpotifyAdapter),
   bind(YOUTUBE, (r) => r.youtube, RealYoutubeAdapter),
@@ -67,7 +64,6 @@ const providers: Provider[] = [
     DriveAncestryCache,
     GOOGLE_OAUTH,
     GOOGLE_DRIVE,
-    GOOGLE_CALENDAR,
     GOOGLE_PLACES,
     SPOTIFY,
     YOUTUBE,

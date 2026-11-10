@@ -1,14 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import {
   driveStatusSchema,
   fakePickerSchema,
   googleIntegrationsSchema,
   googlePickerConfigSchema,
-  type CalendarSetupResult,
-  type CalendarSyncStatus,
   type GoogleService,
 } from "@greenroom/shared";
 import { api, getApiUrl } from "@/lib/api";
@@ -19,13 +16,12 @@ export const googleKeys = {
   all: (bandId: string) => ["bands", bandId, "google"] as const,
   status: (bandId: string) => ["bands", bandId, "google", "status"] as const,
   drive: (bandId: string) => ["bands", bandId, "google", "drive"] as const,
-  sync: (bandId: string) => ["bands", bandId, "google", "sync"] as const,
   fakePicker: (bandId: string) =>
     ["bands", bandId, "google", "fake-picker"] as const,
   media: (bandId: string) => ["bands", bandId, "gig-media"] as const,
 };
 
-/** Link state of the band's Google Drive and Calendar. */
+/** Link state of the band's Google Drive. */
 export const googleStatusQuery = (bandId: string) => ({
   queryKey: googleKeys.status(bandId),
   queryFn: () => api(base(bandId), { schema: googleIntegrationsSchema }),
@@ -45,17 +41,6 @@ export function useDriveStatus(bandId: string, enabled: boolean) {
     enabled,
     queryFn: () =>
       api(`${base(bandId)}/drive/status`, { schema: driveStatusSchema }),
-  });
-}
-
-export function useCalendarSync(bandId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: googleKeys.sync(bandId),
-    enabled,
-    queryFn: () =>
-      api(`${base(bandId)}/calendar/sync`, {
-        schema: z.custom<CalendarSyncStatus>(),
-      }),
   });
 }
 
@@ -79,19 +64,6 @@ export function useDisconnectGoogle(bandId: string, service: GoogleService) {
       void qc.invalidateQueries({ queryKey: googleKeys.all(bandId) });
       void qc.invalidateQueries({ queryKey: googleKeys.media(bandId) });
     },
-  });
-}
-
-export function useCalendarSetup(bandId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      api(`${base(bandId)}/calendar/setup`, {
-        method: "POST",
-        body: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        schema: z.custom<CalendarSetupResult>(),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: googleKeys.all(bandId) }),
   });
 }
 

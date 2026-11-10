@@ -4,11 +4,7 @@ import { and, eq } from "drizzle-orm";
 import {
   bandGoogleLinks,
   bands,
-  calendarSyncStates,
-  gigs,
   oauthStates,
-  practiceOccurrenceOverrides,
-  practiceSeries,
   users,
   type Database,
 } from "@greenroom/db";
@@ -67,10 +63,7 @@ export class GoogleLinksService {
       .leftJoin(users, eq(users.id, bandGoogleLinks.linkedByUserId))
       .where(eq(bandGoogleLinks.bandId, bandId));
     const [band] = await this.db
-      .select({
-        folderId: bands.driveRootFolderId,
-        calendarId: bands.calendarId,
-      })
+      .select({ folderId: bands.driveRootFolderId })
       .from(bands)
       .where(eq(bands.id, bandId));
     const of = (service: GoogleService) => {
@@ -87,14 +80,6 @@ export class GoogleLinksService {
     };
     return {
       drive: { ...of("drive"), folderId: band?.folderId ?? null },
-      // Calendar is owned by the bot account, so it is linked once the band has a calendar.
-      calendar: {
-        linked: !!band?.calendarId,
-        email: null,
-        linkedBy: null,
-        linkedAt: null,
-        calendarId: band?.calendarId ?? null,
-      },
     };
   }
 
@@ -207,19 +192,8 @@ export class GoogleLinksService {
     return { ok: true, redirectTo: row.redirectTo, service };
   }
 
-  /**
-   * Drive: revokes the refresh token (best effort), deletes the link and clears the
-   * band columns. Calendar: clears the band's calendar columns and sync state only.
-   */
+  /** Revokes the refresh token (best effort), deletes the link and clears the band columns. */
   async disconnect(bandId: string, service: GoogleService): Promise<void> {
-    if (service === "calendar") {
-      await this.db
-        .update(bands)
-        .set({ calendarId: null, calendarLinkedByUserId: null })
-        .where(eq(bands.id, bandId));
-      await this.clearCalendarSync(bandId);
-      return;
-    }
     const link = await this.getLink(bandId, service);
     if (link) {
       try {
@@ -318,38 +292,7 @@ export class GoogleLinksService {
       );
     await this.db
       .update(bands)
-      .set(
-        service === "drive"
-          ? { driveRootFolderId: null, driveLinkedByUserId: null }
-          : { calendarId: null, calendarLinkedByUserId: null },
-      )
+      .set({ driveRootFolderId: null, driveLinkedByUserId: null })
       .where(eq(bands.id, bandId));
-    if (service === "calendar") await this.clearCalendarSync(bandId);
-  }
-
-  /** Forgets every Google event id, etag and the sync token; the Google calendar is left alone. */
-  private async clearCalendarSync(bandId: string): Promise<void> {
-    await this.db
-      .update(gigs)
-      .set({ gcalEventId: null, gcalEtag: null, updatedAt: gigs.updatedAt })
-      .where(eq(gigs.bandId, bandId));
-    await this.db
-      .update(practiceSeries)
-      .set({
-        gcalEventId: null,
-        gcalEtag: null,
-        updatedAt: practiceSeries.updatedAt,
-      })
-      .where(eq(practiceSeries.bandId, bandId));
-    await this.db
-      .update(practiceOccurrenceOverrides)
-      .set({
-        gcalInstanceEtag: null,
-        updatedAt: practiceOccurrenceOverrides.updatedAt,
-      })
-      .where(eq(practiceOccurrenceOverrides.bandId, bandId));
-    await this.db
-      .delete(calendarSyncStates)
-      .where(eq(calendarSyncStates.bandId, bandId));
   }
 }
