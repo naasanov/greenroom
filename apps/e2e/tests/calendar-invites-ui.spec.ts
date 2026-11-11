@@ -81,6 +81,23 @@ test("the subscribe path shows the feed and instructions, and Back returns to th
   );
 });
 
+test("Settings opens the chooser first, even with the subscribe link in use", async ({
+  page,
+}) => {
+  const dialog = await openDialog(page);
+  await dialog.getByTestId("calendar-choice-feed").click();
+  await expect(dialog.getByTestId("calendar-feed-url")).toBeVisible({ timeout: 40_000 });
+  await page.keyboard.press("Escape");
+  await page.goto("/settings");
+  await page.getByTestId("calendar-invites-open").click();
+  const settings = page.getByTestId("calendar-invites-dialog");
+  await expect(settings.getByTestId("calendar-choice-email")).toBeVisible({ timeout: 40_000 });
+  await expect(settings.getByTestId("calendar-choice-feed")).toBeVisible();
+  await expect(settings.getByTestId("calendar-feed-url")).toHaveCount(0);
+  await settings.getByTestId("calendar-choice-feed").click();
+  await expect(settings.getByTestId("calendar-feed-url")).toBeVisible({ timeout: 40_000 });
+});
+
 test("the dialog is reachable at phone width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await openDialog(page);
@@ -127,6 +144,9 @@ test("email invites turn on with an optional address and can be turned off", asy
     "Email invites",
   );
   await page.getByTestId("calendar-invites-open").click();
+  const settingsDialog = page.getByTestId("calendar-invites-dialog");
+  await expect(settingsDialog.getByTestId("calendar-choice-email")).toBeVisible({ timeout: 40_000 });
+  await settingsDialog.getByTestId("calendar-choice-email").click();
   await page.getByTestId("calendar-invites-off").click();
   await expect
     .poll(async () => (await stored(db)())?.calendarInvitesEnabled)

@@ -17,6 +17,7 @@ import { FilesModule } from "./files/files.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { LinksModule } from "./links/links.module.js";
 import { PublicCalendarModule } from "./public-calendar/public-calendar.module.js";
+import { LinkPreviewModule } from "./link-preview/link-preview.module.js";
 import { SetlistsModule } from "./setlists/setlists.module.js";
 import { SongsModule } from "./songs/songs.module.js";
 import { SpotifyConnectModule } from "./spotify-connect/spotify-connect.module.js";
@@ -44,6 +45,7 @@ import { TestingModule } from "./testing/testing.module.js";
     MediaModule,
     FilesModule,
     PublicCalendarModule,
+    LinkPreviewModule,
     FeedbackModule,
     // The test-control API is only registered with fakes outside production.
     ...(testingEnabled() ? [TestingModule] : []),

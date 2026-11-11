@@ -220,11 +220,23 @@ export function SetlistSection({
                 itemId={item.songId}
                 dimWhenDragging={false}
                 overlay={
-                  <div className="flex h-14 cursor-grabbing items-center gap-2 rounded-2xl border border-primary/40 bg-card pr-3 pl-0.5 shadow-lift">
+                  <div className="flex h-14 cursor-grabbing items-center gap-2 rounded-2xl border border-primary/40 bg-card pr-1 pl-0.5 shadow-lift">
                     <span className="flex h-full w-8 shrink-0 items-center justify-center text-muted-foreground/70">
                       <GripVertical className="size-5" />
                     </span>
-                    <SongLine song={song} />
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <SongLine song={song} />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      tabIndex={-1}
+                      aria-hidden
+                      className="pointer-events-none shrink-0 text-muted-foreground"
+                    >
+                      <X />
+                    </Button>
                   </div>
                 }
               >
@@ -269,10 +281,7 @@ export function SetlistSection({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Remove ${item.title}`}
-                      className={cn(
-                        "shrink-0 text-muted-foreground",
-                        dragging && "opacity-30",
-                      )}
+                      className="shrink-0 text-muted-foreground"
                       onClick={() =>
                         void guarded((target) =>
                           editor.remove(item.songId, target),

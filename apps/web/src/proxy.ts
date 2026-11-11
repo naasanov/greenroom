@@ -10,6 +10,8 @@ const PUBLIC_PREFIXES = [
   "/u/",
   "/c/",
 ];
+// Deep links render a shell with link-preview metadata; AuthGate redirects signed-out visitors.
+const DEEP_LINK_PREFIXES = ["/songs/", "/gigs/", "/practices/"];
 // gr_session locally, gr_<env>_session elsewhere (e.g. gr_staging_session).
 const SESSION_COOKIE = /^gr_([a-z]+_)?session$/;
 
@@ -27,7 +29,9 @@ export function proxy(request: NextRequest) {
   const hasSession = request.cookies
     .getAll()
     .some((c) => SESSION_COOKIE.test(c.name));
-  if (hasSession) return NextResponse.next();
+  if (hasSession || DEEP_LINK_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
   const url = request.nextUrl.clone();
   url.pathname = "/sign-in";
   url.search = `?redirectTo=${encodeURIComponent(pathname + search)}`;

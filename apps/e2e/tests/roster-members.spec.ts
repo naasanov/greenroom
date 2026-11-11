@@ -120,6 +120,14 @@ test("Remove admin and Remove from band buttons are the same size", async ({
   const b = (await remove.boundingBox())!;
   expect(a.width).toBe(b.width);
   expect(a.height).toBe(b.height);
+  const edge = (el: typeof demote) =>
+    el.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return [c.borderTopWidth, c.borderLeftWidth, c.backgroundClip];
+    });
+  const [ea, eb] = [await edge(demote), await edge(remove)];
+  expect(eb.slice(0, 2)).toEqual(ea.slice(0, 2));
+  expect(eb[2]).toBe("border-box");
 });
 
 test("admin has no actions on their own row", async ({

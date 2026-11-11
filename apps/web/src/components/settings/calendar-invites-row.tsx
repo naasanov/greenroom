@@ -55,6 +55,7 @@ export function CalendarInvitesRow({
         bandId={bandId}
         open={open}
         onOpenChange={setOpen}
+        startAtChoice
       />
     </div>
   );

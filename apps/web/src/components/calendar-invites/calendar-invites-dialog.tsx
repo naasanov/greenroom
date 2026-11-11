@@ -254,16 +254,25 @@ type Step = "choice" | "email" | "feed";
 /**
  * Two-step flow. A member already using a method opens straight onto its
  * step (email wins when both are in use) and can go Back to switch.
+ * `startAtChoice` always opens on the chooser.
  */
-function CalendarFlow({ bandId }: { bandId: string }) {
+function CalendarFlow({
+  bandId,
+  startAtChoice,
+}: {
+  bandId: string;
+  startAtChoice: boolean;
+}) {
   const me = useMe().data!;
   const method = useCalendarMethod(me.id, bandId, me.calendarInvitesEnabled);
   const [step, setStep] = useState<Step>(
-    method === "email" || method === "both"
-      ? "email"
-      : method === "feed"
-        ? "feed"
-        : "choice",
+    startAtChoice
+      ? "choice"
+      : method === "email" || method === "both"
+        ? "email"
+        : method === "feed"
+          ? "feed"
+          : "choice",
   );
   const usesEmail = method === "email" || method === "both";
   const usesFeed = method === "feed" || method === "both";
@@ -347,10 +356,12 @@ export function CalendarInvitesDialog({
   bandId,
   open,
   onOpenChange,
+  startAtChoice = false,
 }: {
   bandId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  startAtChoice?: boolean;
 }) {
   const me = useMe().data;
   return (
@@ -366,7 +377,7 @@ export function CalendarInvitesDialog({
             reach the calendar you already use.
           </DialogDescription>
         </DialogHeader>
-        {me ? <CalendarFlow bandId={bandId} /> : null}
+        {me ? <CalendarFlow bandId={bandId} startAtChoice={startAtChoice} /> : null}
       </DialogContent>
     </Dialog>
   );

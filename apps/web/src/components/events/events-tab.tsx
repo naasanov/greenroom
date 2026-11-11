@@ -502,10 +502,10 @@ export function EventsTab({
           onEventClick={selectFromCalendar}
           headerAction={
             bandId ? (
-              <>
+              <div className="ml-2 flex items-center gap-1">
                 <AddToCalendarButton onClick={openInvites} />
                 <PublicCalendarExport bandId={bandId} />
-              </>
+              </div>
             ) : null
           }
           selectedEvent={

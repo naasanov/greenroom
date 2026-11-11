@@ -182,7 +182,7 @@ export function MemberSheet({
                 <Button
                   variant="destructive"
                   size="lg"
-                  className="w-full"
+                  className="w-full bg-clip-border"
                   onClick={() => setConfirmRemove(true)}
                 >
                   <UserMinus /> Remove from band
