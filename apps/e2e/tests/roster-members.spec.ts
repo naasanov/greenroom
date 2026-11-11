@@ -349,7 +349,9 @@ test("clicking the selected member again closes the sheet", async ({
   page,
   testApi,
   loginAs,
+  isMobile,
 }) => {
+  test.skip(isMobile, "The roster sheet is modal on mobile");
   await testApi.seed("band");
   await loginAs(USERS.cleo.email);
   await page.goto("/roster");
@@ -365,7 +367,9 @@ test("clicking another member while the sheet is open switches to them", async (
   page,
   testApi,
   loginAs,
+  isMobile,
 }) => {
+  test.skip(isMobile, "The roster sheet is modal on mobile");
   await testApi.seed("band");
   await loginAs(USERS.cleo.email);
   await page.goto("/roster");
