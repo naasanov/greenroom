@@ -39,8 +39,6 @@ export const gigs = pgTable(
       .notNull()
       .default(true),
     driveFolderId: text("drive_folder_id"),
-    gcalEventId: text("gcal_event_id"),
-    gcalEtag: text("gcal_etag"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -50,7 +48,6 @@ export const gigs = pgTable(
   },
   (t) => [
     index("gigs_band_id_date_idx").on(t.bandId, t.date),
-    index("gigs_gcal_event_id_idx").on(t.gcalEventId),
   ],
 );
 

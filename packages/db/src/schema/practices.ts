@@ -28,8 +28,6 @@ export const practiceSeries = pgTable(
     dtstart: tstz("dtstart").notNull(),
     timeZone: text("time_zone").notNull(),
     durationMinutes: integer("duration_minutes").notNull(),
-    gcalEventId: text("gcal_event_id"),
-    gcalEtag: text("gcal_etag"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -57,7 +55,6 @@ export const practiceOccurrenceOverrides = pgTable(
     endsAt: tstz("ends_at"),
     title: text("title"),
     location: text("location"),
-    gcalInstanceEtag: text("gcal_instance_etag"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

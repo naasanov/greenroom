@@ -22,19 +22,6 @@ export const driveSyncCursors = pgTable(
   (t) => [uniqueIndex("drive_sync_cursors_band_id_idx").on(t.bandId)],
 );
 
-export const calendarSyncStates = pgTable(
-  "calendar_sync_states",
-  {
-    id: id(),
-    bandId: uuid("band_id")
-      .notNull()
-      .references(() => bands.id, { onDelete: "cascade" }),
-    syncToken: text("sync_token"),
-    lastSyncedAt: tstz("last_synced_at"),
-  },
-  (t) => [uniqueIndex("calendar_sync_states_band_id_idx").on(t.bandId)],
-);
-
 // Invite bookkeeping per event (gig or practice series) and recipient address (lowercased).
 // `event_id` is not a foreign key because it points at either table.
 export const calendarInvites = pgTable(

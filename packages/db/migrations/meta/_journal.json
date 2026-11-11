@@ -148,6 +148,13 @@
       "when": 1794271116539,
       "tag": "0020_calendar_invites_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794437812931,
+      "tag": "0021_drop_gcal_leftovers",
+      "breakpoints": true
     }
   ]
 }

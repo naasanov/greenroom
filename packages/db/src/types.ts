@@ -51,10 +51,6 @@ export type NewPracticeSetlistAssignment = InferInsertModel<
 >;
 export type DriveSyncCursor = InferSelectModel<typeof s.driveSyncCursors>;
 export type NewDriveSyncCursor = InferInsertModel<typeof s.driveSyncCursors>;
-export type CalendarSyncState = InferSelectModel<typeof s.calendarSyncStates>;
-export type NewCalendarSyncState = InferInsertModel<
-  typeof s.calendarSyncStates
->;
 export type User = InferSelectModel<typeof s.users>;
 export type NewUser = InferInsertModel<typeof s.users>;
 export type MagicLinkToken = InferSelectModel<typeof s.magicLinkTokens>;

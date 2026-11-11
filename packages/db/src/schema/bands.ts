@@ -40,7 +40,6 @@ export const bands = pgTable("bands", {
     () => users.id,
     { onDelete: "set null" },
   ),
-  calendarId: text("calendar_id"),
   calendarLinkedByUserId: uuid("calendar_linked_by_user_id").references(
     () => users.id,
     { onDelete: "set null" },
