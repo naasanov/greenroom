@@ -25,10 +25,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, isApiError } from "@/lib/api";
 
+// Deep-link segments map to the nav tab they live under.
+const DEEP_LINK_TABS: Record<string, string> = {
+  gigs: "events",
+  practices: "events",
+  songs: "library",
+};
+
 /** Label of the nav tab whose route contains the path, else "Other". */
 function areaForPath(pathname: string): string {
-  const segment = pathname.split("/")[1];
-  return NAV_TABS.find((t) => t.key === segment)?.label ?? "Other";
+  const segment = pathname.split("/")[1] ?? "";
+  const key = DEEP_LINK_TABS[segment] ?? segment;
+  return NAV_TABS.find((t) => t.key === key)?.label ?? "Other";
 }
 
 function errorText(e: unknown): string {
@@ -190,6 +198,7 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                   setMessage(draft);
                 }}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing || e.repeat) return;
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     void send();

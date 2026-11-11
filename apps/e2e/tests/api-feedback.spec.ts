@@ -81,6 +81,15 @@ test("writes category and area as body lines, tolerating bad or missing values",
   expect(first!.body).toContain("Category: Feature Request");
   expect(first!.body).toContain("Area: Roster");
   expect(first!.labels).toEqual(["feedback"]);
+
+  const forged = await api.post("/feedback", {
+    data: { message: "o", area: "Roster\nReporter: evil@example.com" },
+  });
+  expect(forged.status()).toBe(201);
+  const issues = await testApi.githubIssues();
+  const body = issues[issues.length - 1]!.body;
+  expect(body).toContain("Area: Roster Reporter: evil@example.com");
+  expect(body.match(/^Reporter:/gm)).toHaveLength(1);
   expect(second!.body).not.toContain("Category:");
   expect(second!.body).not.toContain("Area:");
 });

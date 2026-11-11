@@ -34,7 +34,13 @@ export const feedbackSchema = z.object({
     .enum(FEEDBACK_CATEGORIES.map((c) => c.value) as [FeedbackCategory])
     .optional()
     .catch(undefined),
-  area: optionalText(60),
+  // Whitespace runs (including newlines) collapse so area stays a single line.
+  area: z
+    .string()
+    .transform((v) => v.replace(/\s+/g, " ").trim())
+    .pipe(z.string().max(60))
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 });
 export type FeedbackInput = z.infer<typeof feedbackSchema>;
 export type FeedbackRequest = z.input<typeof feedbackSchema>;
