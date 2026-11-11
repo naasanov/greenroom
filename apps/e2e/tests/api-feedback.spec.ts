@@ -65,6 +65,26 @@ test("records a labelled issue with reporter and band, no secrets", async ({
   expect(issue!.body).not.toMatch(/gr_session|token/i);
 });
 
+test("writes category and area as body lines, tolerating bad or missing values", async ({
+  testApi,
+}) => {
+  const { api } = await client(testApi, "ca@example.com");
+  const ok = await api.post("/feedback", {
+    data: { message: "m", category: "feature", area: "Roster" },
+  });
+  expect(ok.status()).toBe(201);
+  const odd = await api.post("/feedback", {
+    data: { message: "n", category: "nonsense" },
+  });
+  expect(odd.status()).toBe(201);
+  const [first, second] = await testApi.githubIssues();
+  expect(first!.body).toContain("Category: Feature Request");
+  expect(first!.body).toContain("Area: Roster");
+  expect(first!.labels).toEqual(["feedback"]);
+  expect(second!.body).not.toContain("Category:");
+  expect(second!.body).not.toContain("Area:");
+});
+
 test("a given title is used and a foreign band id is not disclosed", async ({
   testApi,
 }) => {

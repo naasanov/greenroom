@@ -1,12 +1,17 @@
 "use client";
 
 import { MessageSquarePlus } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  FEEDBACK_CATEGORIES,
   FEEDBACK_ERROR_CODES,
   FEEDBACK_MESSAGE_MAX,
+  type FeedbackCategory,
   type FeedbackRequest,
 } from "@greenroom/shared";
+import { NAV_TABS } from "@/components/app/app-shell";
+import { NativeSelect } from "@/components/events/form-parts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +24,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, isApiError } from "@/lib/api";
+
+/** Label of the nav tab whose route contains the path, else "Other". */
+function areaForPath(pathname: string): string {
+  const segment = pathname.split("/")[1];
+  return NAV_TABS.find((t) => t.key === segment)?.label ?? "Other";
+}
 
 function errorText(e: unknown): string {
   if (isApiError(e, 429)) {
@@ -57,19 +68,24 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<FeedbackCategory | "">("");
+  const [area, setArea] = useState("Other");
+  const pathname = usePathname();
   const viewportHeight = useVisualViewportHeight(open);
 
-  function onOpenChange(next: boolean) {
-    setOpen(next);
-    if (!next) {
-      setSent(false);
-      setError(null);
-    }
+  // Form state resets on open, so the success view stays put while closing.
+  function openDialog() {
+    setSent(false);
+    setError(null);
+    setArea(areaForPath(pathname));
+    setOpen(true);
   }
+
+  const canSend = !sending && !!message.trim() && category !== "";
 
   async function send() {
     const text = message.trim();
-    if (!text || sending) return;
+    if (!canSend || !category) return;
     setSending(true);
     setError(null);
     const body: FeedbackRequest = {
@@ -77,11 +93,14 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
       pageUrl: window.location.href.slice(0, 2000),
       userAgent: navigator.userAgent.slice(0, 500),
       bandId,
+      category,
+      area,
     };
     try {
       await api("/feedback", { method: "POST", body });
       draft = "";
       setMessage("");
+      setCategory("");
       setSent(true);
     } catch (e) {
       setError(errorText(e));
@@ -95,12 +114,12 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
       <button
         type="button"
         aria-label="Send feedback"
-        onClick={() => setOpen(true)}
+        onClick={openDialog}
         className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <MessageSquarePlus className="size-5" />
       </button>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           data-testid="feedback-dialog"
           style={
@@ -128,6 +147,38 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                 void send();
               }}
             >
+              <Label htmlFor="feedback-category">Category</Label>
+              <NativeSelect
+                id="feedback-category"
+                value={category}
+                required
+                disabled={sending}
+                onChange={(e) =>
+                  setCategory(e.target.value as FeedbackCategory | "")
+                }
+              >
+                <option value="" disabled>
+                  Select a category
+                </option>
+                {FEEDBACK_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <Label htmlFor="feedback-area">Area</Label>
+              <NativeSelect
+                id="feedback-area"
+                value={area}
+                disabled={sending}
+                onChange={(e) => setArea(e.target.value)}
+              >
+                {[...NAV_TABS.map((t) => t.label), "Other", "N/A"].map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </NativeSelect>
               <Label htmlFor="feedback-message">Message</Label>
               <Textarea
                 id="feedback-message"
@@ -137,6 +188,12 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                 onChange={(e) => {
                   draft = e.target.value;
                   setMessage(draft);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    void send();
+                  }
                 }}
                 onFocus={(e) => {
                   const el = e.currentTarget;
@@ -150,11 +207,7 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
                 </p>
               ) : null}
               <DialogFooter>
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={sending || !message.trim()}
-                >
+                <Button type="submit" size="lg" disabled={!canSend}>
                   {sending ? "Sending..." : "Send"}
                 </Button>
               </DialogFooter>
@@ -162,7 +215,7 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
           )}
           {sent ? (
             <DialogFooter>
-              <Button size="lg" onClick={() => onOpenChange(false)}>
+              <Button size="lg" onClick={() => setOpen(false)}>
                 Done
               </Button>
             </DialogFooter>
