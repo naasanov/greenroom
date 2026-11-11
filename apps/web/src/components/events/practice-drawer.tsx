@@ -190,6 +190,32 @@ function PracticeDetails({
 
       {occ.cancelled ? null : (
         <>
+          <SetlistSection
+            builder={setlist}
+            caption={
+              occ.recurring
+                ? "Changes apply to this and later practices."
+                : null
+            }
+            extra={
+              occ.setlistId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="ml-auto text-muted-foreground"
+                  onClick={onRemoveSetlist}
+                >
+                  Remove setlist
+                </Button>
+              ) : null
+            }
+          />
+          {setlistError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {setlistError}
+            </p>
+          ) : null}
+
           <section aria-label="Your RSVP" className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Your RSVP</h3>
             <SegmentedToggle<RsvpChoice>
@@ -218,32 +244,6 @@ function PracticeDetails({
               }}
             />
           </section>
-
-          <SetlistSection
-            builder={setlist}
-            caption={
-              occ.recurring
-                ? "Changes apply to this and later practices."
-                : null
-            }
-            extra={
-              occ.setlistId ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="ml-auto text-muted-foreground"
-                  onClick={onRemoveSetlist}
-                >
-                  Remove setlist
-                </Button>
-              ) : null
-            }
-          />
-          {setlistError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {setlistError}
-            </p>
-          ) : null}
 
           <section aria-label="Attendees" className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Who&apos;s coming</h3>

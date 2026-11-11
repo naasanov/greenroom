@@ -456,6 +456,21 @@ test("practice drawer has per-section buttons and no footer", async ({
   await expect(drawer.getByTestId("practice-when")).toContainText("7:00 PM");
 });
 
+test("practice drawer orders setlist, RSVP, then who's coming", async ({
+  page,
+}) => {
+  const date = seed.practice.moved.startsAt.slice(0, 10);
+  await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
+  const drawer = dialog(page, seed.practice.title);
+  await expect(drawer.getByTestId("attendee-list")).toBeVisible();
+  const top = async (loc: Locator) => (await loc.boundingBox())!.y;
+  const setlist = await top(drawer.getByTestId("setlist-section"));
+  const rsvp = await top(drawer.getByRole("region", { name: "Your RSVP" }));
+  const coming = await top(drawer.getByRole("region", { name: "Attendees" }));
+  expect(setlist).toBeLessThan(rsvp);
+  expect(rsvp).toBeLessThan(coming);
+});
+
 test("editing practice details swaps only the details block inline", async ({
   page,
 }) => {
