@@ -150,6 +150,7 @@ export function MemberSheet({
                   <Button
                     variant="outline"
                     size="lg"
+                    className="w-full"
                     disabled={setRole.isPending}
                     onClick={() => {
                       setError(null);
@@ -165,6 +166,7 @@ export function MemberSheet({
                   <Button
                     variant="outline"
                     size="lg"
+                    className="w-full"
                     disabled={setRole.isPending}
                     onClick={() => {
                       setError(null);
@@ -180,6 +182,7 @@ export function MemberSheet({
                 <Button
                   variant="destructive"
                   size="lg"
+                  className="w-full"
                   onClick={() => setConfirmRemove(true)}
                 >
                   <UserMinus /> Remove from band
