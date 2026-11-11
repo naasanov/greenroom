@@ -90,6 +90,10 @@ export function RosterTab({ band }: { band: BandSummary }) {
                 member={m}
                 selected={sheetOpen && m.userId === selectedId}
                 onSelect={() => {
+                  if (sheetOpen && m.userId === selectedId) {
+                    setSheetOpen(false);
+                    return;
+                  }
                   setSelectedId(m.userId);
                   setSheetOpen(true);
                 }}

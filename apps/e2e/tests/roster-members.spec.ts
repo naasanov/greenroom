@@ -102,6 +102,26 @@ test("admin promotes and demotes a member", async ({
   expect(await roleOf()).toBe("member");
 });
 
+test("Remove admin and Remove from band buttons are the same size", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/roster");
+  await card(page, USERS.cleo.displayName).getByRole("button").first().click();
+  const s = sheet(page, USERS.cleo.displayName);
+  await s.getByRole("button", { name: "Make admin" }).click();
+  const demote = s.getByRole("button", { name: "Remove admin" });
+  await expect(demote).toBeVisible();
+  const remove = s.getByRole("button", { name: "Remove from band" });
+  const a = (await demote.boundingBox())!;
+  const b = (await remove.boundingBox())!;
+  expect(a.width).toBe(b.width);
+  expect(a.height).toBe(b.height);
+});
+
 test("admin has no actions on their own row", async ({
   page,
   testApi,
@@ -323,4 +343,39 @@ test("an empty name keeps the field and its error in view", async ({
   await expect(drawer.getByText("Enter a name.")).toBeInViewport();
   await expect(drawer.getByLabel("Name")).toBeInViewport();
   await expect(drawer.getByLabel("Name")).toBeFocused();
+});
+
+test("clicking the selected member again closes the sheet", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto("/roster");
+  const dev = card(page, USERS.dev.displayName);
+  await dev.getByRole("button").first().click();
+  const s = sheet(page, USERS.dev.displayName);
+  await expect(s).toBeVisible();
+  await dev.getByRole("button").first().click();
+  await expect(s).toBeHidden();
+});
+
+test("clicking another member while the sheet is open switches to them", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto("/roster");
+  await card(page, USERS.dev.displayName).getByRole("button").first().click();
+  await expect(sheet(page, USERS.dev.displayName)).toBeVisible();
+  const ava = card(page, USERS.ava.displayName);
+  await ava.getByRole("button").first().click();
+  await expect(sheet(page, USERS.ava.displayName)).toBeVisible();
+  await expect(ava.getByTestId("list-card")).toHaveAttribute(
+    "data-selected",
+    "true",
+  );
 });
