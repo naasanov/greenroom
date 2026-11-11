@@ -9,6 +9,7 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { bands, memberships, type Database } from "@greenroom/db";
 import {
+  FEEDBACK_CATEGORIES,
   FEEDBACK_ERROR_CODES,
   type FeedbackInput,
   type FeedbackResult,
@@ -83,12 +84,17 @@ export class FeedbackService {
   async submit(user: User, input: FeedbackInput): Promise<FeedbackResult> {
     this.checkRate(user.id);
     const band = await this.bandName(user.id, input.bandId);
+    const category = FEEDBACK_CATEGORIES.find(
+      (c) => c.value === input.category,
+    );
     const body = [
       input.message,
       "",
       "---",
       `Reporter: ${user.displayName} (${user.email})`,
       `Band: ${band ?? "none"}`,
+      ...(category ? [`Category: ${category.label}`] : []),
+      ...(input.area ? [`Area: ${input.area}`] : []),
       `Page: ${input.pageUrl ?? "unknown"}`,
       `User agent: ${input.userAgent ?? "unknown"}`,
     ].join("\n");
