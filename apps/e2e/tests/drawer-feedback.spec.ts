@@ -91,6 +91,33 @@ test("clicking a setlist song opens its sheet; the drag handle does not", async 
   await expect(page.getByRole("dialog", { name: title })).toBeVisible();
 });
 
+test("a song sheet opened from a gig setlist switches songs and closes on an outside press", async ({
+  page,
+}) => {
+  const gig = await openClub(page);
+  const rows = page.getByTestId("setlist-row");
+  const titleOf = async (i: number) =>
+    (
+      await rows.nth(i).locator("span.font-semibold").first().innerText()
+    ).trim();
+  const first = await titleOf(0);
+  const second = await titleOf(1);
+  await rows.nth(0).getByTestId("setlist-row-open").click();
+  await expect(page.getByRole("dialog", { name: first })).toBeVisible();
+  await rows.nth(1).getByTestId("setlist-row-open").click();
+  await expect(page.getByRole("dialog", { name: second })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: first })).toHaveCount(0);
+  // A press on another control closes the sheet and still reaches the control.
+  const toggle = page.getByLabel("Show on public calendar");
+  const before = await toggle.getAttribute("aria-checked");
+  await page.getByRole("heading", { name: gig.title }).click();
+  await expect(page.getByTestId("right-sheet")).toHaveAttribute(
+    "data-state",
+    "closed",
+  );
+  await expect(toggle).toHaveAttribute("aria-checked", before!);
+});
+
 test("pressing the FAB twice closes the create drawer instead of reopening it", async ({
   page,
   isMobile,

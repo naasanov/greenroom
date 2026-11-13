@@ -18,6 +18,7 @@ import {
 import {
   gigSetlists,
   gigs,
+  practiceOccurrenceOverrides,
   practiceSeries,
   practiceSetlistAssignments,
   setlistItems,
@@ -41,6 +42,8 @@ import {
   type UsedIn,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
+import { resolveAssignment } from "../events/assignment.js";
+import { expandSeries } from "../events/occurrences.js";
 import {
   SONGSTERR,
   YOUTUBE,
@@ -416,20 +419,7 @@ export class SongsService {
           ),
         )
         .orderBy(desc(gigs.date), asc(gigs.id)),
-      this.db
-        .select({
-          setlistId: practiceSetlistAssignments.setlistId,
-          seriesId: practiceSeries.id,
-          title: practiceSeries.title,
-          effectiveFrom: practiceSetlistAssignments.effectiveFrom,
-        })
-        .from(practiceSetlistAssignments)
-        .innerJoin(
-          practiceSeries,
-          eq(practiceSeries.id, practiceSetlistAssignments.seriesId),
-        )
-        .where(inArray(practiceSetlistAssignments.setlistId, setlistIds))
-        .orderBy(desc(practiceSetlistAssignments.effectiveFrom)),
+      this.nextPractice(songId),
     ]);
     return [
       ...gigRows.map((g): UsedIn => ({
@@ -439,13 +429,84 @@ export class SongsService {
         title: g.title,
         date: g.date,
       })),
-      ...practiceRows.map((p): UsedIn => ({
-        kind: "practice",
-        setlistId: p.setlistId!,
-        seriesId: p.seriesId,
-        title: p.title,
-        effectiveFrom: p.effectiveFrom.toISOString(),
-      })),
+      ...practiceRows,
     ];
+  }
+  /** The earliest practice occurrence, today or later, whose resolved setlist holds the song. */
+  private async nextPractice(songId: string): Promise<UsedIn[]> {
+    const withSong = (
+      await this.db
+        .selectDistinct({ id: setlistItems.setlistId })
+        .from(setlistItems)
+        .where(eq(setlistItems.songId, songId))
+    ).map((r) => r.id);
+    if (withSong.length === 0) return [];
+    const hit = this.db
+      .select({ id: practiceSetlistAssignments.seriesId })
+      .from(practiceSetlistAssignments)
+      .where(inArray(practiceSetlistAssignments.setlistId, withSong));
+    const [assignments, seriesRows, overrides] = await Promise.all([
+      this.db
+        .select()
+        .from(practiceSetlistAssignments)
+        .where(inArray(practiceSetlistAssignments.seriesId, hit)),
+      this.db
+        .select()
+        .from(practiceSeries)
+        .where(
+          and(
+            inArray(practiceSeries.id, hit),
+            isNull(practiceSeries.deletedAt),
+          ),
+        ),
+      this.db
+        .select()
+        .from(practiceOccurrenceOverrides)
+        .where(inArray(practiceOccurrenceOverrides.seriesId, hit)),
+    ]);
+    const from = new Date();
+    from.setUTCHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + 400 * 86_400_000);
+    let next: {
+      at: string;
+      seriesId: string;
+      title: string;
+      setlistId: string;
+    } | null = null;
+    for (const series of seriesRows) {
+      const rows = assignments.filter((a) => a.seriesId === series.id);
+      const events = expandSeries(
+        series,
+        overrides.filter((o) => o.seriesId === series.id),
+        from,
+        to,
+      );
+      for (const ev of events) {
+        if (new Date(ev.startsAt) < from) continue;
+        const setlistId = resolveAssignment(
+          rows,
+          new Date(ev.originalStart),
+        ).setlistId;
+        if (!setlistId || !withSong.includes(setlistId)) continue;
+        if (!next || ev.startsAt < next.at)
+          next = {
+            at: ev.startsAt,
+            seriesId: series.id,
+            title: series.title,
+            setlistId,
+          };
+      }
+    }
+    return next
+      ? [
+          {
+            kind: "practice",
+            setlistId: next.setlistId,
+            seriesId: next.seriesId,
+            title: next.title,
+            effectiveFrom: next.at,
+          },
+        ]
+      : [];
   }
 }

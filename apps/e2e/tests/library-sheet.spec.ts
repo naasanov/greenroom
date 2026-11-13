@@ -1,4 +1,9 @@
-import { USERS } from "@greenroom/db";
+import {
+  USERS,
+  practiceSeries,
+  practiceSetlistAssignments,
+} from "@greenroom/db";
+import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import { cards, chooseSort, openLibrary, sheet } from "./library-helpers.js";
 
@@ -165,4 +170,72 @@ test("desktop sheet is non-modal: another song switches it, other clicks close i
 
   await page.getByRole("heading", { name: "Music Library" }).click();
   await expect(s).toBeHidden();
+});
+
+test("the References pencil edits only the references", async ({ page }) => {
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Original One" }).click();
+  const s = sheet(page);
+  await s.getByRole("button", { name: "Edit references" }).click();
+  // Song details stay in view mode.
+  await expect(s.getByLabel("Title")).toHaveCount(0);
+  await s.getByRole("button", { name: "Add row" }).click();
+  await s.getByLabel("Reference label").last().fill("Key");
+  await s.getByLabel("Reference value").last().fill("A minor");
+  await s.getByRole("button", { name: "Save references" }).click();
+  await expect(s.getByTestId("references-edit")).toHaveCount(0);
+  await expect(s.getByTestId("reference-text")).toContainText("A minor");
+  await expect(
+    s.getByRole("button", { name: "Edit references" }),
+  ).toBeVisible();
+  await expect(
+    s.getByRole("button", { name: "Edit", exact: true }),
+  ).toBeVisible();
+});
+
+test("Used in is last, after Files, and lists one upcoming practice", async ({
+  page,
+  db,
+}) => {
+  const [series] = await db.select().from(practiceSeries);
+  const [assignment] = await db
+    .select()
+    .from(practiceSetlistAssignments)
+    .where(eq(practiceSetlistAssignments.seriesId, series!.id));
+  const day = 86_400_000;
+  const extras = [
+    { rrule: "RRULE:COUNT=1", offset: -9 },
+    { rrule: "RRULE:COUNT=1", offset: 40 },
+  ];
+  for (const [i, e] of extras.entries()) {
+    const [row] = await db
+      .insert(practiceSeries)
+      .values({
+        ...series!,
+        id: undefined,
+        title: `Extra practice ${i}`,
+        rrule: e.rrule,
+        dtstart: new Date(Date.now() + e.offset * day),
+      })
+      .returning();
+    await db.insert(practiceSetlistAssignments).values({
+      ...assignment!,
+      id: undefined,
+      seriesId: row!.id,
+      effectiveFrom: row!.dtstart,
+    });
+  }
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Red Line" }).click();
+  const s = sheet(page);
+  await expect(s.getByTestId("used-in")).toBeVisible();
+  const headings = await s.locator("h3").allTextContents();
+  expect(headings.at(-1)).toBe("Used in");
+  expect(headings.indexOf("Files")).toBeGreaterThan(-1);
+  expect(headings.indexOf("Files")).toBeLessThan(headings.indexOf("Used in"));
+  const practices = s
+    .getByTestId("used-in")
+    .locator('li:has(span:text-is("Practice"))');
+  await expect(practices).toHaveCount(1);
+  await expect(practices).not.toContainText("Extra practice 0");
 });

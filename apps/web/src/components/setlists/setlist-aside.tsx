@@ -438,6 +438,7 @@ function AddSongSheet({
             </DialogPrimitive.Title>
             <SongSheet
               className="max-md:w-[calc(100%-1.25rem)]"
+              nonModal={!!sheet.songId}
               bandId={bandId}
               target={
                 sheet.songId
