@@ -14,6 +14,8 @@ import {
   type UploadChunkInput,
   type UploadChunkResult,
   type UploadStatusResult,
+  DRIVE_EXPORT_MIME,
+  isNativeGoogleMime,
 } from "./google-drive.adapter.js";
 import {
   DRIVE_FILE_FIELDS,
@@ -43,6 +45,10 @@ function httpStatus(err: unknown): number | undefined {
 
 function isNotFound(err: unknown): boolean {
   return httpStatus(err) === 404;
+}
+
+function isInaccessible(err: unknown): boolean {
+  return isNotFound(err) || httpStatus(err) === 403;
 }
 
 function driveFor(accessToken: string): drive_v3.Drive {
@@ -259,6 +265,9 @@ export class RealGoogleDriveAdapter implements GoogleDriveAdapter {
     const meta = await this.getFile(accessToken, fileId);
     if (meta.status === "not-found" || meta.file.mimeType === DRIVE_FOLDER_MIME)
       return { status: "not-found" };
+    if (isNativeGoogleMime(meta.file.mimeType)) {
+      return this.exportPdf(accessToken, fileId, meta.file.name);
+    }
     const total = meta.file.size;
     const end = range ? Math.min(range.end ?? total - 1, total - 1) : 0;
     if (range && range.start > end) return { status: "not-found" };
@@ -278,7 +287,32 @@ export class RealGoogleDriveAdapter implements GoogleDriveAdapter {
         ...(range ? { partial: { start: range.start, end, total } } : {}),
       };
     } catch (err) {
-      if (isNotFound(err)) return { status: "not-found" };
+      if (isInaccessible(err)) return { status: "not-found" };
+      throw err;
+    }
+  }
+
+  /** Drive caps exports at 10 MB, so the PDF is buffered to give an exact length. */
+  private async exportPdf(
+    accessToken: string,
+    fileId: string,
+    name: string,
+  ): Promise<DriveDownloadResult> {
+    try {
+      const res = await driveFor(accessToken).files.export(
+        { fileId, mimeType: DRIVE_EXPORT_MIME },
+        { responseType: "arraybuffer" },
+      );
+      const buf = Buffer.from(res.data as unknown as ArrayBuffer);
+      return {
+        status: "ok",
+        stream: Readable.from([buf]),
+        size: buf.length,
+        name: `${name}.pdf`,
+        mimeType: DRIVE_EXPORT_MIME,
+      };
+    } catch (err) {
+      if (isInaccessible(err)) return { status: "not-found" };
       throw err;
     }
   }
