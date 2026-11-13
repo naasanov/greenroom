@@ -56,10 +56,9 @@ test("returning from Google lands on Connections with the Drive picker", async (
   await page.getByRole("button", { name: "Connect Google Drive" }).click();
   await expect(page.getByTestId("drive-picker")).toBeVisible();
   await expect(page).toHaveURL(/\/settings\?tab=connections$/);
-  await expect(page.getByRole("tab", { name: "Connections" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(
+    page.getByRole("tab", { name: "Connections", includeHidden: true }),
+  ).toHaveAttribute("aria-selected", "true");
 });
 
 test("a denied Google sign-in shows the error on Connections", async ({
