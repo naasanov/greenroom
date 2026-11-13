@@ -152,7 +152,7 @@ export function sendContent(
   result: OkDownload,
   file: { mimeType: string | null; name: string; download: boolean },
 ): void {
-  const mime = file.mimeType ?? "application/octet-stream";
+  const mime = result.mimeType ?? file.mimeType ?? "application/octet-stream";
   const attachment = file.download || !inlineSafe(mime);
   const partial = result.partial;
   if (partial) {
@@ -168,7 +168,7 @@ export function sendContent(
     "Accept-Ranges": "bytes",
     "Content-Disposition": contentDisposition(
       attachment ? "attachment" : "inline",
-      file.name,
+      result.mimeType ? result.name : file.name,
     ),
     "Cache-Control": PRIVATE_CACHE,
   });

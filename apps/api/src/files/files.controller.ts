@@ -39,6 +39,7 @@ import {
   sendThumbnail,
   sendUnsatisfiable,
 } from "../media/media-util.js";
+import { isNativeGoogleMime } from "../integrations/google-drive/google-drive.adapter.js";
 import { FilesService } from "./files.service.js";
 import { GigFolderLinkService } from "./gig-folder-link.service.js";
 
@@ -106,7 +107,10 @@ export class FilesController {
     @Res() res: Response,
   ): Promise<void> {
     const stat = await this.files.stat(bandId, fileId);
-    const parsed = parseRange(req.headers.range, stat.size);
+    // Native Google files are exported whole, so a range never applies.
+    const parsed = isNativeGoogleMime(stat.mimeType)
+      ? null
+      : parseRange(req.headers.range, stat.size);
     if (parsed === "unsatisfiable") {
       sendUnsatisfiable(res, stat.size);
       return;

@@ -164,6 +164,21 @@ test("root listing, sorting, nested browse, and breadcrumbs", async ({
   expect(inline.headers()["content-disposition"]).toContain("inline");
   const dl = await ben.get(`${itemUrl(pic.id)}/content?download=1`);
   expect(dl.headers()["content-disposition"]).toContain("attachment");
+  // Native Google docs are exported to PDF instead of failing.
+  const gdoc = await fake.external({
+    action: "add",
+    name: "Chart",
+    parentId: root,
+    content: "lyrics",
+    mimeType: "application/vnd.google-apps.document",
+  });
+  const exported = await ben.get(`${itemUrl(gdoc.id)}/content`, {
+    headers: { Range: "bytes=0-4" },
+  });
+  expect(exported.status()).toBe(200);
+  expect(exported.headers()["content-type"]).toBe("application/pdf");
+  expect(exported.headers()["content-disposition"]).toContain("Chart.pdf");
+  expect(await exported.text()).toContain("%PDF");
   expect((await ben.get(`${itemUrl(file.id)}/thumbnail`)).status()).toBe(200);
   expect((await ben.get(`${itemUrl(alpha.id)}/content`)).status()).toBe(404);
   expect((await ben.get(`${itemUrl(alpha.id)}/thumbnail`)).status()).toBe(404);
