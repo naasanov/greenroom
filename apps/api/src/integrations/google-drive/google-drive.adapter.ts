@@ -3,6 +3,15 @@ import type { Readable } from "node:stream";
 export const GOOGLE_DRIVE = Symbol("GOOGLE_DRIVE");
 
 export const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+export const DRIVE_EXPORT_MIME = "application/pdf";
+
+/** Docs, Sheets, Slides and other Google-native types, which have no binary content. */
+export function isNativeGoogleMime(mimeType: string): boolean {
+  return (
+    mimeType.startsWith("application/vnd.google-apps.") &&
+    mimeType !== DRIVE_FOLDER_MIME
+  );
+}
 
 export interface DriveFile {
   id: string;
@@ -75,6 +84,8 @@ export type DriveDownloadResult =
       /** Whole-file size, even for a partial response. */
       size: number;
       name: string;
+      /** Set when the bytes differ from the file's own type (native docs export as PDF). */
+      mimeType?: string;
       /** Present when a range was served; inclusive byte offsets. */
       partial?: { start: number; end: number; total: number };
     }
@@ -135,6 +146,7 @@ export interface GoogleDriveAdapter {
     accessToken: string,
     pageToken: string,
   ): Promise<DriveChangesResult>;
+  /** Native Google files are exported to PDF and served whole; a range is ignored. */
   download(
     accessToken: string,
     fileId: string,
