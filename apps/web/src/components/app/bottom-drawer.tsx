@@ -116,6 +116,14 @@ export function BottomDrawer({
               ? (e) => {
                   if (e.detail.originalEvent.timeStamp < openedAt.current)
                     return;
+                  // A tab press navigates, which closes the drawer; closing
+                  // first would race that navigation and swallow it.
+                  if (
+                    (e.detail.originalEvent.target as Element | null)?.closest(
+                      'nav[aria-label="Primary"]',
+                    )
+                  )
+                    return;
                   if (asideClose.current) return asideClose.current();
                   requestClose();
                 }

@@ -133,6 +133,35 @@ test("the FAB closes an open gig drawer", async ({ page, isMobile }) => {
   await expect(createDrawer(page)).toHaveCount(0);
 });
 
+const tabNav = (page: Page, isMobile: boolean) =>
+  page.getByTestId(isMobile ? "bottom-tab-bar" : "top-tabs");
+
+test("pressing another tab with the gig drawer open navigates to it", async ({
+  page,
+  isMobile,
+}) => {
+  const gig = await openClub(page);
+  await expect(live(page, gig.title)).toBeVisible();
+  await tabNav(page, isMobile).getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library/);
+  await expect(
+    page.locator("[data-vaul-drawer]:not([data-exiting])"),
+  ).toHaveCount(0);
+});
+
+test("pressing another tab with the practice drawer open navigates to it", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto(`/practices/${seed.practice.seriesId}`);
+  await expect(live(page, seed.practice.title)).toBeVisible();
+  await tabNav(page, isMobile).getByRole("link", { name: "Files" }).click();
+  await expect(page).toHaveURL(/\/files/);
+  await expect(
+    page.locator("[data-vaul-drawer]:not([data-exiting])"),
+  ).toHaveCount(0);
+});
+
 test("a dirty gig drawer asks before the FAB closes it", async ({
   page,
   isMobile,
