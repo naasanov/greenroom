@@ -120,7 +120,7 @@ test("a song sheet opened from a gig setlist switches songs and closes on an out
   await reveal(toggle);
   const before = await toggle.getAttribute("aria-checked");
   await toggle.click();
-  await expect(page.getByTestId("right-sheet")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: second })).toHaveCount(0);
   await expect(toggle).not.toHaveAttribute("aria-checked", before!);
 });
 

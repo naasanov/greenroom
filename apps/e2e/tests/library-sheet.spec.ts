@@ -176,7 +176,7 @@ test("the References pencil edits only the references", async ({ page }) => {
   await openLibrary(page);
   await cards(page).filter({ hasText: "Original One" }).click();
   const s = sheet(page);
-  await s.getByRole("button", { name: "Edit references" }).click();
+  await s.getByRole("button", { name: "Change references" }).click();
   // Song details stay in view mode.
   await expect(s.getByLabel("Title")).toHaveCount(0);
   await s.getByRole("button", { name: "Add row" }).click();
@@ -186,7 +186,7 @@ test("the References pencil edits only the references", async ({ page }) => {
   await expect(s.getByTestId("references-edit")).toHaveCount(0);
   await expect(s.getByTestId("reference-text")).toContainText("A minor");
   await expect(
-    s.getByRole("button", { name: "Edit references" }),
+    s.getByRole("button", { name: "Change references" }),
   ).toBeVisible();
   await expect(
     s.getByRole("button", { name: "Edit", exact: true }),
