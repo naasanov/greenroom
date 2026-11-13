@@ -13,7 +13,7 @@ import {
   useGoogleIntegrations,
 } from "@/lib/queries/google";
 
-const RETURN_TO = "/settings";
+const RETURN_TO = "/settings?tab=connections";
 
 function Row({
   testId,
@@ -168,7 +168,7 @@ function DriveRow({ bandId }: { bandId: string }) {
   );
 }
 
-/** Admin Google area of Band settings: the Drive row. */
+/** Admin Google area of Connections settings: the Drive row. */
 export function GoogleSettings({ bandId }: { bandId: string }) {
   return (
     <div

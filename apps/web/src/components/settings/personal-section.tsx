@@ -9,7 +9,6 @@ import { userSchema, type UpdateProfile, type User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
 import { CalendarInvitesRow } from "@/components/settings/calendar-invites-row";
 import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
-import { SpotifyRow } from "@/components/settings/spotify-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { PhotoUpload } from "@/components/app/photo-upload";
 import { MemberAvatar } from "@/components/roster/member-avatar";
@@ -210,8 +209,6 @@ export function PersonalSection({
           Loading...
         </p>
       )}
-
-      <SpotifyRow />
 
       <Button
         variant="destructive"

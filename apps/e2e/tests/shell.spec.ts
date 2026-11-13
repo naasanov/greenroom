@@ -105,7 +105,7 @@ test("the band picker links straight to band settings", async ({
   await page.goto("/events");
   await page.getByRole("button", { name: /Switch band/ }).click();
   await page.getByRole("menuitem", { name: "Band settings" }).click();
-  await expect(page).toHaveURL(/\/settings(#settings-band)?$/);
+  await expect(page).toHaveURL(/\/settings\?tab=band$/);
   await expect(page.getByTestId("settings-band")).toBeVisible();
 });
 
@@ -159,10 +159,11 @@ test("Band section shows for admins and is hidden for members", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   await expect(page.getByTestId("settings-band")).toBeVisible();
   await expect(page.getByLabel("Band name")).toHaveValue("The Night Owls");
 
+  await page.getByRole("tab", { name: "Profile" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
   // Leaves sign-in first so it can't redirect home once the new session exists.
@@ -172,6 +173,8 @@ test("Band section shows for admins and is hidden for members", async ({
   await expect(page.getByTestId("settings-name")).toHaveText(
     USERS.cleo.displayName,
   );
+  await page.getByRole("tab", { name: "Band" }).click();
+  await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
 });
 
