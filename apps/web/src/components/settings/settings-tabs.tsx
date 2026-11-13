@@ -46,7 +46,7 @@ export function SettingsTabBar({
   };
 
   return (
-    <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
+    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+1px)] z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
       <div
         role="tablist"
         aria-label="Settings sections"
