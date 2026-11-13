@@ -1,5 +1,5 @@
 import type { BandSeedResult } from "@greenroom/db";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
 import { agendaSheet, openAgenda } from "./agenda-helpers.js";
 import { AVA, eventIn, pickSide, showGigDate } from "./events-helpers.js";
@@ -89,6 +89,39 @@ test("clicking a setlist song opens its sheet; the drag handle does not", async 
   await expect(page.getByRole("dialog", { name: title })).toHaveCount(0);
   await row.getByTestId("setlist-row-open").click();
   await expect(page.getByRole("dialog", { name: title })).toBeVisible();
+});
+
+test("a song sheet opened from a gig setlist switches songs and closes on an outside press", async ({
+  page,
+  isMobile,
+}) => {
+  await openClub(page);
+  const rows = page.getByTestId("setlist-row");
+  const titleOf = async (i: number) =>
+    (
+      await rows.nth(i).locator("span.font-semibold").first().innerText()
+    ).trim();
+  const first = await titleOf(0);
+  const second = await titleOf(1);
+  // On phones the sheet fills the bottom 60dvh, so targets are scrolled to the top first.
+  const reveal = async (target: Locator) => {
+    if (isMobile) await target.evaluate((el) => el.scrollIntoView());
+  };
+  const sheet = (name: string) => page.getByRole("dialog", { name });
+  await reveal(rows.nth(0));
+  await rows.nth(0).getByTestId("setlist-row-open").click();
+  await expect(sheet(first)).toBeVisible();
+  await reveal(rows.nth(1));
+  await rows.nth(1).getByTestId("setlist-row-open").click();
+  await expect(sheet(second)).toBeVisible();
+  await expect(sheet(first)).toHaveCount(0);
+  // An outside press on a real control closes the sheet and still activates it.
+  const toggle = page.getByRole("switch", { name: "Show on public calendar" });
+  await reveal(toggle);
+  const before = await toggle.getAttribute("aria-checked");
+  await toggle.click();
+  await expect(page.getByRole("dialog", { name: second })).toHaveCount(0);
+  await expect(toggle).not.toHaveAttribute("aria-checked", before!);
 });
 
 test("pressing the FAB twice closes the create drawer instead of reopening it", async ({

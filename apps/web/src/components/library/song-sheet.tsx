@@ -25,6 +25,7 @@ import { MediaThumb, isVideo } from "@/components/media/media-tile";
 import { MediaViewer } from "@/components/media/media-viewer";
 import { Button } from "@/components/ui/button";
 import { useSongMedia } from "@/lib/queries/uploads";
+import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import {
   DuplicateSongError,
@@ -38,6 +39,7 @@ import {
 import { SongFiles } from "./song-files";
 import { CandidatePreview } from "./candidate-preview";
 import { SmartInput } from "./smart-input";
+import { SongLinkEditor } from "./song-link-editor";
 import { SongForm } from "./song-form";
 import {
   formatDuration,
@@ -99,14 +101,19 @@ function valuesFromSong(song: SongDetail): SongFormValues {
 
 function Section({
   label,
+  action,
   children,
 }: {
   label: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="text-sm font-medium">{label}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">{label}</h3>
+        {action}
+      </div>
       {children}
     </section>
   );
@@ -247,6 +254,71 @@ function DetailSkeleton({ error }: { error: boolean }) {
   );
 }
 
+/** The reference links, with their own pencil that edits and saves only the links. */
+function ReferencesSection({
+  bandId,
+  song,
+}: {
+  bandId: string;
+  song: SongDetail;
+}) {
+  const update = useUpdateSong(bandId, song.id);
+  const [rows, setRows] = useState<SongFormValues["references"] | null>(null);
+  const save = () => {
+    if (!rows) return;
+    const { references } = toSongBody({
+      ...valuesFromSong(song),
+      references: rows,
+    });
+    update.mutate({ references }, { onSuccess: () => setRows(null) });
+  };
+  return (
+    <Section
+      label="Reference"
+      action={
+        rows ? null : (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Change references"
+            className="-my-1.5"
+            onClick={() => setRows(valuesFromSong(song).references)}
+          >
+            <Pencil />
+          </Button>
+        )
+      }
+    >
+      {rows ? (
+        <div data-testid="references-edit" className="flex flex-col gap-3">
+          <SongLinkEditor rows={rows} onChange={setRows} />
+          {update.isError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Could not save your changes. Please try again.
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={update.isPending} onClick={save}>
+              {update.isPending ? "Saving..." : "Save references"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setRows(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <LinkList
+          rows={song.references.map((r) => ({
+            id: r.id,
+            label: r.label,
+            value: r.value,
+          }))}
+        />
+      )}
+    </Section>
+  );
+}
+
 /** Renders the summary fields at once; detail-only sections fill in later. */
 function SongView({
   bandId,
@@ -281,15 +353,7 @@ function SongView({
       </Section>
       {detail ? (
         <>
-          <Section label="Reference">
-            <LinkList
-              rows={detail.references.map((r) => ({
-                id: r.id,
-                label: r.label,
-                value: r.value,
-              }))}
-            />
-          </Section>
+          <ReferencesSection key={detail.id} bandId={bandId} song={detail} />
           <Section label="Notes">
             {detail.notes ? (
               <p className="text-sm whitespace-pre-wrap">{detail.notes}</p>
@@ -297,6 +361,8 @@ function SongView({
               <p className="text-sm text-muted-foreground">No notes.</p>
             )}
           </Section>
+          <SongVideos bandId={bandId} songId={song.id} songTitle={song.title} />
+          <SongFiles bandId={bandId} songId={song.id} />
           <Section label="Used in">
             {detail.usedIn.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -343,8 +409,6 @@ function SongView({
               </p>
             ) : null}
           </Section>
-          <SongVideos bandId={bandId} songId={song.id} songTitle={song.title} />
-          <SongFiles bandId={bandId} songId={song.id} />
         </>
       ) : (
         <DetailSkeleton error={detailError} />
@@ -370,6 +434,7 @@ export function SongSheet({
   onDirtyChange,
   initialText,
   className,
+  nonModal = false,
 }: {
   bandId: string;
   target: SheetTarget;
@@ -386,6 +451,8 @@ export function SongSheet({
   /** Prefills the add flow's smart input. */
   initialText?: string;
   className?: string;
+  /** Treats a press outside the sheet as a dismissal on every viewport, not only desktop. */
+  nonModal?: boolean;
 }) {
   const adding = target.kind === "add";
   const songId = target.kind === "song" ? target.id : null;
@@ -491,13 +558,13 @@ export function SongSheet({
     );
   }
 
-  // On desktop the sheet is non-modal: a press on a song row switches songs
-  // (the row handles it); a press anywhere else outside the sheet closes it.
+  // The sheet is non-modal on desktop, or everywhere when `nonModal`: a press on
+  // a song row switches songs (the row handles it); any other outside press closes it.
   const closeRef = useRef(onRequestClose);
   useEffect(() => {
     closeRef.current = onRequestClose;
   });
-  const closeOnOutside = open && desktop && !adding && !editing;
+  const closeOnOutside = open && (desktop || nonModal) && !adding && !editing;
   useEffect(() => {
     if (!closeOnOutside) return;
     const onDown = (e: PointerEvent) => {
@@ -697,7 +764,10 @@ export function SongSheet({
   return (
     <>
       <RightSheet
-        className={className}
+        className={cn(
+          nonModal && "max-md:top-[40dvh] max-md:rounded-t-3xl",
+          className,
+        )}
         open={open}
         onOpenChange={(o) => !o && onRequestClose()}
         title={title}
