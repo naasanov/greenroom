@@ -116,14 +116,12 @@ export function BottomDrawer({
               ? (e) => {
                   if (e.detail.originalEvent.timeStamp < openedAt.current)
                     return;
-                  // A tab press navigates, which closes the drawer; closing
-                  // first would race that navigation and swallow it.
-                  if (
-                    (e.detail.originalEvent.target as Element | null)?.closest(
-                      'nav[aria-label="Primary"]',
-                    )
-                  )
-                    return;
+                  // A press on a tab that leads elsewhere navigates, which closes
+                  // the drawer; closing first would race and swallow it.
+                  const tab = (
+                    e.detail.originalEvent.target as Element | null
+                  )?.closest<HTMLAnchorElement>('nav[aria-label="Primary"] a');
+                  if (tab && tab.pathname !== window.location.pathname) return;
                   if (asideClose.current) return asideClose.current();
                   requestClose();
                 }
