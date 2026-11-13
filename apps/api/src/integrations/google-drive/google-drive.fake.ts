@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import {
+  DRIVE_EXPORT_MIME,
   DRIVE_FOLDER_MIME,
+  isNativeGoogleMime,
   type DriveChange,
   type DriveChangesResult,
   type DriveByteRange,
@@ -190,6 +192,16 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     const data = this.contents.get(fileId);
     if (!f || !data || f.mimeType === DRIVE_FOLDER_MIME)
       return { status: "not-found" };
+    if (isNativeGoogleMime(f.mimeType)) {
+      const pdf = Buffer.concat([Buffer.from("%PDF-fake "), data]);
+      return {
+        status: "ok",
+        stream: Readable.from([pdf]),
+        size: pdf.length,
+        name: `${f.name}.pdf`,
+        mimeType: DRIVE_EXPORT_MIME,
+      };
+    }
     if (range) {
       const start = range.start;
       const end = Math.min(range.end ?? data.length - 1, data.length - 1);
