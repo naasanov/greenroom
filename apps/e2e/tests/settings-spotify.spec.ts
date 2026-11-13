@@ -9,13 +9,13 @@ test.beforeEach(async ({ testApi, loginAs }) => {
 
 test("connect and disconnect Spotify from settings", async ({ page }) => {
   await fakeSpotifyConsent(page);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   const status = page.getByTestId("settings-spotify-status");
   await expect(status).toHaveText("Not connected");
   await page.getByRole("button", { name: "Connect Spotify" }).click();
   await expect(status).toHaveText(/^Connected as /);
   await expect(page.getByText("Spotify connected.")).toBeVisible();
-  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page).toHaveURL(/\/settings\?tab=connections$/);
 
   await page.getByRole("button", { name: "Disconnect" }).click();
   await page
@@ -27,7 +27,7 @@ test("connect and disconnect Spotify from settings", async ({ page }) => {
 
 test("a denied login shows an error in settings", async ({ page }) => {
   await fakeSpotifyConsent(page, "deny");
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await page.getByRole("button", { name: "Connect Spotify" }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Couldn't connect" }),
@@ -35,5 +35,5 @@ test("a denied login shows an error in settings", async ({ page }) => {
   await expect(page.getByTestId("settings-spotify-status")).toHaveText(
     "Not connected",
   );
-  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page).toHaveURL(/\/settings\?tab=connections$/);
 });

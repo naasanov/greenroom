@@ -21,7 +21,7 @@ test("a regular member leaves and the app switches to their other band", async (
   await api.put("/me/current-band", { data: { bandId: BANDS.nightOwls.id } });
   await api.dispose();
 
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   await expect(switcher(page, "The Night Owls")).toBeVisible();
   await page.getByRole("button", { name: "Leave The Night Owls" }).click();
   await page
@@ -39,14 +39,14 @@ test("the last admin sees the warning up front and cannot leave", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   await expect(
     page.getByRole("alert").filter({ hasText: "last admin" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Leave The Night Owls" }),
   ).toBeDisabled();
-  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page).toHaveURL(/\/settings\?tab=band$/);
   await expect(switcher(page, "The Night Owls")).toBeVisible();
 });
 
@@ -74,7 +74,7 @@ test("the only member must delete the band, typing its name to confirm", async (
   await testApi.seed("band");
   await loginAs(USERS.ben.email);
   // Ben's first band in the list is irrelevant: make Side Project current via the switcher.
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   if (!(await switcher(page, "Side Project").isVisible())) {
     await page.getByRole("button", { name: /Switch band/ }).click();
     await page.getByRole("menuitem", { name: /Side Project/ }).click();
@@ -102,7 +102,7 @@ test("leaving the only band returns to the start screen", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.cleo.email);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   await page.getByRole("button", { name: "Leave The Night Owls" }).click();
   await page
     .getByRole("alertdialog")

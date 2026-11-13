@@ -133,7 +133,7 @@ export function RoutedShell({ children }: { children: ReactNode }) {
         onCreateBand={() => setCreateOpen(true)}
         onBandSettings={
           currentBand.role === "admin"
-            ? () => router.push("/settings#settings-band")
+            ? () => router.push("/settings?tab=band")
             : undefined
         }
         activeTab={activeTab}
