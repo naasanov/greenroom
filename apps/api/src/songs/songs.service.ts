@@ -432,7 +432,7 @@ export class SongsService {
       ...practiceRows,
     ];
   }
-  /** The earliest practice occurrence, today or later, whose resolved setlist holds the song. */
+  /** The earliest practice occurrence that has not started yet, whose resolved setlist holds the song. */
   private async nextPractice(songId: string): Promise<UsedIn[]> {
     const withSong = (
       await this.db
@@ -464,7 +464,8 @@ export class SongsService {
         .from(practiceOccurrenceOverrides)
         .where(inArray(practiceOccurrenceOverrides.seriesId, hit)),
     ]);
-    const from = new Date();
+    const now = new Date();
+    const from = new Date(now);
     from.setUTCHours(0, 0, 0, 0);
     const to = new Date(from.getTime() + 400 * 86_400_000);
     let next: {
@@ -482,7 +483,7 @@ export class SongsService {
         to,
       );
       for (const ev of events) {
-        if (new Date(ev.startsAt) < from) continue;
+        if (new Date(ev.startsAt) < now) continue;
         const setlistId = resolveAssignment(
           rows,
           new Date(ev.originalStart),

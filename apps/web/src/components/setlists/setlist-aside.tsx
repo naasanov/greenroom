@@ -424,6 +424,7 @@ function AddSongSheet({
     <>
       <DialogPrimitive.Root open modal={false}>
         <DialogPrimitive.Portal>
+          {/* Inline style: Radix sets pointer-events:auto inline under a modal drawer, which a class cannot override. */}
           <DialogPrimitive.Content
             aria-describedby={undefined}
             onInteractOutside={(e) => e.preventDefault()}
@@ -431,7 +432,8 @@ function AddSongSheet({
               e.preventDefault();
               requestClose();
             }}
-            className="pointer-events-none fixed inset-0 z-[60] outline-none [&>aside]:pointer-events-auto"
+            style={{ pointerEvents: "none" }}
+            className="fixed inset-0 z-[60] outline-none [&>aside]:pointer-events-auto"
           >
             <DialogPrimitive.Title className="sr-only">
               {sheet.songId ? "Song" : title}

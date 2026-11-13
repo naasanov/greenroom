@@ -280,7 +280,7 @@ function ReferencesSection({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Edit references"
+            aria-label="Change references"
             className="-my-1.5"
             onClick={() => setRows(valuesFromSong(song).references)}
           >
