@@ -2,6 +2,7 @@
 name: local-run-gotchas
 description: Full e2e runs that cross local midnight fail date-relative specs; `pnpm format` rewrites files; WebKit crashes on the factory
 type: project
+applies-to: apps/e2e/**
 ---
 
 - A full `pnpm test:e2e` run (about 18 min) that crosses local midnight fails ~30 calendar, agenda, and event drawer specs, because seeds and the app compute "today" at different moments. Rerun the failed files before treating them as regressions (seen 2026-10-22).
