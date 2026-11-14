@@ -31,6 +31,7 @@ import {
   type FakeIssue,
   type SentCalendarInvite,
   type SentMagicLink,
+  SuggestionLookupState,
 } from "../integrations/index.js";
 
 // To add a control: inject nothing new, read/mutate the fake on `this.registry`,
@@ -44,6 +45,7 @@ export class TestingController {
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
     private readonly driveCache: DriveAncestryCache,
+    private readonly lookupState: SuggestionLookupState,
     private readonly invites: CalendarInviteService,
     private readonly inviteQueue: CalendarInviteQueue,
     private readonly inbound: CalendarInviteInboundService,
@@ -55,6 +57,7 @@ export class TestingController {
     await resetDatabase(this.db);
     this.registry.resetAll();
     this.driveCache.clear();
+    this.lookupState.reset();
     this.inviteQueue.reset();
     return { ok: true };
   }
@@ -69,6 +72,7 @@ export class TestingController {
     }
     this.registry.resetAll();
     this.driveCache.clear();
+    this.lookupState.reset();
     this.inviteQueue.reset();
     return seedScenario(this.db, body.scenario);
   }
@@ -212,5 +216,57 @@ export class TestingController {
     trackIds: string[];
   }[] {
     return this.registry.spotify.createdPlaylists();
+  }
+
+  /** Seeds the Odesli fake: links (platform to URL) for a source URL. */
+  @Post("odesli/seed")
+  @HttpCode(200)
+  seedOdesli(
+    @Body() body: { sourceUrl: string; links: Record<string, string> },
+  ): {
+    ok: true;
+  } {
+    this.registry.odesli.seedLinks(body.sourceUrl, body.links);
+    return { ok: true };
+  }
+
+  /** Makes the Odesli and/or Songsterr fake fail every lookup. */
+  @Post("suggestions/failing")
+  @HttpCode(200)
+  setSuggestionsFailing(
+    @Body() body: { odesli?: boolean; songsterr?: boolean },
+  ): {
+    ok: true;
+  } {
+    if (body.odesli !== undefined) this.registry.odesli.setFailing(body.odesli);
+    if (body.songsterr !== undefined) {
+      this.registry.songsterr.setFailing(body.songsterr);
+    }
+    return { ok: true };
+  }
+
+  /** Seeds the Songsterr fake with a song's bass and/or guitar tab URLs. */
+  @Post("songsterr/seed")
+  @HttpCode(200)
+  seedSongsterr(
+    @Body()
+    body: {
+      title: string;
+      artist: string;
+      bass?: string;
+      guitar?: string;
+    },
+  ): { ok: true } {
+    this.registry.songsterr.seedTabs(body);
+    return { ok: true };
+  }
+
+  /** Lookups the Odesli and Songsterr fakes received since the last reset. */
+  @Get("suggestions/calls")
+  suggestionCalls(): { odesli: string[]; songsterr: string[] } {
+    return {
+      odesli: this.registry.odesli.lookups(),
+      songsterr: this.registry.songsterr.lookups(),
+    };
   }
 }

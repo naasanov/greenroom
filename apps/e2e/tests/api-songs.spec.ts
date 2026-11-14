@@ -34,7 +34,6 @@ async function bandWithClient(testApi: TestApi, email = "a@example.com") {
 interface Created {
   id: string;
   title: string;
-  suggestedReference: { label: string; value: string } | null;
 }
 
 async function addSong(
@@ -88,7 +87,6 @@ test("CRUD with ordered references and soft delete", async ({ testApi }) => {
       { label: "Chart", value: "https://example.com/chart" },
     ],
   });
-  expect(created.suggestedReference).toBeNull();
 
   const got = await (await api.get(`${base}/${created.id}`)).json();
   expect(got).toMatchObject({
@@ -499,39 +497,76 @@ test("YouTube links fill the duration on create and on link edit when empty", as
   expect(kept.durationSeconds).toBe(3725);
 });
 
-test("create suggests a Songsterr tab without saving it", async ({
+test("suggest-references returns whitelisted links and tabs, never saved", async ({
   testApi,
 }) => {
   const { api, base } = await bandWithClient(testApi);
-  const tab =
-    "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1";
-
-  const hit = await addSong(api, base, {
-    title: "Mr. Brightside",
-    artist: "The Killers",
+  const source = "https://open.spotify.com/track/abc";
+  await testApi.seedOdesli(source, {
+    appleMusic: "https://music.apple.com/x",
+    tidal: "https://tidal.com/x",
   });
-  expect(hit.suggestedReference).toEqual({ label: "Songsterr", value: tab });
-  const stored = await (await api.get(`${base}/${hit.id}`)).json();
+  const hit = await api.post(`${base}/suggest-references`, {
+    data: {
+      title: "Mr. Brightside",
+      artist: "The Killers",
+      sourceUrl: source,
+    },
+  });
+  expect(hit.status()).toBe(200);
+  expect((await hit.json()).suggestions).toEqual([
+    {
+      key: "appleMusic",
+      label: "Apple Music",
+      value: "https://music.apple.com/x",
+    },
+    {
+      key: "guitarTabs",
+      label: "Guitar tabs",
+      value:
+        "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1t0",
+    },
+  ]);
+
+  const miss = await api.post(`${base}/suggest-references`, {
+    data: { title: "Totally Original" },
+  });
+  expect((await miss.json()).suggestions).toEqual([]);
+
+  // Lookup failures are silent: still 200 with no suggestions.
+  await testApi.failSuggestions({ odesli: true, songsterr: true });
+  const failed = await api.post(`${base}/suggest-references`, {
+    data: { title: "Seven Nation Army", sourceUrl: "https://x.test/other" },
+  });
+  expect(failed.status()).toBe(200);
+  expect((await failed.json()).suggestions).toEqual([]);
+
+  const created = await addSong(api, base, { title: "Mr. Brightside" });
+  const stored = await (await api.get(`${base}/${created.id}`)).json();
   expect(stored.references).toEqual([]);
+  await api.dispose();
+});
 
-  const miss = await addSong(api, base, { title: "Totally Original" });
-  expect(miss.suggestedReference).toBeNull();
+test("Odesli lookups are cached and throttled under the free limit", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const ask = (n: number) =>
+    api.post(`${base}/suggest-references`, {
+      data: { title: "T", sourceUrl: `https://open.spotify.com/track/t${n}` },
+    });
+  await testApi.seedOdesli("https://open.spotify.com/track/t0", {
+    appleMusic: "https://music.apple.com/t0",
+  });
+  const first = await (await ask(0)).json();
+  const again = await (await ask(0)).json();
+  expect(again).toEqual(first);
+  expect((await testApi.suggestionCalls()).odesli).toHaveLength(1);
 
-  // No suggestion when the song already carries a Songsterr row.
-  const has = await addSong(api, base, {
-    title: "Seven Nation Army",
-    artist: "The White Stripes",
-    references: [{ label: "songsterr", value: "https://x.test/tab" }],
-  });
-  expect(has.suggestedReference).toBeNull();
-
-  const direct = await api.post(`${base}/suggest-tab`, {
-    data: { title: "Seven Nation Army", artist: "White Stripes" },
-  });
-  expect(direct.status()).toBe(200);
-  expect((await direct.json()).suggestedReference).toMatchObject({
-    label: "Songsterr",
-  });
+  for (let n = 1; n <= 14; n++) await ask(n);
+  const calls = (await testApi.suggestionCalls()).odesli;
+  expect(calls.length).toBeGreaterThan(1);
+  expect(calls.length).toBeLessThan(10);
   await api.dispose();
 });
 

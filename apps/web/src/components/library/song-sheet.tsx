@@ -11,7 +11,6 @@ import type {
   SongCreated,
   SongDetail,
   SongSummary,
-  SuggestedReference,
 } from "@greenroom/shared";
 import {
   ConfirmDialog,
@@ -469,11 +468,6 @@ export function SongSheet({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [offer, setOffer] = useState<{
-    songId: string;
-    ref: SuggestedReference;
-  } | null>(null);
-  const [dismissedTab, setDismissedTab] = useState<string | null>(null);
   if (resetKey !== prevKey) {
     setPrevKey(resetKey);
     setEditing(false);
@@ -511,14 +505,6 @@ export function SongSheet({
       {
         onSuccess: (created) => {
           handleDirty(false);
-          const ref = created.suggestedReference;
-          if (
-            ref &&
-            ref.value !== dismissedTab &&
-            !created.references.some((r) => r.value === ref.value)
-          ) {
-            setOffer({ songId: created.id, ref });
-          }
           onCreated(created);
         },
         onError: (e) => {
@@ -543,19 +529,6 @@ export function SongSheet({
       if (!next) handleDirty(false);
       setEditing(next);
     }
-  }
-
-  function addOfferedTab() {
-    if (!song || !offer) return;
-    update.mutate(
-      {
-        references: [
-          ...song.references.map(({ label, value }) => ({ label, value })),
-          offer.ref,
-        ],
-      },
-      { onSuccess: () => setOffer(null) },
-    );
   }
 
   // The sheet is non-modal on desktop, or everywhere when `nonModal`: a press on
@@ -645,10 +618,8 @@ export function SongSheet({
         bandId={bandId}
         defaults={draft.values}
         art={draft.meta.imageUrl}
-        suggestTab
         onSubmit={(v) => submitCreate(v, false)}
         onDirtyChange={handleDirty}
-        onDismissTab={setDismissedTab}
         notice={
           duplicateId ? (
             <div
@@ -706,7 +677,6 @@ export function SongSheet({
         bandId={bandId}
         defaults={valuesFromSong(song)}
         art={songArt(song)}
-        suggestTab={false}
         onSubmit={submitEdit}
         onDirtyChange={handleDirty}
         notice={
@@ -730,25 +700,6 @@ export function SongSheet({
   } else {
     body = (
       <div className="flex flex-col gap-5">
-        {song && offer && offer.songId === song.id ? (
-          <div
-            data-testid="songsterr-offer"
-            className="flex items-center gap-2 rounded-2xl bg-gig-soft px-3 py-2 text-sm text-gig-soft-foreground"
-          >
-            <span className="flex-1">Found a tab on Songsterr. Add it?</span>
-            <Button type="button" size="sm" onClick={addOfferedTab}>
-              Add tab
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOffer(null)}
-            >
-              No thanks
-            </Button>
-          </div>
-        ) : null}
         <SongView
           bandId={bandId}
           song={shown}

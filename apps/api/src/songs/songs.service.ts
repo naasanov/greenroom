@@ -37,19 +37,13 @@ import {
   type SongCreated,
   type SongDetail,
   type SongSummary,
-  type SuggestedReference,
   type UpdateSong,
   type UsedIn,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { resolveAssignment } from "../events/assignment.js";
 import { expandSeries } from "../events/occurrences.js";
-import {
-  SONGSTERR,
-  YOUTUBE,
-  type SongsterrAdapter,
-  type YoutubeAdapter,
-} from "../integrations/index.js";
+import { YOUTUBE, type YoutubeAdapter } from "../integrations/index.js";
 import { SongIndex } from "./song-match.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -58,15 +52,12 @@ type SongRow = typeof songs.$inferSelect;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const SONGSTERR_LABEL = "Songsterr";
-
 const escapeLike = (s: string): string => s.replace(/[\\%_]/g, "\\$&");
 
 @Injectable()
 export class SongsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
-    @Inject(SONGSTERR) private readonly songsterr: SongsterrAdapter,
     @Inject(YOUTUBE) private readonly youtube: YoutubeAdapter,
   ) {}
 
@@ -181,13 +172,7 @@ export class SongsService {
       await this.insertReferences(tx, created!.id, input.references ?? []);
       return created!;
     });
-    const detail = await this.detail(row);
-    const suggestedReference = detail.references.some(
-      (r) => r.label.toLowerCase() === SONGSTERR_LABEL.toLowerCase(),
-    )
-      ? null
-      : await this.suggestTab(input.title, input.artist ?? undefined);
-    return { ...detail, suggestedReference };
+    return this.detail(row);
   }
 
   // ---- update ----
@@ -274,19 +259,6 @@ export class SongsService {
     },
   ): Promise<string | null> {
     return (await this.index(bandId)).find(input);
-  }
-
-  async suggestTab(
-    title: string,
-    artist?: string,
-  ): Promise<SuggestedReference | null> {
-    try {
-      const hit = await this.songsterr.searchTab({ title, artist });
-      return hit ? { label: SONGSTERR_LABEL, value: hit.url } : null;
-    } catch {
-      // A failed lookup only loses the suggestion.
-      return null;
-    }
   }
 
   // ---- internals ----

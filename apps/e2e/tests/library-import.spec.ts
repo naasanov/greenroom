@@ -107,3 +107,21 @@ test("the Your library mode searches existing songs without importing", async ({
     .fill("zzzz-nothing");
   await expect(dialog).toContainText("No songs in your library match.");
 });
+
+test("bulk import does no reference-suggestion lookups", async ({
+  page,
+  testApi,
+}) => {
+  await openLibrary(page);
+  await fabAction(page, "import-playlist");
+  const dialog = page.getByRole("dialog", { name: "Import playlist" });
+  await dialog
+    .getByRole("textbox", { name: "Playlist link" })
+    .fill("https://open.spotify.com/playlist/fakePlaylistPublic");
+  await dialog.getByRole("button", { name: "Import" }).click();
+  await expect(dialog.getByTestId("import-summary")).toContainText("3 added");
+  expect(await testApi.suggestionCalls()).toEqual({
+    odesli: [],
+    songsterr: [],
+  });
+});

@@ -1,5 +1,9 @@
-import type { SongSort } from "@greenroom/shared";
-import { songSortSchema } from "@greenroom/shared";
+import {
+  SUGGESTIBLE_REFERENCES,
+  songSortSchema,
+  type ReferenceSuggestion,
+  type SongSort,
+} from "@greenroom/shared";
 
 export const SORT_LABELS: Record<SongSort, string> = {
   recent: "Recently added",
@@ -88,4 +92,57 @@ function hostOf(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** A link the song was resolved from; Spotify first, else any http(s) row. */
+export function sourceUrlOf(rows: { value: string }[]): string | null {
+  const urls = rows
+    .map((r) => r.value.trim())
+    .filter((v) => /^https?:\/\//i.test(v));
+  return (
+    urls.find((u) => /^https?:\/\/open\.spotify\.com\//i.test(u)) ??
+    urls[0] ??
+    null
+  );
+}
+
+export const MAX_SUGGESTION_CHIPS = 4;
+
+const hostOfUrl = (value: string): string | null => {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Drops suggestions the song already has, puts references the band has used
+ * as keys first, breaks ties by whitelist order, and keeps the first four.
+ */
+export function rankSuggestions(
+  suggestions: ReferenceSuggestion[],
+  rows: { label: string; value: string }[],
+  usedLabels: string[],
+): ReferenceSuggestion[] {
+  const used = new Set(usedLabels.map((l) => l.trim().toLowerCase()));
+  const order = (key: string) =>
+    SUGGESTIBLE_REFERENCES.findIndex((r) => r.key === key);
+  const isTab = (key: string) =>
+    SUGGESTIBLE_REFERENCES.some((r) => r.key === key && "songsterr" in r);
+  const hasIt = (s: ReferenceSuggestion) =>
+    rows.some((r) => {
+      const value = r.value.trim();
+      if (r.label.trim().toLowerCase() === s.label.toLowerCase()) return true;
+      if (value === s.value) return true;
+      // Streaming links on the same service count as the same reference.
+      const host = hostOfUrl(s.value);
+      return !isTab(s.key) && host !== null && hostOfUrl(value) === host;
+    });
+  const rank = (s: ReferenceSuggestion) =>
+    used.has(s.label.toLowerCase()) ? 0 : 1;
+  return suggestions
+    .filter((s) => order(s.key) >= 0 && !hasIt(s))
+    .sort((a, b) => rank(a) - rank(b) || order(a.key) - order(b.key))
+    .slice(0, MAX_SUGGESTION_CHIPS);
 }
