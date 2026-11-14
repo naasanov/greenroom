@@ -2,6 +2,7 @@
 name: fly-infra-gotchas
 description: Non-obvious Fly.io/Cloudflare facts for greenroom staging (merged deploy token format, flyctl path, DNS-only CNAMEs, db has no IPs)
 type: project
+applies-to: infra/fly/**, .github/workflows/**
 ---
 
 Learned while standing up staging on 2026-10-19:

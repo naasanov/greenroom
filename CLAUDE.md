@@ -11,6 +11,10 @@ A web app that is a small band's home base: gigs and practices on a shared calen
 - Docs and memory (`CLAUDE.md`, `docs/`, `memory/`) are the orchestrator's to write.
 - Never trust a subagent's self-report: read the diff, rerun build/typecheck/lint/tests, and verify UI at runtime before marking a task Done.
 
+## Factory pipeline sessions
+
+Sessions started by the factory pipeline (the box's nightly build and morning triage) follow their pipeline prompt, which overrides this file where they conflict: they work on `factory/*` branches through PRs, ship through the pipeline's deploy steps, and skip `docs/execution-plan.md`. Everything else here (conventions, commands, memory) still applies. They also record lessons in `memory/` (see `applies-to` in `memory/MEMORY.md`).
+
 ## Session start checklist
 
 1. Read `memory/MEMORY.md` and any entries relevant to the work.

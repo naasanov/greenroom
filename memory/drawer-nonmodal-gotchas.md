@@ -2,6 +2,7 @@
 name: drawer-nonmodal-gotchas
 description: How non-modal Vaul drawers work here (Radix stays modal underneath) and the pitfalls the calendar/agenda UI must design around
 type: project
+applies-to: apps/web/src/components/**
 ---
 
 Drawers became non-modal on 2026-10-20 (Gate 1 feedback). Vaul 1.1.2's `modal={false}` does not reach the Radix Dialog it wraps, so `components/ui/drawer.tsx` undoes Radix's modal side effects by hand (body pointer-events, `aria-hidden` on the page) and implements outside-tap close itself. Guarded drawers (`dismissible={false}` + `onDismissAttempt`) swallow the outside click in the capture phase.
