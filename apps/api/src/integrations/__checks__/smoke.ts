@@ -224,9 +224,10 @@ async function main(): Promise<void> {
     "not-found",
   );
   assert.ok(
-    await songsterr.searchTab({ title: "Mr. Brightside", artist: "Killers" }),
+    (await songsterr.findTabs({ title: "Mr. Brightside", artist: "Killers" }))
+      ?.guitar,
   );
-  assert.equal(await songsterr.searchTab({ title: "Nothing" }), null);
+  assert.deepEqual(await songsterr.findTabs({ title: "Nothing" }), {});
   const issue = await gh.createIssue({
     title: "t",
     body: "b",

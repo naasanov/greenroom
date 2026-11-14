@@ -3,6 +3,7 @@ import { FakeGithubAdapter } from "./github/github.fake.js";
 import { FakeGoogleDriveAdapter } from "./google-drive/google-drive.fake.js";
 import { FakeGoogleOAuthAdapter } from "./google-oauth/google-oauth.fake.js";
 import { FakeGooglePlacesAdapter } from "./google-places/google-places.fake.js";
+import { FakeOdesliAdapter } from "./odesli/odesli.fake.js";
 import { FakeSongsterrAdapter } from "./songsterr/songsterr.fake.js";
 import { FakeSpotifyAdapter } from "./spotify/spotify.fake.js";
 import { FakeYoutubeAdapter } from "./youtube/youtube.fake.js";
@@ -15,6 +16,7 @@ export class FakeIntegrationsRegistry {
   readonly spotify = new FakeSpotifyAdapter();
   readonly youtube = new FakeYoutubeAdapter();
   readonly songsterr = new FakeSongsterrAdapter();
+  readonly odesli = new FakeOdesliAdapter();
   readonly github = new FakeGithubAdapter();
   readonly email = new FakeEmailAdapter();
 
@@ -25,6 +27,7 @@ export class FakeIntegrationsRegistry {
     this.spotify.reset();
     this.youtube.reset();
     this.songsterr.reset();
+    this.odesli.reset();
     this.github.reset();
     this.email.reset();
   }

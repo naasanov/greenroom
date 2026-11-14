@@ -1,15 +1,28 @@
 import { Logger } from "@nestjs/common";
-import type { SongsterrAdapter } from "./songsterr.adapter.js";
+import type { SongsterrAdapter, SongsterrTabs } from "./songsterr.adapter.js";
 
 const log = new Logger("SongsterrAdapter");
 const SEARCH_URL = "https://www.songsterr.com/api/songs";
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 4000;
 
-interface SongsterrHit {
-  id?: unknown;
-  title?: unknown;
-  artist?: unknown;
+interface Hit {
+  songId?: number;
+  id?: number;
+  title: string;
+  artist: string | { name: string };
+  tracks?: { instrument?: unknown; name?: unknown }[];
 }
+
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null;
+
+const isHit = (v: unknown): v is Hit =>
+  isObj(v) &&
+  typeof v.title === "string" &&
+  (typeof v.artist === "string" ||
+    (isObj(v.artist) && typeof v.artist.name === "string")) &&
+  (v.tracks === undefined ||
+    (Array.isArray(v.tracks) && v.tracks.every(isObj)));
 
 const norm = (s: string): string =>
   s
@@ -19,23 +32,14 @@ const norm = (s: string): string =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-const artistName = (a: unknown): string => {
-  if (typeof a === "string") return a;
-  if (a && typeof a === "object" && "name" in a) {
-    const name = (a as { name: unknown }).name;
-    return typeof name === "string" ? name : "";
-  }
-  return "";
-};
-
-/** Searches Songsterr's public endpoint; any failure means no suggestion. */
+/** Searches Songsterr's unofficial endpoint; any failure means no tabs. */
 export class RealSongsterrAdapter implements SongsterrAdapter {
-  async searchTab(input: {
+  async findTabs(input: {
     title: string;
     artist?: string;
-  }): Promise<{ url: string } | null> {
+  }): Promise<SongsterrTabs | null> {
     const title = norm(input.title);
-    if (!title) return null;
+    if (!title) return {};
     const artist = input.artist ? norm(input.artist) : "";
     try {
       const pattern = `${input.title} ${input.artist ?? ""}`.trim();
@@ -47,22 +51,14 @@ export class RealSongsterrAdapter implements SongsterrAdapter {
         log.warn(`tab search failed status=${res.status}`);
         return null;
       }
-      const hits = (await res.json()) as SongsterrHit[];
-      if (!Array.isArray(hits)) return null;
-      const hit = hits.find((h) => {
-        if (typeof h.id !== "number" || typeof h.title !== "string") {
-          return false;
-        }
-        if (norm(h.title) !== title) return false;
-        return !artist || norm(artistName(h.artist)).includes(artist);
-      });
-      if (!hit) return null;
-      const slug = norm(`${artistName(hit.artist)} ${hit.title as string}`)
-        .replace(/ /g, "-")
-        .slice(0, 120);
-      return {
-        url: `https://www.songsterr.com/a/wsa/${slug}-tab-s${hit.id as number}`,
-      };
+      const body: unknown = await res.json();
+      if (!Array.isArray(body) || !body.every(isHit)) return null;
+      const hit = body.find(
+        (h) =>
+          norm(h.title) === title &&
+          (!artist || norm(artistName(h.artist)).includes(artist)),
+      );
+      return hit ? tabsFor(hit) : {};
     } catch (err) {
       log.warn(
         `tab search errored: ${err instanceof Error ? err.message : String(err)}`,
@@ -70,4 +66,29 @@ export class RealSongsterrAdapter implements SongsterrAdapter {
       return null;
     }
   }
+}
+
+const strOf = (v: unknown): string => (typeof v === "string" ? v : "");
+
+const artistName = (a: Hit["artist"]): string =>
+  typeof a === "string" ? a : a.name;
+
+function tabsFor(hit: Hit): SongsterrTabs {
+  const id = hit.songId ?? hit.id;
+  if (id === undefined) return {};
+  const slug = norm(`${artistName(hit.artist)} ${hit.title}`)
+    .replace(/ /g, "-")
+    .slice(0, 120);
+  const tracks = hit.tracks ?? [];
+  const find = (match: (kind: string) => boolean): number =>
+    tracks.findIndex((t) =>
+      match(norm(`${strOf(t.instrument)} ${strOf(t.name)}`)),
+    );
+  const bass = find((k) => k.includes("bass"));
+  const guitar = find((k) => k.includes("guitar") && !k.includes("bass"));
+  const base = `https://www.songsterr.com/a/wsa/${slug}`;
+  return {
+    ...(bass >= 0 ? { bass: `${base}-bass-tab-s${id}t${bass}` } : {}),
+    ...(guitar >= 0 ? { guitar: `${base}-tab-s${id}t${guitar}` } : {}),
+  };
 }

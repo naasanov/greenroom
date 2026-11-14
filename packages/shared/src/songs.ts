@@ -128,15 +128,7 @@ export interface ReferenceTag {
   count: number;
 }
 
-export interface SuggestedReference {
-  label: string;
-  value: string;
-}
-
-export interface SongCreated extends SongDetail {
-  /** A Songsterr tab for the new song, never saved automatically. */
-  suggestedReference: SuggestedReference | null;
-}
+export type SongCreated = SongDetail;
 
 export interface DeletedSong {
   id: string;
@@ -168,11 +160,34 @@ export interface ResolveResult {
   candidates: SongCandidate[];
 }
 
-export const suggestTabSchema = z.object({
+/**
+ * The only references the app suggests, in tie-break order (streaming
+ * platforms first, then tabs). `odesli` is the Odesli platform key and
+ * `songsterr` the tab instrument; adding a provider is one more entry.
+ */
+export const SUGGESTIBLE_REFERENCES = [
+  { key: "spotify", label: "Spotify", odesli: "spotify" },
+  { key: "youtubeMusic", label: "YouTube Music", odesli: "youtubeMusic" },
+  { key: "youtube", label: "YouTube", odesli: "youtube" },
+  { key: "appleMusic", label: "Apple Music", odesli: "appleMusic" },
+  { key: "bassTabs", label: "Bass tabs", songsterr: "bass" },
+  { key: "guitarTabs", label: "Guitar tabs", songsterr: "guitar" },
+] as const;
+export type SuggestibleKey = (typeof SUGGESTIBLE_REFERENCES)[number]["key"];
+
+export const suggestReferencesSchema = z.object({
   title: z.string().trim().min(1).max(300),
   artist: z.string().trim().max(300).optional(),
+  /** A link to the song on any platform; Odesli resolves the others from it. */
+  sourceUrl: z.string().trim().max(2048).optional(),
 });
-export type SuggestTab = z.infer<typeof suggestTabSchema>;
+export type SuggestReferences = z.infer<typeof suggestReferencesSchema>;
+
+export interface ReferenceSuggestion {
+  key: SuggestibleKey;
+  label: string;
+  value: string;
+}
 
 export const importPlaylistSchema = z.object({
   url: z.string().trim().min(1).max(2048),

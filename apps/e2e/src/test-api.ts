@@ -152,4 +152,35 @@ export class TestApi {
   > {
     return this.call("get", "spotify/created-playlists");
   }
+
+  /** Seeds the Odesli fake with platform links for a source URL. */
+  async seedOdesli(
+    sourceUrl: string,
+    links: Record<string, string>,
+  ): Promise<void> {
+    await this.call("post", "odesli/seed", { data: { sourceUrl, links } });
+  }
+
+  /** Seeds the Songsterr fake with a song's bass and/or guitar tab URLs. */
+  async seedSongsterr(tabs: {
+    title: string;
+    artist: string;
+    bass?: string;
+    guitar?: string;
+  }): Promise<void> {
+    await this.call("post", "songsterr/seed", { data: tabs });
+  }
+
+  /** Makes the Odesli and/or Songsterr fake fail every lookup. */
+  async failSuggestions(failing: {
+    odesli?: boolean;
+    songsterr?: boolean;
+  }): Promise<void> {
+    await this.call("post", "suggestions/failing", { data: failing });
+  }
+
+  /** Lookups the suggestion fakes received since the last reset. */
+  async suggestionCalls(): Promise<{ odesli: string[]; songsterr: string[] }> {
+    return this.call("get", "suggestions/calls");
+  }
 }
