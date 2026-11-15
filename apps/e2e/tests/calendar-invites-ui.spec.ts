@@ -51,16 +51,22 @@ test("a fresh member sees the two-option choice, with invites off", async ({
 
 test("the subscribe path shows the feed and instructions, and Back returns to the choice", async ({
   page,
+  isMobile,
 }) => {
   const dialog = await openDialog(page);
   await dialog.getByTestId("calendar-choice-feed").click();
   await expect(dialog.getByTestId("calendar-feed-url")).toHaveValue(
     /\/public\/calendar-feed\/[0-9a-f]{64}\.ics$/,
   );
-  await expect(dialog.getByTestId("calendar-feed-webcal")).toHaveAttribute(
-    "href",
-    /^webcal:\/\/.*\.ics$/,
-  );
+  await expect(dialog.getByTestId("calendar-feed-copy")).toBeVisible();
+  if (isMobile) {
+    await expect(dialog.getByTestId("calendar-feed-webcal")).toHaveAttribute(
+      "href",
+      /^webcal:\/\/.*\.ics$/,
+    );
+  } else {
+    await expect(dialog.getByTestId("calendar-feed-webcal")).toHaveCount(0);
+  }
   await expect(dialog.getByText("Other calendars")).toBeVisible({ timeout: 40_000 });
   await expect(dialog.getByText("Subscribe from web")).toBeVisible({ timeout: 40_000 });
   await expect(dialog.getByText("New Calendar Subscription")).toBeVisible({ timeout: 40_000 });
@@ -206,7 +212,9 @@ test("the banner shows for a fresh member and hides for a week once dismissed", 
   await page.goto("/events");
   const banner = page.getByTestId("calendar-banner");
   await expect(banner).toBeVisible({ timeout: 30_000 });
-  await expect(banner).toContainText("Optional");
+  await expect(banner).toContainText(
+    "Get gigs and practices in your calendar",
+  );
   await expect(banner).not.toContainText("Google");
   await banner.getByRole("button", { name: "Dismiss" }).click();
   await expect(banner).toBeHidden({ timeout: 40_000 });
