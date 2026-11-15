@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, Copy, ExternalLink, Mail, Rss } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ConfirmDialog } from "@/components/app/confirm-dialogs";
 import { FormField } from "@/components/app/form-field";
 import { Button } from "@/components/ui/button";
@@ -127,9 +127,27 @@ function EmailStep({
   );
 }
 
+const TOUCH_QUERY = "(pointer: coarse)";
+
+function subscribeTouch(onChange: () => void) {
+  const mq = window.matchMedia(TOUCH_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/** True on touch-primary devices; false during SSR. */
+function useIsTouch() {
+  return useSyncExternalStore(
+    subscribeTouch,
+    () => window.matchMedia(TOUCH_QUERY).matches,
+    () => false,
+  );
+}
+
 function FeedSection({ bandId }: { bandId: string }) {
   const feed = useCalendarFeed(bandId);
   const rotate = useRotateCalendarFeed(bandId);
+  const isTouch = useIsTouch();
   const [copied, setCopied] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,11 +185,16 @@ function FeedSection({ bandId }: { bandId: string }) {
         onFocus={(e) => e.currentTarget.select()}
       />
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={copy} disabled={!url}>
+        <Button
+          type="button"
+          data-testid="calendar-feed-copy"
+          onClick={copy}
+          disabled={!url}
+        >
           {copied ? <Check /> : <Copy />}
           {copied ? "Copied" : "Copy link"}
         </Button>
-        {feed.data ? (
+        {feed.data && isTouch ? (
           <Button variant="outline" asChild>
             <a href={feed.data.webcalUrl} data-testid="calendar-feed-webcal">
               <ExternalLink />
