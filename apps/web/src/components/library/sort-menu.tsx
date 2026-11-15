@@ -39,7 +39,7 @@ export function SortMenu({
           className={className}
         >
           <ArrowUpDown />
-          {iconOnly ? null : <span>Sort: {SORT_LABELS[sort]}</span>}
+          {iconOnly ? null : <span>{SORT_LABELS[sort]}</span>}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
