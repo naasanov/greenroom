@@ -404,7 +404,11 @@ test("the screen wake lock is held while uploading and released after", async ({
   await expect.poll(async () => (await wl()).requested).toBeGreaterThan(0);
   expect((await wl()).released).toBe(0);
   release();
-  await expect(utile(page, "w.png")).toHaveAttribute("data-status", "done");
+  // The tile leaves the tray as soon as the file reaches the gallery, so "done" can be missed.
+  await expect(utile(page, "w.png")).toHaveCount(0);
+  await expect
+    .poll(async () => (await mediaState()).unsorted.map((i) => i.name))
+    .toContain("w.png");
   await expect.poll(async () => (await wl()).released).toBeGreaterThan(0);
   await expect(page.getByTestId("upload-keep-open")).toHaveCount(0);
 });
