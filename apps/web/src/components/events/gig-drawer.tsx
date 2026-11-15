@@ -20,7 +20,10 @@ import { dayLabel, time12, timeRange } from "@/components/events/time";
 import { MediaSection } from "@/components/media/media-section";
 import { UploadLinkButton } from "@/components/media/upload-link-dialog";
 import { LineupAside } from "@/components/lineups/lineup-aside";
-import { LineupSection } from "@/components/lineups/lineup-section";
+import {
+  LineupMemberSheet,
+  LineupSection,
+} from "@/components/lineups/lineup-section";
 import {
   useLineupBuilder,
   type LineupBuilder,
@@ -275,11 +278,14 @@ export function GigDrawer({
     mode: setlist.mode,
     onOpenRoster: closeSetlistAsides,
   });
-  const { setRosterOpen } = lineup;
+  const { setRosterOpen, setMemberSheetId } = lineup;
   const setlistAsideOpen = setlist.libraryOpen || setlist.historyOpen;
   useEffect(() => {
-    if (setlistAsideOpen) setRosterOpen(false);
-  }, [setlistAsideOpen, setRosterOpen]);
+    if (setlistAsideOpen) {
+      setRosterOpen(false);
+      setMemberSheetId(null);
+    }
+  }, [setlistAsideOpen, setRosterOpen, setMemberSheetId]);
 
   const requestClose = () => (dirty ? setDiscard("close") : onClose());
   const requestCloseRef = useRef(requestClose);
@@ -310,6 +316,7 @@ export function GigDrawer({
             <>
               <SetlistAside builder={setlist} />
               <LineupAside builder={lineup} />
+              <LineupMemberSheet builder={lineup} />
             </>
           }
           onOpenChange={(open) => !open && onClose()}

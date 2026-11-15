@@ -15,20 +15,35 @@ export function PersonLine({
   person,
   member,
   left,
+  onOpenMember,
 }: {
   person: PersonData;
   /** The band member record, when known, for instrument icons. */
   member?: BandMember;
   left?: boolean;
+  /** Makes the name a button that opens the member's sheet. */
+  onOpenMember?: () => void;
 }) {
   const instruments = member ? memberInstruments(member) : [];
   return (
     <>
       <MemberAvatar member={person} letters={2} className="size-10" />
       <span className="flex min-w-0 flex-1 flex-col text-left">
-        <span className="truncate text-sm leading-tight font-semibold">
-          {person.displayName}
-        </span>
+        {onOpenMember ? (
+          <button
+            type="button"
+            onClick={onOpenMember}
+            className="w-fit max-w-full cursor-pointer rounded-sm text-left outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <span className="block truncate text-sm leading-tight font-semibold">
+              {person.displayName}
+            </span>
+          </button>
+        ) : (
+          <span className="truncate text-sm leading-tight font-semibold">
+            {person.displayName}
+          </span>
+        )}
         {left ? (
           <span
             data-testid="left-tag"

@@ -26,8 +26,8 @@ import { cn } from "@/lib/utils";
  * Holds the close handler of the aside that is open inside a BottomDrawer, so
  * the first outside press or Escape dismisses only the aside, not its parent.
  */
-const AsideDismissContext = createContext<
-  ((close: (() => void) | null) => void) | null
+export const AsideDismissContext = createContext<
+  ((close: (() => void) | null, owner?: () => void) => void) | null
 >(null);
 
 export interface BottomDrawerProps {
@@ -100,7 +100,9 @@ export function BottomDrawer({
   }, [isOpen]);
   // Every dismissal route funnels here so guarded drawers stay open.
   const asideClose = useRef<(() => void) | null>(null);
-  const registerAside = (close: (() => void) | null) => {
+  // Clearing with an owner only applies while that owner is still registered.
+  const registerAside = (close: (() => void) | null, owner?: () => void) => {
+    if (close === null && owner && asideClose.current !== owner) return;
     asideClose.current = close;
   };
   const requestClose = () =>
@@ -237,8 +239,9 @@ export function SideDrawer({
   const registerAside = useContext(AsideDismissContext);
   useEffect(() => {
     if (!registerAside || !open) return;
-    registerAside(() => onOpenChange(false));
-    return () => registerAside(null);
+    const close = () => onOpenChange(false);
+    registerAside(close);
+    return () => registerAside(null, close);
   }, [registerAside, open, onOpenChange]);
 
   if (!wide) {

@@ -22,6 +22,7 @@ export function MemberSheet({
   viewerIsAdmin,
   viewerId,
   onEdit,
+  placement,
 }: {
   bandId: string;
   member: BandMember | null;
@@ -30,6 +31,8 @@ export function MemberSheet({
   viewerIsAdmin: boolean;
   viewerId: string;
   onEdit?: () => void;
+  /** "contained" anchors the sheet inside a positioned parent such as a drawer. */
+  placement?: "fixed" | "contained";
 }) {
   const setRole = useSetMemberRole(bandId);
   const remove = useRemoveMember(bandId);
@@ -50,6 +53,7 @@ export function MemberSheet({
   return (
     <>
       <RightSheet
+        placement={placement}
         open={open}
         onOpenChange={(o) => {
           if (!o) setError(null);
