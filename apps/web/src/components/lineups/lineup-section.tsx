@@ -164,6 +164,9 @@ export function LineupMemberSheet({ builder }: { builder: LineupBuilder }) {
     return () => registerAside(null, close);
   }, [registerAside, open, close]);
 
+  // Mounted only while a member is selected so no idle right-sheet exists.
+  if (!member) return null;
+
   return (
     <MemberSheet
       bandId={builder.bandId}
