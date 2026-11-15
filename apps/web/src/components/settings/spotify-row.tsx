@@ -61,7 +61,7 @@ export function SpotifyRow() {
           ) : (
             <Button
               variant="outline"
-              onClick={() => connectSpotify("/settings")}
+              onClick={() => connectSpotify("/settings?tab=connections")}
             >
               Connect Spotify
             </Button>

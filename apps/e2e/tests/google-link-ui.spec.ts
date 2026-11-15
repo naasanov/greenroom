@@ -17,9 +17,12 @@ test("non-admins do not see band settings", async ({
 }) => {
   await context.clearCookies();
   await loginAs(USERS.ben.email);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Connections" }).click();
+  await expect(page.getByTestId("settings-spotify")).toBeVisible();
   await expect(page.getByTestId("settings-google")).toHaveCount(0);
 });
 
@@ -40,7 +43,7 @@ test("create a new Drive folder named after the band and see its name in setting
   await picker.getByRole("button", { name: "Confirm" }).click();
   await expect(picker).toBeHidden();
 
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await expect(page.getByTestId("settings-google-drive-detail")).toHaveText(
     "Folder: Gig photos",
   );
@@ -72,7 +75,7 @@ test("link Drive from a gig drawer, pick a folder, manage it in settings", async
   await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   await expect(drawer.getByTestId("media-add")).toHaveText("Add media");
 
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   const status = page.getByTestId("settings-google-drive-status");
   await expect(status).toHaveText("Linked as band@example.com");
   await expect(page.getByTestId("settings-google-drive-detail")).toHaveText(

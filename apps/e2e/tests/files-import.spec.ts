@@ -27,7 +27,7 @@ async function driveStatus(ava: APIRequestContext) {
 }
 
 async function openDriveChooser(page: Page) {
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await page
     .getByTestId("settings-google-drive")
     .getByRole("button", { name: "Choose folder" })
@@ -139,7 +139,7 @@ test.describe("Drive import: gigs root step", () => {
     });
     await ava.post(`${DRIVE}/folder`, { data: { folderId: band } });
 
-    await page.goto("/settings");
+    await page.goto("/settings?tab=connections");
     const line = page.getByTestId("settings-google-gigs-folder");
     await expect(line).toContainText("Gigs folder: Gigs");
     await line.getByRole("button", { name: "Change" }).click();

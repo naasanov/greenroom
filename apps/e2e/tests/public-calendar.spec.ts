@@ -6,7 +6,7 @@ import { AVA, isoDay } from "./events-helpers.js";
 const tokenOf = (url: string) => url.split("/c/")[1]!;
 
 async function adminLink(page: import("@playwright/test").Page) {
-  await page.goto("/settings");
+  await page.goto("/settings?tab=band");
   const row = page.getByTestId("public-calendar-row");
   const input = row.getByLabel("Public calendar link");
   await expect(input).toHaveValue(/\/c\//);
@@ -68,8 +68,8 @@ test("members do not see the public link settings", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.dev.email);
-  await page.goto("/settings");
-  await expect(page.getByTestId("settings-personal")).toBeVisible();
+  await page.goto("/settings?tab=band");
+  await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("public-calendar-row")).toHaveCount(0);
 });
 
