@@ -276,3 +276,20 @@ test("a lineup change shows up in the agenda member filter", async ({
   await page.getByRole("menuitemradio", { name: "Me" }).click();
   await expect(agendaCard(page, seed.gigs.upcomingClub.title)).toHaveCount(0);
 });
+
+test("clicking a lineup member name opens their member sheet", async ({
+  page,
+}) => {
+  await openGig(page, seed.gigs.upcomingClub);
+  await rows(page)
+    .filter({ hasText: "Ben" })
+    .getByRole("button", { name: /^Ben/ })
+    .click();
+  const sheet = page.getByRole("dialog", { name: /^Ben/ });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId("member-sheet")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(page.getByTestId("lineup-section")).toBeVisible();
+  await expect(rows(page)).toHaveCount(3);
+});

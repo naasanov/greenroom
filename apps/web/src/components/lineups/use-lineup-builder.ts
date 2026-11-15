@@ -41,6 +41,9 @@ export interface LineupBuilder {
   /** Set after copy-from-last finds no earlier lineup. */
   noPrevious: boolean;
   copyFailed: boolean;
+  /** User id of the member whose sheet is open, or null. */
+  memberSheetId: string | null;
+  setMemberSheetId: (userId: string | null) => void;
   /** True while the roster drawer shows the past-gig history view. */
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
@@ -80,6 +83,7 @@ export function useLineupBuilder({
   const copyGigMutation = useCopyLineup(bandId, gigId);
   const [rosterOpen, setRosterOpenState] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [memberSheetId, setMemberSheetIdState] = useState<string | null>(null);
 
   const lineup = lineupQuery.data;
   const members = membersQuery.data;
@@ -90,7 +94,22 @@ export function useLineupBuilder({
     (open: boolean) => {
       setRosterOpenState(open);
       if (!open) setHistoryOpen(false);
-      if (open) onOpenRoster?.();
+      if (open) {
+        setMemberSheetIdState(null);
+        onOpenRoster?.();
+      }
+    },
+    [onOpenRoster],
+  );
+
+  const setMemberSheetId = useCallback(
+    (userId: string | null) => {
+      setMemberSheetIdState(userId);
+      if (userId !== null) {
+        setRosterOpenState(false);
+        setHistoryOpen(false);
+        onOpenRoster?.();
+      }
     },
     [onOpenRoster],
   );
@@ -173,6 +192,8 @@ export function useLineupBuilder({
       (copyMutation.isError && !noPrevious) || copyGigMutation.isError,
     historyOpen,
     setHistoryOpen,
+    memberSheetId,
+    setMemberSheetId,
     copyFromGig,
     mode,
   };
