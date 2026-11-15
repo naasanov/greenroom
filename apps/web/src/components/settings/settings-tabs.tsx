@@ -26,7 +26,7 @@ export function useSettingsTab(): [SettingsTab, (t: SettingsTab) => void] {
   return [tab, setTab];
 }
 
-/** Sticky segmented control with tab roles and arrow-key navigation. */
+/** Segmented control on mobile, vertical list on md+, with arrow-key navigation. */
 export function SettingsTabBar({
   active,
   onChange,
@@ -35,7 +35,12 @@ export function SettingsTabBar({
   onChange: (t: SettingsTab) => void;
 }) {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
     if (!step) return;
     e.preventDefault();
     const i = SETTINGS_TABS.findIndex((t) => t.key === active);
@@ -46,12 +51,12 @@ export function SettingsTabBar({
   };
 
   return (
-    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+1px)] z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
+    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+1px)] z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur md:col-start-1 md:row-start-1 md:mx-0 md:bg-transparent md:px-0 md:backdrop-blur-none">
       <div
         role="tablist"
         aria-label="Settings sections"
         onKeyDown={onKeyDown}
-        className="grid grid-cols-3 gap-1 rounded-full bg-muted p-1"
+        className="grid grid-cols-3 gap-1 rounded-full bg-muted p-1 md:flex md:flex-col md:rounded-xl"
       >
         {SETTINGS_TABS.map((t) => (
           <button
@@ -64,7 +69,7 @@ export function SettingsTabBar({
             tabIndex={active === t.key ? 0 : -1}
             onClick={() => onChange(t.key)}
             className={cn(
-              "min-h-10 rounded-full px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "min-h-10 rounded-full px-3 text-sm md:rounded-lg md:text-left font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active === t.key
                 ? "bg-card text-foreground shadow-soft"
                 : "text-muted-foreground hover:text-foreground",

@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCurrentBand } from "@/lib/current-band";
 import { useMe } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 /** Settings page split into Profile, Band, and Connections tabs. */
 export function SettingsView() {
@@ -29,7 +30,7 @@ export function SettingsView() {
   const tab = currentBand ? requested : "profile";
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-5 pb-10">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 py-5 pb-10 md:max-w-4xl">
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" aria-label="Back" asChild>
           <Link href={tabPath(lastTab ?? "events")}>
@@ -40,25 +41,39 @@ export function SettingsView() {
       </div>
 
       {currentBand ? <GoogleLinkReturn bandId={currentBand.id} /> : null}
-      {currentBand ? <SettingsTabBar active={tab} onChange={setTab} /> : null}
-
-      <SettingsPanel tab="profile" active={tab === "profile"}>
-        <PersonalSection user={me} bandId={currentBand?.id} />
-        <DeleteAccountSection />
-      </SettingsPanel>
-      {currentBand ? (
-        <>
-          <SettingsPanel tab="band" active={tab === "band"}>
-            {isAdmin ? (
-              <BandSection key={currentBand.id} band={currentBand} />
-            ) : null}
-            <LeaveBandSection key={currentBand.id} band={currentBand} />
+      <div
+        className={cn(
+          "flex flex-col gap-6",
+          currentBand &&
+            "md:grid md:grid-cols-[12rem_1fr] md:items-start md:gap-8",
+        )}
+      >
+        {currentBand ? <SettingsTabBar active={tab} onChange={setTab} /> : null}
+        <div
+          className={cn(
+            "flex flex-col gap-6",
+            currentBand && "md:col-start-2 md:row-start-1 md:max-w-xl",
+          )}
+        >
+          <SettingsPanel tab="profile" active={tab === "profile"}>
+            <PersonalSection user={me} bandId={currentBand?.id} />
+            <DeleteAccountSection />
           </SettingsPanel>
-          <SettingsPanel tab="connections" active={tab === "connections"}>
-            <ConnectionsSection bandId={currentBand.id} isAdmin={isAdmin} />
-          </SettingsPanel>
-        </>
-      ) : null}
+          {currentBand ? (
+            <>
+              <SettingsPanel tab="band" active={tab === "band"}>
+                {isAdmin ? (
+                  <BandSection key={currentBand.id} band={currentBand} />
+                ) : null}
+                <LeaveBandSection key={currentBand.id} band={currentBand} />
+              </SettingsPanel>
+              <SettingsPanel tab="connections" active={tab === "connections"}>
+                <ConnectionsSection bandId={currentBand.id} isAdmin={isAdmin} />
+              </SettingsPanel>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

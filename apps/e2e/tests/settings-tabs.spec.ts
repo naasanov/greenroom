@@ -87,3 +87,40 @@ test("members see only Leave band on Band and no Drive card", async ({
   await expect(page.getByTestId("settings-spotify")).toBeVisible();
   await expect(page.getByTestId("settings-google-drive")).toHaveCount(0);
 });
+
+test("tabs sit left of the panel on desktop and above it on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/settings");
+  const list = page.getByRole("tablist");
+  const panel = page.getByRole("tabpanel");
+  const lb = (await list.boundingBox())!;
+  const pb = (await panel.boundingBox())!;
+  expect(lb.x + lb.width).toBeLessThanOrEqual(pb.x);
+
+  await page.getByRole("tab", { name: "Profile" }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("tab", { name: "Band" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("tab", { name: "Band" })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("tab", { name: "Profile" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mlb = (await list.boundingBox())!;
+  const mpb = (await panel.boundingBox())!;
+  expect(mlb.y + mlb.height).toBeLessThanOrEqual(mpb.y);
+
+  await page.getByRole("tab", { name: "Profile" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Band" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
