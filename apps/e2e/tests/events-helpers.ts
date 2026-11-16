@@ -37,6 +37,25 @@ export async function showGigDate(page: Page, gigId: string, title: string) {
 }
 
 /**
+ * Pages the month grid with Next/Previous until it covers `date` (`YYYY-MM-DD`).
+ * A grid spans whole Sunday to Saturday weeks, so two gigs a few days apart can sit
+ * in different grids. The buttons are clicked by dispatch so an open drawer cannot cover them.
+ */
+export async function pageToDay(page: Page, date: string) {
+  const days = calendar(page).locator("[data-grid] td.fc-daygrid-day");
+  for (let i = 0; i < 12; i++) {
+    const start = (await days.first().getAttribute("data-date")) ?? date;
+    const end = (await days.last().getAttribute("data-date")) ?? date;
+    if (date >= start && date <= end) return;
+    await calendar(page)
+      .locator(`button[aria-label="${date > end ? "Next" : "Previous"}"]`)
+      .dispatchEvent("click");
+    await expect(days.first()).not.toHaveAttribute("data-date", start);
+  }
+  throw new Error(`Calendar never reached ${date}`);
+}
+
+/**
  * Switches to Week view and pages with Next/Previous until the week holding
  * `date` (`YYYY-MM-DD`) is shown, since Week anchors on today when it shares the month.
  */
