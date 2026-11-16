@@ -4,7 +4,6 @@ import { Link2, Plus } from "lucide-react";
 import type { SVGProps } from "react";
 import type { SuggestibleKey } from "@greenroom/shared";
 import { useReferenceTags, useSuggestedReferences } from "@/lib/queries/songs";
-import { useDebounced } from "./use-debounced";
 import { rankSuggestions } from "./song-utils";
 
 type IconProps = SVGProps<SVGSVGElement>;
@@ -68,27 +67,16 @@ const ICONS: Partial<
  */
 export function SuggestedReferenceChips({
   bandId,
-  title,
-  artist,
   sourceUrl,
   rows,
   onAdd,
 }: {
   bandId: string;
-  title: string;
-  artist: string;
   sourceUrl: string | null;
   rows: { label: string; value: string }[];
   onAdd: (label: string, value: string) => void;
 }) {
-  const debouncedTitle = useDebounced(title.trim(), 500);
-  const debouncedArtist = useDebounced(artist.trim(), 500);
-  const found = useSuggestedReferences(
-    bandId,
-    debouncedTitle,
-    debouncedArtist,
-    sourceUrl,
-  );
+  const found = useSuggestedReferences(bandId, sourceUrl);
   const tags = useReferenceTags(bandId);
   // Wait for the band's tags so the order settles once and stays put.
   if (!found.data || tags.isPending) return null;
@@ -102,7 +90,7 @@ export function SuggestedReferenceChips({
   return (
     <div
       data-testid="suggestion-chips"
-      className="flex flex-nowrap gap-1.5 overflow-hidden"
+      className="flex flex-nowrap gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {chips.map((chip) => {
         const Icon = ICONS[chip.key] ?? Link2;
@@ -113,10 +101,10 @@ export function SuggestedReferenceChips({
             data-testid="suggestion-chip"
             data-key={chip.key}
             onClick={() => onAdd(chip.label, chip.value)}
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-dashed bg-card px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-dashed bg-card px-2 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            <Plus className="size-3 opacity-60" aria-hidden="true" />
-            <Icon className="size-3.5" />
+            <Plus className="size-2.5 opacity-60" aria-hidden="true" />
+            <Icon className="size-3" />
             {chip.label}
           </button>
         );

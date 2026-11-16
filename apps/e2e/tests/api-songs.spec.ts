@@ -542,11 +542,13 @@ test("suggest-references returns whitelisted links, never saved", async ({
 
   // Lookup failures are silent: still 200 with no suggestions.
   await testApi.failSuggestions({ musiclink: true });
+  const failing = "https://open.spotify.com/track/failing";
   const failed = await api.post(`${base}/suggest-references`, {
-    data: { title: "Seven Nation Army", sourceUrl: "https://x.test/other" },
+    data: { title: "Seven Nation Army", sourceUrl: failing },
   });
   expect(failed.status()).toBe(200);
   expect((await failed.json()).suggestions).toEqual([]);
+  expect((await testApi.suggestionCalls()).musiclink).toContain(failing);
 
   const created = await addSong(api, base, { title: "Mr. Brightside" });
   const stored = await (await api.get(`${base}/${created.id}`)).json();
@@ -570,9 +572,12 @@ test("MusicLink lookups are cached per source URL and never retried", async ({
   expect(again).toEqual(first);
   expect((await testApi.suggestionCalls()).musiclink).toHaveLength(1);
 
-  // A failed lookup is not retried within the request.
-  await testApi.failSuggestions({ musiclink: true });
+  // A rate-limited lookup reaches the adapter once; the next one is held back.
+  await testApi.failSuggestions({ musiclink: true, retryAfterSeconds: 600 });
   await ask(1);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(2);
+  await ask(1);
+  await ask(2);
   expect((await testApi.suggestionCalls()).musiclink).toHaveLength(2);
   await api.dispose();
 });

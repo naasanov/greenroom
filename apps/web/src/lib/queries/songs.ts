@@ -199,35 +199,22 @@ export function useResolveSong(bandId: string, input: string) {
   });
 }
 
-/** Whitelisted reference suggestions; empty when nothing matches or a lookup fails. */
+/** Whitelisted suggestions for a source link; no request without an allowed link. */
 export function useSuggestedReferences(
   bandId: string,
-  title: string,
-  artist: string,
   sourceUrl: string | null,
 ) {
   return useQuery({
-    queryKey: [
-      "bands",
-      bandId,
-      "song-suggest-references",
-      title,
-      artist,
-      sourceUrl,
-    ] as const,
+    queryKey: ["bands", bandId, "song-suggest-references", sourceUrl] as const,
     queryFn: async () => {
       const res = await api(`/bands/${bandId}/songs/suggest-references`, {
         method: "POST",
-        body: {
-          title,
-          ...(artist ? { artist } : {}),
-          ...(sourceUrl ? { sourceUrl } : {}),
-        },
+        body: { sourceUrl },
         schema: typed<{ suggestions: ReferenceSuggestion[] }>(),
       });
       return res.suggestions;
     },
-    enabled: title.length > 0,
+    enabled: !!sourceUrl,
     retry: false,
     staleTime: 60_000,
   });

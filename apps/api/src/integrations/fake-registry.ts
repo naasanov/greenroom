@@ -4,7 +4,6 @@ import { FakeGoogleDriveAdapter } from "./google-drive/google-drive.fake.js";
 import { FakeGoogleOAuthAdapter } from "./google-oauth/google-oauth.fake.js";
 import { FakeGooglePlacesAdapter } from "./google-places/google-places.fake.js";
 import { FakeMusicLinkAdapter } from "./musiclink/musiclink.fake.js";
-import { FakeSongsterrAdapter } from "./songsterr/songsterr.fake.js";
 import { FakeSpotifyAdapter } from "./spotify/spotify.fake.js";
 import { FakeYoutubeAdapter } from "./youtube/youtube.fake.js";
 
@@ -15,7 +14,6 @@ export class FakeIntegrationsRegistry {
   readonly googlePlaces = new FakeGooglePlacesAdapter();
   readonly spotify = new FakeSpotifyAdapter();
   readonly youtube = new FakeYoutubeAdapter();
-  readonly songsterr = new FakeSongsterrAdapter();
   readonly musiclink = new FakeMusicLinkAdapter();
   readonly github = new FakeGithubAdapter();
   readonly email = new FakeEmailAdapter();
@@ -26,7 +24,6 @@ export class FakeIntegrationsRegistry {
     this.googlePlaces.reset();
     this.spotify.reset();
     this.youtube.reset();
-    this.songsterr.reset();
     this.musiclink.reset();
     this.github.reset();
     this.email.reset();

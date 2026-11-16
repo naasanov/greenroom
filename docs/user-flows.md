@@ -6,7 +6,7 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 
 - Each flow: ID, title, tags, design section, steps, expected results. Run every flow on desktop and on phone unless it is tagged only [desktop] or [mobile]. Untagged viewport means both.
 - Tags: [desktop], [mobile], [real-google], [real-spotify], [needs-two-users], [destructive] (deletes or leaves things; use throwaway data).
-- Fake mode (staging default per execution plan Gate 2 notes): sign in with the staging passcode (STAGING_LOGIN_PASSCODE), Google Drive/Calendar/Picker/Spotify/Songsterr/GitHub are fakes. The Picker is a stand-in folder list, Drive is in-memory (resets when the API restarts), thumbnails are grey placeholders. Flows without [real-google] or [real-spotify] work in fake mode.
+- Fake mode (staging default per execution plan Gate 2 notes): sign in with the staging passcode (STAGING_LOGIN_PASSCODE), Google Drive/Calendar/Picker/Spotify/MusicLink/GitHub are fakes. The Picker is a stand-in folder list, Drive is in-memory (resets when the API restarts), thumbnails are grey placeholders. Flows without [real-google] or [real-spotify] work in fake mode.
 - [real-google] flows need a real Google account (Sign in with Google, Drive consent, real Picker). [real-spotify] flows need a real Spotify account listed in the Spotify app's User Management.
 - Needs two users: use two browser contexts (two passcode accounts).
 - Referenced design.md sections are named by their headings.
@@ -701,10 +701,10 @@ Expected: every imported field is editable and can differ from the source.
 1. Add a song that already exists.
 Expected: "already in your library" message.
 
-### LIB-11 Songsterr suggestion
-Section: Songsterr tab suggestion.
-1. Add a song that has a Songsterr match (fake adapter in fake mode).
-Expected: "Found a tab on Songsterr. Add it?" with one-tap add as a Reference row; never added automatically.
+### LIB-11 Suggested reference chips
+Section: Suggested references.
+1. Add or edit a song with a Spotify, YouTube, YouTube Music or Apple Music link (MusicLink fake in fake mode).
+Expected: up to four chips (YouTube Music, YouTube, Apple Music, Spotify) under the references list; tapping one adds a Reference row and removes the chip; never added automatically.
 
 ### LIB-12 Library list cards
 Section: Library list.

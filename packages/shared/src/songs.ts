@@ -172,10 +172,33 @@ export const SUGGESTIBLE_REFERENCES = [
 ] as const;
 export type SuggestibleKey = (typeof SUGGESTIBLE_REFERENCES)[number]["key"];
 
+/** Hosts whose links may seed a suggestion lookup; anything else is never sent on. */
+export const SUGGESTION_SOURCE_HOSTS = [
+  "open.spotify.com",
+  "music.youtube.com",
+  "www.youtube.com",
+  "youtube.com",
+  "youtu.be",
+  "music.apple.com",
+] as const;
+
+/** True for https links on an allowed streaming host. */
+export function isSuggestionSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return (
+      url.protocol === "https:" &&
+      (SUGGESTION_SOURCE_HOSTS as readonly string[]).includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const suggestReferencesSchema = z.object({
-  title: z.string().trim().min(1).max(300),
+  title: z.string().trim().max(300).optional(),
   artist: z.string().trim().max(300).optional(),
-  /** A link to the song on any platform; MusicLink resolves the others from it. */
+  /** A streaming link to the song; MusicLink resolves the others from it. */
   sourceUrl: z.string().trim().max(2048).optional(),
 });
 export type SuggestReferences = z.infer<typeof suggestReferencesSchema>;

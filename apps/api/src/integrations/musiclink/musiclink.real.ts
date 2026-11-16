@@ -19,9 +19,20 @@ interface MusicLinkItem {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
-const retryAfterOf = (res: Response): number | undefined => {
-  const seconds = Number(res.headers.get("retry-after"));
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+const MAX_RETRY_AFTER_SECONDS = 24 * 60 * 60;
+
+/** Seconds from a Retry-After header, in delta-seconds or HTTP-date form, capped at 24h. */
+export const retryAfterOf = (
+  res: Pick<Response, "headers">,
+  now = Date.now(),
+): number | undefined => {
+  const raw = res.headers.get("retry-after")?.trim();
+  if (!raw) return undefined;
+  const seconds = /^\d+(\.\d+)?$/.test(raw)
+    ? Number(raw)
+    : (Date.parse(raw) - now) / 1000;
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  return Math.min(Math.ceil(seconds), MAX_RETRY_AFTER_SECONDS);
 };
 
 /** Resolves a track link through MusicLink, keeping only whitelisted platforms. */

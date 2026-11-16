@@ -111,22 +111,37 @@ test("edit mode shows chips and hides references the song already has", async ({
   expect(stored.references).toHaveLength(2);
 });
 
-test("no match or failed lookups show no chip and no error, and saving still works", async ({
+test("no match shows no chip and no error, and saving still works", async ({
   page,
   testApi,
 }) => {
   await addFromSpotify(page);
   // Nothing seeded for this link: MusicLink's empty result is a non-match.
+  await expect
+    .poll(async () => (await testApi.suggestionCalls()).musiclink)
+    .toEqual([SPOTIFY_URL]);
   await expect(sheet(page).getByTestId("link-row")).toHaveCount(1);
   await expect(chips(page)).toHaveCount(0);
   await expect(sheet(page).getByRole("alert")).toHaveCount(0);
-  await sheet(page).getByLabel("Title").fill("Take Me Out Again");
+  await sheet(page).getByRole("button", { name: "Done" }).click();
+  await expect(page).toHaveURL(/\/songs\/[0-9a-f-]+$/);
+});
 
+test("a failing lookup shows no chip and no error, and saving still works", async ({
+  page,
+  testApi,
+}) => {
+  await seedAll(testApi);
   await testApi.failSuggestions({ musiclink: true });
-  await sheet(page).getByLabel("Title").fill("Take Me Out Once More");
-  await page.waitForTimeout(900);
+  await addFromSpotify(page);
+  // The failing fake was reached, so the silence comes from the failure path.
+  await expect
+    .poll(async () => (await testApi.suggestionCalls()).musiclink)
+    .toEqual([SPOTIFY_URL]);
   await expect(chips(page)).toHaveCount(0);
   await expect(sheet(page).getByRole("alert")).toHaveCount(0);
+  expect(await testApi.linkCacheRow(SPOTIFY_URL)).toBeNull();
+  await sheet(page).getByLabel("Title").fill("Take Me Out Once More");
   await sheet(page).getByRole("button", { name: "Done" }).click();
   await expect(page).toHaveURL(/\/songs\/[0-9a-f-]+$/);
 });
@@ -135,7 +150,8 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
   page,
   testApi,
 }) => {
-  const source = "https://example.com/chart";
+  // youtu.be differs from the suggested YouTube host, so all four chips stay.
+  const source = "https://youtu.be/rankvid1";
   await testApi.seedMusicLink(source, {
     spotify: "https://open.spotify.com/track/rank",
     youtube_music: "https://music.youtube.com/watch?v=rank",
@@ -172,6 +188,25 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
     els.map((e) => Math.round(e.getBoundingClientRect().top)),
   );
   expect(new Set(tops).size).toBe(1);
+  // Every chip is inside the row's visible box, or the row scrolls sideways.
+  const geo = await page.getByTestId("suggestion-chips").evaluate((row) => {
+    const box = row.getBoundingClientRect();
+    return {
+      scrollable: row.scrollWidth > row.clientWidth,
+      left: box.left,
+      right: box.right,
+      chips: [...row.children].map((c) => {
+        const b = c.getBoundingClientRect();
+        return { left: b.left, right: b.right };
+      }),
+    };
+  });
+  expect(
+    geo.scrollable ||
+      geo.chips.every(
+        (c) => c.left >= geo.left - 1 && c.right <= geo.right + 1,
+      ),
+  ).toBe(true);
 
   await chip(page, "YouTube").click();
   await expect(chips(page)).toHaveText([
@@ -179,13 +214,16 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
     "Spotify",
     "YouTube Music",
   ]);
-  // Rerendering on an artist edit keeps the order.
+  // Title and artist edits neither reorder the chips nor trigger a new lookup.
   await sheet(page).getByLabel("Artist").fill("Franz Ferdinand");
+  await sheet(page).getByLabel("Title").fill("Ranked Song Two");
+  await page.waitForTimeout(900);
   await expect(chips(page)).toHaveText([
     "Apple Music",
     "Spotify",
     "YouTube Music",
   ]);
+  expect((await testApi.suggestionCalls()).musiclink).toEqual([source]);
 });
 
 test("a rate-limited MusicLink backs off: no chips, no error, no further lookups", async ({

@@ -55,10 +55,7 @@ export function SongForm({
   const { errors, isDirty } = form.formState;
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
-  const [rawTitle, rawArtist, references] = useWatch({
-    control: form.control,
-    name: ["title", "artist", "references"],
-  });
+  const references = useWatch({ control: form.control, name: "references" });
 
   return (
     <form
@@ -121,8 +118,6 @@ export function SongForm({
         />
         <SuggestedReferenceChips
           bandId={bandId}
-          title={rawTitle}
-          artist={rawArtist}
           sourceUrl={sourceUrlOf(defaults.references)}
           rows={references}
           onAdd={(label, value) =>

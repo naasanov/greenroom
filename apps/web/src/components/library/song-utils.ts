@@ -1,5 +1,6 @@
 import {
   SUGGESTIBLE_REFERENCES,
+  isSuggestionSourceUrl,
   songSortSchema,
   type ReferenceSuggestion,
   type SongSort,
@@ -94,13 +95,11 @@ function hostOf(value: string): string | null {
   }
 }
 
-/** A link the song was resolved from; Spotify first, else any http(s) row. */
+/** The row to resolve from: an allowed streaming link, Spotify first. */
 export function sourceUrlOf(rows: { value: string }[]): string | null {
-  const urls = rows
-    .map((r) => r.value.trim())
-    .filter((v) => /^https?:\/\//i.test(v));
+  const urls = rows.map((r) => r.value.trim()).filter(isSuggestionSourceUrl);
   return (
-    urls.find((u) => /^https?:\/\/open\.spotify\.com\//i.test(u)) ??
+    urls.find((u) => new URL(u).hostname === "open.spotify.com") ??
     urls[0] ??
     null
   );
