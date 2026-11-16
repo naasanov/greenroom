@@ -1,8 +1,22 @@
 "use client";
 
-import { Download, File as FileIcon, Folder, Plus, Unlink } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  File as FileIcon,
+  Folder,
+  Plus,
+  Unlink,
+} from "lucide-react";
 import { useState } from "react";
-import type { SongFile } from "@greenroom/shared";
+import { createPortal } from "react-dom";
+import type { FileEntry, SongFile } from "@greenroom/shared";
+import { FileViewer } from "@/components/files/file-viewer";
+import {
+  driveOpenUrl,
+  isGoogleDoc,
+  previewKind,
+} from "@/components/files/file-utils";
 import { FolderPickerDialog } from "@/components/google/folder-picker-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +25,22 @@ import {
   useSongFiles,
   useUnlinkSongFile,
 } from "@/lib/queries/drive-browse";
+
+/** The slice of a file entry the viewer and type detection read. */
+function toEntry(file: SongFile): FileEntry {
+  return {
+    id: file.driveFileId,
+    name: file.name,
+    kind: file.isFolder ? "folder" : "file",
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+    modifiedTime: file.modifiedTime ?? "",
+    thumbnailAvailable: file.thumbnailAvailable,
+    isGigsRoot: false,
+    gig: file.gig,
+    songLinks: [],
+  };
+}
 
 function FileRow({
   bandId,
@@ -25,6 +55,11 @@ function FileRow({
 }) {
   const Icon = file.isFolder ? Folder : FileIcon;
   const muted = !file.available;
+  const [viewing, setViewing] = useState(false);
+  const entry = toEntry(file);
+  const kind = previewKind(entry);
+  const inApp =
+    file.available && !file.isFolder && (kind === "image" || kind === "audio");
   return (
     <li
       data-testid="song-file"
@@ -36,9 +71,22 @@ function FileRow({
         className={`size-4 shrink-0 ${muted ? "text-muted-foreground/60" : "text-muted-foreground"}`}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        {file.available && !file.isFolder ? (
+        {inApp ? (
+          <button
+            type="button"
+            aria-label={`Open ${file.name}`}
+            onClick={() => setViewing(true)}
+            className="truncate text-left font-medium hover:underline"
+          >
+            {file.name}
+          </button>
+        ) : file.available && !file.isFolder ? (
           <a
-            href={fileContentUrl(bandId, file.driveFileId)}
+            href={
+              isGoogleDoc(entry)
+                ? driveOpenUrl(entry)
+                : fileContentUrl(bandId, file.driveFileId)
+            }
             target="_blank"
             rel="noreferrer"
             aria-label={`Open ${file.name}`}
@@ -63,6 +111,18 @@ function FileRow({
           </span>
         ) : null}
       </div>
+      {file.available ? (
+        <Button variant="ghost" size="icon-sm" asChild>
+          <a
+            href={driveOpenUrl(entry)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open in Drive"
+          >
+            <ExternalLink />
+          </a>
+        </Button>
+      ) : null}
       {file.available && !file.isFolder ? (
         <Button variant="ghost" size="icon-sm" asChild>
           <a
@@ -82,6 +142,16 @@ function FileRow({
       >
         <Unlink />
       </Button>
+      {viewing
+        ? createPortal(
+            <FileViewer
+              bandId={bandId}
+              entry={entry}
+              onClose={() => setViewing(false)}
+            />,
+            document.body,
+          )
+        : null}
     </li>
   );
 }

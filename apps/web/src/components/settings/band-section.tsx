@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { BandDetail, BandSummary } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
-import { GoogleSettings } from "@/components/google/google-settings";
 import { BandPhotoRow } from "@/components/settings/band-photo-row";
 import { PublicCalendarRow } from "@/components/settings/public-calendar-row";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
@@ -223,7 +222,6 @@ export function BandSection({ band }: { band: BandSummary }) {
         </p>
       )}
       <PublicCalendarRow bandId={band.id} />
-      <GoogleSettings bandId={band.id} />
     </SectionCard>
   );
 }

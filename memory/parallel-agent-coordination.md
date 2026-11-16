@@ -2,6 +2,7 @@
 name: parallel-agent-coordination
 description: How parallel Sonnet agents share this repo safely (one lockfile owner, orchestrator pre-installs deps, e2e mutex lock)
 type: feedback
+applies-to: all
 ---
 
 Rules for running Sonnet agents in parallel on the same working tree:

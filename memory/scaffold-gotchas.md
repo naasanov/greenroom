@@ -2,6 +2,7 @@
 name: scaffold-gotchas
 description: Non-obvious choices in the monorepo scaffold (Nest 12 ESM + ESLint instead of oxlint/vitest, shadcn's cn package, shared package build order)
 type: project
+applies-to: apps/api/**, apps/web/src/lib/**, packages/**, package.json, pnpm-lock.yaml
 ---
 
 Choices made in task 0.1 (2026-10-19) that a fresh agent might "fix" by mistake:

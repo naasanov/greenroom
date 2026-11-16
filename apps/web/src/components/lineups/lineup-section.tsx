@@ -1,8 +1,11 @@
 "use client";
 
 import { Pencil, Plus, X } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useContext, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { AsideDismissContext } from "@/components/app/bottom-drawer";
+import { MemberSheet } from "@/components/roster/member-sheet";
+import { useMe } from "@/lib/queries";
 import { PickTarget, TargetRow } from "@/components/setlists/pick-dnd";
 import { PersonLine, PersonOverlay } from "./person-row";
 import { LINEUP_TARGET, type LineupBuilder } from "./use-lineup-builder";
@@ -109,7 +112,16 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
                     data-testid="lineup-row"
                     className="flex h-full items-center gap-2.5 rounded-2xl border bg-card pr-1 pl-2.5 shadow-soft"
                   >
-                    <PersonLine person={m} member={member} left={m.left} />
+                    <PersonLine
+                      person={m}
+                      member={member}
+                      left={m.left}
+                      onOpenMember={
+                        member && !member.isPlaceholder
+                          ? () => builder.setMemberSheetId(member.userId)
+                          : undefined
+                      }
+                    />
                     <Button
                       type="button"
                       variant="ghost"
@@ -134,5 +146,40 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
         </p>
       ) : null}
     </section>
+  );
+}
+
+/** The member sheet for a lineup row, rendered inside the gig drawer's aside slot. */
+export function LineupMemberSheet({ builder }: { builder: LineupBuilder }) {
+  const { members, memberSheetId, setMemberSheetId } = builder;
+  const me = useMe().data;
+  const registerAside = useContext(AsideDismissContext);
+  const member = members?.find((m) => m.userId === memberSheetId) ?? null;
+  const open = memberSheetId !== null && member !== null;
+  const close = useCallback(() => setMemberSheetId(null), [setMemberSheetId]);
+
+  useEffect(() => {
+    if (!registerAside || !open) return;
+    registerAside(close);
+    return () => registerAside(null, close);
+  }, [registerAside, open, close]);
+
+  // Mounted only while a member is selected so no idle right-sheet exists.
+  if (!member) return null;
+
+  return (
+    <MemberSheet
+      bandId={builder.bandId}
+      member={member}
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) close();
+      }}
+      viewerIsAdmin={
+        members?.find((m) => m.userId === me?.id)?.role === "admin"
+      }
+      viewerId={me?.id ?? ""}
+      placement="contained"
+    />
   );
 }

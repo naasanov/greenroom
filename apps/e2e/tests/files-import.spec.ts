@@ -27,7 +27,7 @@ async function driveStatus(ava: APIRequestContext) {
 }
 
 async function openDriveChooser(page: Page) {
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await page
     .getByTestId("settings-google-drive")
     .getByRole("button", { name: "Choose folder" })
@@ -139,7 +139,7 @@ test.describe("Drive import: gigs root step", () => {
     });
     await ava.post(`${DRIVE}/folder`, { data: { folderId: band } });
 
-    await page.goto("/settings");
+    await page.goto("/settings?tab=connections");
     const line = page.getByTestId("settings-google-gigs-folder");
     await expect(line).toContainText("Gigs folder: Gigs");
     await line.getByRole("button", { name: "Change" }).click();
@@ -263,12 +263,16 @@ test.describe("song detail Files section", () => {
     band = (await setupDrive(ava)).folderId;
   });
 
-  async function addFile(name: string, link: boolean) {
+  async function addFile(
+    name: string,
+    link: boolean,
+    mimeType = "application/pdf",
+  ) {
     const f = await fake.external({
       action: "add",
       name,
       parentId: band,
-      mimeType: "application/pdf",
+      mimeType,
       content: name,
     });
     if (link) {
@@ -326,6 +330,58 @@ test.describe("song detail Files section", () => {
       await ava.get(`/bands/${BAND}/songs/${SONGS.skyline.id}/files`)
     ).json();
     expect(songs.map((f: { name: string }) => f.name)).toEqual(["chart.pdf"]);
+  });
+
+  test("image and audio files open in the in-app viewer", async ({ page }) => {
+    await addFile("cover.png", true, "image/png");
+    await addFile("demo.mp3", true, "audio/mpeg");
+    const files = await openSong(page);
+    await files.getByRole("button", { name: "Open cover.png" }).click();
+    await expect(page.getByTestId("viewer-image")).toBeVisible();
+    await page.getByRole("button", { name: "Close viewer" }).click();
+    await expect(page.getByTestId("file-viewer")).toHaveCount(0);
+    await files.getByRole("button", { name: "Open demo.mp3" }).click();
+    await expect(page.getByTestId("viewer-audio")).toBeVisible();
+  });
+
+  test("other files open externally and every file has Open in Drive", async ({
+    page,
+  }) => {
+    const id = await addFile("chart.pdf", true);
+    const files = await openSong(page);
+    const link = files.getByRole("link", { name: "Open chart.pdf" });
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(page.getByTestId("file-viewer")).toHaveCount(0);
+    const drive = files.getByRole("link", { name: "Open in Drive" });
+    await expect(drive).toHaveAttribute(
+      "href",
+      `https://drive.google.com/open?id=${encodeURIComponent(id)}`,
+    );
+    await expect(drive).toHaveAttribute("target", "_blank");
+    await expect(drive).toHaveAttribute("rel", /noopener/);
+  });
+
+  test("Escape closes only the viewer and a Google Doc links to Drive", async ({
+    page,
+  }) => {
+    await addFile("cover.png", true, "image/png");
+    const doc = await addFile(
+      "setlist",
+      true,
+      "application/vnd.google-apps.document",
+    );
+    const files = await openSong(page);
+    await files.getByRole("button", { name: "Open cover.png" }).click();
+    await expect(page.getByTestId("viewer-image")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("file-viewer")).toHaveCount(0);
+    await expect(files).toBeVisible();
+    await expect(
+      files.getByRole("link", { name: "Open setlist" }),
+    ).toHaveAttribute(
+      "href",
+      `https://drive.google.com/open?id=${encodeURIComponent(doc)}`,
+    );
   });
 
   test("unlink removes the song from the file", async ({ page }) => {
