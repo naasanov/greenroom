@@ -1,6 +1,6 @@
 "use client";
 
-import { Guitar, Link2, Plus } from "lucide-react";
+import { Link2, Plus } from "lucide-react";
 import type { SVGProps } from "react";
 import type { SuggestibleKey } from "@greenroom/shared";
 import { useReferenceTags, useSuggestedReferences } from "@/lib/queries/songs";
@@ -52,11 +52,6 @@ const AppleMusicIcon = svg(
     <circle cx="16.5" cy="16" r="2.5" />
   </>,
 );
-// Songsterr tabs use a guitar glyph; the service name is never rendered.
-const SongsterrIcon = (props: IconProps) => (
-  <Guitar data-icon="songsterr" aria-hidden="true" {...props} />
-);
-
 // Providers without an entry here fall back to a generic link glyph.
 const ICONS: Partial<
   Record<SuggestibleKey, (p: IconProps) => React.JSX.Element>
@@ -65,8 +60,6 @@ const ICONS: Partial<
   youtubeMusic: YouTubeMusicIcon,
   youtube: YouTubeIcon,
   appleMusic: AppleMusicIcon,
-  bassTabs: SongsterrIcon,
-  guitarTabs: SongsterrIcon,
 };
 
 /**

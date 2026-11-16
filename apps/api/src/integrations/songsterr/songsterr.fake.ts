@@ -1,72 +1,52 @@
-import type { SongsterrAdapter, SongsterrTabs } from "./songsterr.adapter.js";
+import type { SongsterrAdapter } from "./songsterr.adapter.js";
 
-interface Entry extends SongsterrTabs {
+interface Tab {
   title: string;
   artist: string;
+  url: string;
 }
 
-const DEFAULTS: Entry[] = [
+const DEFAULT_TABS: Tab[] = [
   {
     title: "Mr. Brightside",
     artist: "The Killers",
-    guitar:
-      "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1t0",
+    url: "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1",
   },
   {
     title: "Seven Nation Army",
     artist: "The White Stripes",
-    guitar:
-      "https://www.songsterr.com/a/wsa/the-white-stripes-seven-nation-army-tab-s2t0",
+    url: "https://www.songsterr.com/a/wsa/the-white-stripes-seven-nation-army-tab-s2",
   },
 ];
 
 export class FakeSongsterrAdapter implements SongsterrAdapter {
-  private entries: Entry[] = [];
-  private failing = false;
-  private calls: string[] = [];
+  private tabs: Tab[] = [];
 
   constructor() {
     this.reset();
   }
 
-  async findTabs(input: {
+  async searchTab(input: {
     title: string;
     artist?: string;
-  }): Promise<SongsterrTabs | null> {
-    this.calls.push(input.title);
-    if (this.failing) return null;
+  }): Promise<{ url: string } | null> {
     const title = input.title.trim().toLowerCase();
     const artist = input.artist?.trim().toLowerCase();
-    const hit = this.entries.find(
-      (e) =>
-        e.title.toLowerCase() === title &&
-        (!artist || e.artist.toLowerCase().includes(artist)),
+    const hit = this.tabs.find(
+      (t) =>
+        t.title.toLowerCase() === title &&
+        (!artist || t.artist.toLowerCase().includes(artist)),
     );
-    if (!hit) return {};
-    return {
-      ...(hit.bass ? { bass: hit.bass } : {}),
-      ...(hit.guitar ? { guitar: hit.guitar } : {}),
-    };
+    return hit ? { url: hit.url } : null;
   }
 
   // ---- test controls ----
 
-  seedTabs(entry: Entry): void {
-    this.entries.unshift(entry);
-  }
-
-  setFailing(failing: boolean): void {
-    this.failing = failing;
-  }
-
-  /** Titles looked up since the last reset, in call order. */
-  lookups(): string[] {
-    return [...this.calls];
+  seedTab(tab: Tab): void {
+    this.tabs.push(tab);
   }
 
   reset(): void {
-    this.entries = DEFAULTS.map((e) => ({ ...e }));
-    this.failing = false;
-    this.calls = [];
+    this.tabs = DEFAULT_TABS.map((t) => ({ ...t }));
   }
 }

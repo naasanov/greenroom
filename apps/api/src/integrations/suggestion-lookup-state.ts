@@ -1,22 +1,23 @@
 import { Injectable } from "@nestjs/common";
 
-const WINDOW_MS = 60_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
+const MAX_BACKOFF_SECONDS = 24 * 60 * 60;
 
-/** Throttle budget and result caches shared by reference-suggestion lookups. */
+/** Result cache and rate-limit back-off shared by reference-suggestion lookups. */
 @Injectable()
 export class SuggestionLookupState {
-  /** Odesli allows about 10 requests a minute without a key. */
-  readonly odesliPerMinute = Number(process.env.ODESLI_MAX_PER_MINUTE) || 8;
-  private odesliCalls: number[] = [];
+  private backoffUntil = 0;
   private cache = new Map<string, { at: number; value: unknown }>();
 
-  /** Reserves one Odesli call; false when the minute's budget is spent. */
-  tryTakeOdesliSlot(now = Date.now()): boolean {
-    this.odesliCalls = this.odesliCalls.filter((t) => now - t < WINDOW_MS);
-    if (this.odesliCalls.length >= this.odesliPerMinute) return false;
-    this.odesliCalls.push(now);
-    return true;
+  /** True while a provider's Retry-After window is still open. */
+  isBackedOff(now = Date.now()): boolean {
+    return now < this.backoffUntil;
+  }
+
+  /** Pauses lookups for the provider's requested interval. */
+  backOff(seconds: number, now = Date.now()): void {
+    const ms = Math.min(seconds, MAX_BACKOFF_SECONDS) * 1000;
+    this.backoffUntil = Math.max(this.backoffUntil, now + ms);
   }
 
   getCached<T>(key: string, now = Date.now()): T | undefined {
@@ -34,7 +35,7 @@ export class SuggestionLookupState {
   }
 
   reset(): void {
-    this.odesliCalls = [];
+    this.backoffUntil = 0;
     this.cache.clear();
   }
 }

@@ -161,24 +161,21 @@ export interface ResolveResult {
 }
 
 /**
- * The only references the app suggests, in tie-break order (streaming
- * platforms first, then tabs). `odesli` is the Odesli platform key and
- * `songsterr` the tab instrument; adding a provider is one more entry.
+ * The only references the app suggests, in tie-break order. `musiclink` is
+ * the MusicLink platform key; adding a provider is one more entry.
  */
 export const SUGGESTIBLE_REFERENCES = [
-  { key: "spotify", label: "Spotify", odesli: "spotify" },
-  { key: "youtubeMusic", label: "YouTube Music", odesli: "youtubeMusic" },
-  { key: "youtube", label: "YouTube", odesli: "youtube" },
-  { key: "appleMusic", label: "Apple Music", odesli: "appleMusic" },
-  { key: "bassTabs", label: "Bass tabs", songsterr: "bass" },
-  { key: "guitarTabs", label: "Guitar tabs", songsterr: "guitar" },
+  { key: "spotify", label: "Spotify", musiclink: "spotify" },
+  { key: "youtubeMusic", label: "YouTube Music", musiclink: "youtube_music" },
+  { key: "youtube", label: "YouTube", musiclink: "youtube" },
+  { key: "appleMusic", label: "Apple Music", musiclink: "apple_music" },
 ] as const;
 export type SuggestibleKey = (typeof SUGGESTIBLE_REFERENCES)[number]["key"];
 
 export const suggestReferencesSchema = z.object({
   title: z.string().trim().min(1).max(300),
   artist: z.string().trim().max(300).optional(),
-  /** A link to the song on any platform; Odesli resolves the others from it. */
+  /** A link to the song on any platform; MusicLink resolves the others from it. */
   sourceUrl: z.string().trim().max(2048).optional(),
 });
 export type SuggestReferences = z.infer<typeof suggestReferencesSchema>;

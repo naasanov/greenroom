@@ -120,8 +120,5 @@ test("bulk import does no reference-suggestion lookups", async ({
     .fill("https://open.spotify.com/playlist/fakePlaylistPublic");
   await dialog.getByRole("button", { name: "Import" }).click();
   await expect(dialog.getByTestId("import-summary")).toContainText("3 added");
-  expect(await testApi.suggestionCalls()).toEqual({
-    odesli: [],
-    songsterr: [],
-  });
+  expect(await testApi.suggestionCalls()).toEqual({ musiclink: [] });
 });

@@ -218,55 +218,38 @@ export class TestingController {
     return this.registry.spotify.createdPlaylists();
   }
 
-  /** Seeds the Odesli fake: links (platform to URL) for a source URL. */
-  @Post("odesli/seed")
+  /** Seeds the MusicLink fake: links (platform to URL) for a source URL. */
+  @Post("musiclink/seed")
   @HttpCode(200)
-  seedOdesli(
+  seedMusicLink(
     @Body() body: { sourceUrl: string; links: Record<string, string> },
   ): {
     ok: true;
   } {
-    this.registry.odesli.seedLinks(body.sourceUrl, body.links);
+    this.registry.musiclink.seedLinks(body.sourceUrl, body.links);
     return { ok: true };
   }
 
-  /** Makes the Odesli and/or Songsterr fake fail every lookup. */
+  /** Makes the MusicLink fake fail every lookup, optionally with a Retry-After. */
   @Post("suggestions/failing")
   @HttpCode(200)
   setSuggestionsFailing(
-    @Body() body: { odesli?: boolean; songsterr?: boolean },
+    @Body() body: { musiclink?: boolean; retryAfterSeconds?: number },
   ): {
     ok: true;
   } {
-    if (body.odesli !== undefined) this.registry.odesli.setFailing(body.odesli);
-    if (body.songsterr !== undefined) {
-      this.registry.songsterr.setFailing(body.songsterr);
+    if (body.musiclink !== undefined) {
+      this.registry.musiclink.setFailing(
+        body.musiclink,
+        body.retryAfterSeconds,
+      );
     }
     return { ok: true };
   }
 
-  /** Seeds the Songsterr fake with a song's bass and/or guitar tab URLs. */
-  @Post("songsterr/seed")
-  @HttpCode(200)
-  seedSongsterr(
-    @Body()
-    body: {
-      title: string;
-      artist: string;
-      bass?: string;
-      guitar?: string;
-    },
-  ): { ok: true } {
-    this.registry.songsterr.seedTabs(body);
-    return { ok: true };
-  }
-
-  /** Lookups the Odesli and Songsterr fakes received since the last reset. */
+  /** Lookups the MusicLink fake received since the last reset. */
   @Get("suggestions/calls")
-  suggestionCalls(): { odesli: string[]; songsterr: string[] } {
-    return {
-      odesli: this.registry.odesli.lookups(),
-      songsterr: this.registry.songsterr.lookups(),
-    };
+  suggestionCalls(): { musiclink: string[] } {
+    return { musiclink: this.registry.musiclink.lookups() };
   }
 }

@@ -165,6 +165,7 @@ API secrets (set with `fly secrets set --stage -a greenroom-fyi-api NAME=value`,
 | `GOOGLE_PLACES_API_KEY` | yes | Venue search and photos. |
 | `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER` | yes for Drive folder picking | Without them the picker config returns nulls and the Drive picker cannot open. |
 | `YOUTUBE_API_KEY` | optional | Without it YouTube songs get no auto duration. |
+| `MUSICLINK_API_KEY` | optional | MusicLink key (300 requests/month plan); without it the song form shows no suggested reference chips. |
 | `GITHUB_FEEDBACK_TOKEN` | optional | Fine-grained PAT, Issues write on `naasanov/greenroom`. Without it `POST /feedback` returns 503. |
 | `RESEND_API_KEY` | required for sign-in in real mode | Resend key with Sending access on `greenroom.fyi`. Without it magic-link sign-in fails. |
 | `RESEND_WEBHOOK_SECRET` | required for calendar replies | Svix signing secret (`whsec_...`) of the Resend inbound webhook; see "Calendar invite replies (Resend inbound)". Without it the webhook answers 401 and replies from calendars are not applied. |

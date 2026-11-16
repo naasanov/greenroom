@@ -497,14 +497,16 @@ test("YouTube links fill the duration on create and on link edit when empty", as
   expect(kept.durationSeconds).toBe(3725);
 });
 
-test("suggest-references returns whitelisted links and tabs, never saved", async ({
+test("suggest-references returns whitelisted links, never saved", async ({
   testApi,
 }) => {
   const { api, base } = await bandWithClient(testApi);
   const source = "https://open.spotify.com/track/abc";
-  await testApi.seedOdesli(source, {
-    appleMusic: "https://music.apple.com/x",
+  await testApi.seedMusicLink(source, {
+    apple_music: "https://music.apple.com/x",
+    youtube_music: "https://music.youtube.com/watch?v=x",
     tidal: "https://tidal.com/x",
+    deezer: "https://deezer.com/x",
   });
   const hit = await api.post(`${base}/suggest-references`, {
     data: {
@@ -514,27 +516,32 @@ test("suggest-references returns whitelisted links and tabs, never saved", async
     },
   });
   expect(hit.status()).toBe(200);
+  // Whitelist order; tidal and deezer are never returned.
   expect((await hit.json()).suggestions).toEqual([
+    {
+      key: "youtubeMusic",
+      label: "YouTube Music",
+      value: "https://music.youtube.com/watch?v=x",
+    },
     {
       key: "appleMusic",
       label: "Apple Music",
       value: "https://music.apple.com/x",
     },
-    {
-      key: "guitarTabs",
-      label: "Guitar tabs",
-      value:
-        "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1t0",
-    },
   ]);
 
+  // No source link, or an unseeded one (MusicLink's empty result), is no match.
   const miss = await api.post(`${base}/suggest-references`, {
     data: { title: "Totally Original" },
   });
   expect((await miss.json()).suggestions).toEqual([]);
+  const empty = await api.post(`${base}/suggest-references`, {
+    data: { title: "T", sourceUrl: "https://open.spotify.com/track/none" },
+  });
+  expect((await empty.json()).suggestions).toEqual([]);
 
   // Lookup failures are silent: still 200 with no suggestions.
-  await testApi.failSuggestions({ odesli: true, songsterr: true });
+  await testApi.failSuggestions({ musiclink: true });
   const failed = await api.post(`${base}/suggest-references`, {
     data: { title: "Seven Nation Army", sourceUrl: "https://x.test/other" },
   });
@@ -547,7 +554,7 @@ test("suggest-references returns whitelisted links and tabs, never saved", async
   await api.dispose();
 });
 
-test("Odesli lookups are cached and throttled under the free limit", async ({
+test("MusicLink lookups are cached per source URL and never retried", async ({
   testApi,
 }) => {
   const { api, base } = await bandWithClient(testApi);
@@ -555,18 +562,39 @@ test("Odesli lookups are cached and throttled under the free limit", async ({
     api.post(`${base}/suggest-references`, {
       data: { title: "T", sourceUrl: `https://open.spotify.com/track/t${n}` },
     });
-  await testApi.seedOdesli("https://open.spotify.com/track/t0", {
-    appleMusic: "https://music.apple.com/t0",
+  await testApi.seedMusicLink("https://open.spotify.com/track/t0", {
+    apple_music: "https://music.apple.com/t0",
   });
   const first = await (await ask(0)).json();
   const again = await (await ask(0)).json();
   expect(again).toEqual(first);
-  expect((await testApi.suggestionCalls()).odesli).toHaveLength(1);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(1);
 
-  for (let n = 1; n <= 14; n++) await ask(n);
-  const calls = (await testApi.suggestionCalls()).odesli;
-  expect(calls.length).toBeGreaterThan(1);
-  expect(calls.length).toBeLessThan(10);
+  // A failed lookup is not retried within the request.
+  await testApi.failSuggestions({ musiclink: true });
+  await ask(1);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(2);
+  await api.dispose();
+});
+
+test("a Retry-After from MusicLink pauses further lookups", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const ask = (n: number) =>
+    api.post(`${base}/suggest-references`, {
+      data: { title: "T", sourceUrl: `https://open.spotify.com/track/r${n}` },
+    });
+  await testApi.failSuggestions({ musiclink: true, retryAfterSeconds: 600 });
+  const limited = await ask(0);
+  expect(limited.status()).toBe(200);
+  expect((await limited.json()).suggestions).toEqual([]);
+  await testApi.failSuggestions({ musiclink: false });
+  await testApi.seedMusicLink("https://open.spotify.com/track/r1", {
+    apple_music: "https://music.apple.com/r1",
+  });
+  expect((await (await ask(1)).json()).suggestions).toEqual([]);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(1);
   await api.dispose();
 });
 

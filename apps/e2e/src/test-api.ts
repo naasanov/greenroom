@@ -153,34 +153,24 @@ export class TestApi {
     return this.call("get", "spotify/created-playlists");
   }
 
-  /** Seeds the Odesli fake with platform links for a source URL. */
-  async seedOdesli(
+  /** Seeds the MusicLink fake with platform links for a source URL. */
+  async seedMusicLink(
     sourceUrl: string,
     links: Record<string, string>,
   ): Promise<void> {
-    await this.call("post", "odesli/seed", { data: { sourceUrl, links } });
+    await this.call("post", "musiclink/seed", { data: { sourceUrl, links } });
   }
 
-  /** Seeds the Songsterr fake with a song's bass and/or guitar tab URLs. */
-  async seedSongsterr(tabs: {
-    title: string;
-    artist: string;
-    bass?: string;
-    guitar?: string;
-  }): Promise<void> {
-    await this.call("post", "songsterr/seed", { data: tabs });
-  }
-
-  /** Makes the Odesli and/or Songsterr fake fail every lookup. */
+  /** Makes the MusicLink fake fail every lookup, optionally with a Retry-After. */
   async failSuggestions(failing: {
-    odesli?: boolean;
-    songsterr?: boolean;
+    musiclink?: boolean;
+    retryAfterSeconds?: number;
   }): Promise<void> {
     await this.call("post", "suggestions/failing", { data: failing });
   }
 
-  /** Lookups the suggestion fakes received since the last reset. */
-  async suggestionCalls(): Promise<{ odesli: string[]; songsterr: string[] }> {
+  /** Lookups the MusicLink fake received since the last reset. */
+  async suggestionCalls(): Promise<{ musiclink: string[] }> {
     return this.call("get", "suggestions/calls");
   }
 }

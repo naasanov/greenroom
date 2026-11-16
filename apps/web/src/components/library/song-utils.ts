@@ -128,8 +128,6 @@ export function rankSuggestions(
   const used = new Set(usedLabels.map((l) => l.trim().toLowerCase()));
   const order = (key: string) =>
     SUGGESTIBLE_REFERENCES.findIndex((r) => r.key === key);
-  const isTab = (key: string) =>
-    SUGGESTIBLE_REFERENCES.some((r) => r.key === key && "songsterr" in r);
   const hasIt = (s: ReferenceSuggestion) =>
     rows.some((r) => {
       const value = r.value.trim();
@@ -137,7 +135,7 @@ export function rankSuggestions(
       if (value === s.value) return true;
       // Streaming links on the same service count as the same reference.
       const host = hostOfUrl(s.value);
-      return !isTab(s.key) && host !== null && hostOfUrl(value) === host;
+      return host !== null && hostOfUrl(value) === host;
     });
   const rank = (s: ReferenceSuggestion) =>
     used.has(s.label.toLowerCase()) ? 0 : 1;
