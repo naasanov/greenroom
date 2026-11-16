@@ -2,7 +2,13 @@ import type { BandSeedResult } from "@greenroom/db";
 import type { Page } from "@playwright/test";
 import type { Locator } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
-import { AVA, calendar, eventIn, showGigDate } from "./events-helpers.js";
+import {
+  AVA,
+  calendar,
+  eventIn,
+  pageToDay,
+  showGigDate,
+} from "./events-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -82,6 +88,7 @@ test("tapping another gig slides the first drawer down while the second slides u
   await showGigDate(page, a.id, a.title);
   await eventIn(page, a.title).click();
   await expect(live(page, a.title)).toBeVisible();
+  await pageToDay(page, b.date);
   await tap(eventIn(page, b.title));
 
   // Both drawers exist at once: A closing, B open.
@@ -122,6 +129,7 @@ test("rapid taps across three events end on the last one with no stuck drawers",
   await showGigDate(page, a.id, a.title);
   await eventIn(page, a.title).click();
   await expect(live(page, a.title)).toBeVisible();
+  await pageToDay(page, b.date);
   await tap(eventIn(page, b.title));
   await tap(eventIn(page, seed.practice.title).first());
   await expect(page).toHaveURL(/\/practices\/[^/?]+\?date=/);
