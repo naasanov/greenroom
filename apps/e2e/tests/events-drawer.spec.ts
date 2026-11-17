@@ -320,6 +320,33 @@ test("cancelling the RSVP scope dialog leaves the status unchanged", async ({
   await expect(going(drawer)).not.toBeChecked();
 });
 
+test("a member sets another member's RSVP from their row", async ({ page }) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  const benRow = drawer.locator("li", { hasText: USERS.ben.displayName });
+  await expect(benRow).not.toHaveAttribute("data-status", "maybe");
+  await benRow
+    .getByRole("radio", { name: `Maybe for ${USERS.ben.displayName}` })
+    .click();
+  await rsvpScopeDialog(page)
+    .getByRole("radio", { name: "This event", exact: true })
+    .click();
+  await rsvpScopeDialog(page)
+    .getByRole("button", { name: "Save RSVP" })
+    .click();
+  await expect(benRow).toHaveAttribute("data-status", "maybe");
+  // The caller's own control is untouched and has no row control.
+  await expect(going(drawer)).not.toBeChecked();
+  await expect(
+    drawer.locator("li", { hasText: USERS.ava.displayName }).getByRole("radio"),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    dialog(page, seed.practice.title).locator("li", {
+      hasText: USERS.ben.displayName,
+    }),
+  ).toHaveAttribute("data-status", "maybe");
+});
+
 const scopeDialog = (page: Page) =>
   page.getByRole("dialog", { name: "Edit recurring event" });
 

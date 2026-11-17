@@ -7,7 +7,7 @@ All routes sit under `/bands/:bandId/...` behind `@BandMember()` (non-members ge
 - `POST /gigs`, `GET|PATCH|DELETE /gigs/:gigId`. Input uses local `date`, `startTime`, `endTime`, `loadInTime` ("HH:mm") plus `timeZone`; the server stores instants and returns both forms. `endTime` at or before `startTime` rolls to the next day. DELETE is a soft delete (`deleted_at`) and never touches Drive fields.
 - `POST /practices` creates a series. `GET /practices/:seriesId`.
 - `GET|PATCH|DELETE /practices/:seriesId/occurrences/:key`. PATCH body carries `scope`; DELETE takes `?scope=`.
-- `PUT /practices/:seriesId/occurrences/:key/rsvp` `{status, scope?}` (`scope` defaults to `this`). Returns the occurrence.
+- `PUT /practices/:seriesId/occurrences/:key/rsvp` `{status, scope?, userId?}` (`scope` defaults to `this`; `userId` is the member being answered for and defaults to the caller). Any active band member may set another active member's RSVP (no admin check); a non-member or former member target is 404. Returns the occurrence as the caller sees it.
 - `PUT /practices/:seriesId/occurrences/:key/setlist` `{setlistId, scope: this | this_and_following, onConflict?: replace | keep}`.
 - `POST .../setlist` `{scope, onConflict?, sourceSetlistId?, copyCurrent?}` creates a new setlist (optionally pre-filled from another setlist or the one in force) and assigns it; returns the assignment result plus `newSetlistId`.
 - `DELETE .../setlist?scope=&onConflict=` clears the occurrence's setlist (same scopes and conflict flags).
@@ -41,4 +41,4 @@ Resolution (`assignment.ts`): a `single` row at exactly the occurrence start win
 
 Attendees are active members; a missing row is `no_response`. Order: going, maybe, no_response, not_going, then by name.
 
-`scope` applies to recurring series only (ignored otherwise) and changes only the caller's rows, in one transaction with one multi-row upsert. `this_and_following` covers the chosen occurrence through 365 days after today; `all` covers the series start through the same horizon (so past occurrences included). Cancelled occurrences are skipped. Each call writes at most 366 rows: the chosen occurrence plus the first 365 later ones (`this_and_following`) or the 365 latest ones (`all`).
+`scope` applies to recurring series only (ignored otherwise) and changes only the target member's rows (the caller's unless `userId` is given), in one transaction with one multi-row upsert. `this_and_following` covers the chosen occurrence through 365 days after today; `all` covers the series start through the same horizon (so past occurrences included). Cancelled occurrences are skipped. Each call writes at most 366 rows: the chosen occurrence plus the first 365 later ones (`this_and_following`) or the 365 latest ones (`all`).

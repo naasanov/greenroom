@@ -23,7 +23,7 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 | Agenda sheet | AGD-01 to AGD-10 | 10 |
 | Create drawer, gig and practice forms | DRW-01 to DRW-18 | 18 |
 | Gig and practice drawers (view, edit, delete, recurring scopes) | EVT-01 to EVT-14 | 14 |
-| RSVP | RSVP-01 to RSVP-06 | 6 |
+| RSVP | RSVP-01 to RSVP-07 | 7 |
 | Setlists and lineup | SET-01 to SET-18 | 18 |
 | Music library and song sheet | LIB-01 to LIB-22 | 22 |
 | Open references and song notes | REF-01 to REF-05 | 5 |
@@ -40,7 +40,7 @@ Derived from [design.md](./design.md) (source of truth) and [execution-plan.md](
 | Feedback widget | FB-01 to FB-03 | 3 |
 | Cross-cutting | XC-01 to XC-10 | 10 |
 
-Total: 263 flows.
+Total: 264 flows.
 
 Flows needing real accounts: DRIVE-01 to DRIVE-04 real variants, MEDIA-23, SPOT-02 to SPOT-08, AUTH-03 (Google sign-in), plus any flow tagged [real-google] or [real-spotify] below. Everything else runs in fake mode with passcode sign-in.
 
@@ -578,6 +578,11 @@ Expected: B sees A's response in the list.
 
 ### RSVP-06 Roster-only members in the attendee list
 Expected: not applicable or shown with no response; they never get invites. (Unspecified, see Ambiguities.)
+
+### RSVP-07 Set another member's RSVP
+Tags: [needs-two-users].
+1. User A opens a practice drawer and changes user B's status from B's row (icon toggle; recurring practices ask scope).
+Expected: B's row updates, A's own RSVP is unchanged, and B sees the new status. B's calendar invite reflects it.
 
 ---
 

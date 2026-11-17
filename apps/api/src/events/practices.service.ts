@@ -691,9 +691,12 @@ export class PracticesService {
     key: string,
     status: RsvpStatus,
     scope: EditScope = "this",
+    targetUserId: string = userId,
   ): Promise<PracticeOccurrence> {
     const series = await this.findSeries(bandId, seriesId);
     const { original, override } = await this.requireOccurrence(series, key);
+    if (targetUserId !== userId)
+      await this.requireActiveMember(bandId, targetUserId);
     const starts =
       scope === "this" || !isRecurring(series)
         ? [original]
@@ -706,7 +709,7 @@ export class PracticesService {
             bandId,
             seriesId,
             originalStart,
-            userId,
+            userId: targetUserId,
             status,
           })),
         )
@@ -719,9 +722,27 @@ export class PracticesService {
           set: { status },
         }),
     );
-    // The member's own invite carries their answer as PARTSTAT.
+    // The target member's invite carries their answer as PARTSTAT.
     await this.invites.series(bandId, seriesId);
     return this.detail(series, original, override, userId);
+  }
+
+  /** Any band member may set another active member's RSVP; others are not found. */
+  private async requireActiveMember(
+    bandId: string,
+    userId: string,
+  ): Promise<void> {
+    const [row] = await this.db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.bandId, bandId),
+          eq(memberships.userId, userId),
+          isNull(memberships.leftAt),
+        ),
+      );
+    if (!row) throw new NotFoundException("Member not found");
   }
 
   /** Non-cancelled occurrences in scope up to the horizon, always including `original`, capped. */

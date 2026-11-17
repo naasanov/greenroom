@@ -1,6 +1,14 @@
 "use client";
 
-import { ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  HelpCircle,
+  Loader2,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -77,6 +85,12 @@ const RSVP_OPTIONS = [
   { value: "not_going", label: "Not going" },
 ] as const;
 
+const OTHER_RSVP_OPTIONS = [
+  { value: "going", label: "Going", icon: <Check />, iconOnly: true },
+  { value: "maybe", label: "Maybe", icon: <HelpCircle />, iconOnly: true },
+  { value: "not_going", label: "Not going", icon: <X />, iconOnly: true },
+] as const;
+
 function mapsUrl(location: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 }
@@ -102,7 +116,10 @@ function PracticeDetails({
 }) {
   const me = useMe().data;
   const rsvp = useSetRsvp(bandId, occ.seriesId, occ.occurrenceKey, me?.id);
-  const [pendingRsvp, setPendingRsvp] = useState<RsvpChoice | null>(null);
+  const [pendingRsvp, setPendingRsvp] = useState<{
+    status: RsvpChoice;
+    userId?: string;
+  } | null>(null);
   const series = usePracticeSeries(bandId, occ.seriesId, occ.recurring);
   const attendees: Attendee[] = occ.attendees.map((a) => ({
     id: a.userId,
@@ -226,7 +243,7 @@ function PracticeDetails({
               }
               onValueChange={(status) =>
                 occ.recurring
-                  ? setPendingRsvp(status)
+                  ? setPendingRsvp({ status })
                   : rsvp.mutate({ status, scope: "this" })
               }
               options={RSVP_OPTIONS}
@@ -238,7 +255,7 @@ function PracticeDetails({
               onConfirm={(scope) => {
                 if (pendingRsvp)
                   rsvp.mutate({
-                    status: pendingRsvp,
+                    ...pendingRsvp,
                     scope: SCOPE_TO_API[scope],
                   });
               }}
@@ -247,7 +264,32 @@ function PracticeDetails({
 
           <section aria-label="Attendees" className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
-            <AttendeeList attendees={attendees} />
+            <AttendeeList
+              attendees={attendees}
+              renderAction={(a) =>
+                a.id === me?.id ? null : (
+                  <SegmentedToggle<RsvpChoice>
+                    label={`RSVP for ${a.name}`}
+                    value={
+                      (a.status === "none"
+                        ? ""
+                        : a.status === "declined"
+                          ? "not_going"
+                          : a.status) as RsvpChoice
+                    }
+                    onValueChange={(status) =>
+                      occ.recurring
+                        ? setPendingRsvp({ status, userId: a.id })
+                        : rsvp.mutate({ status, scope: "this", userId: a.id })
+                    }
+                    options={OTHER_RSVP_OPTIONS.map((o) => ({
+                      ...o,
+                      label: `${o.label} for ${a.name}`,
+                    }))}
+                  />
+                )
+              }
+            />
           </section>
         </>
       )}

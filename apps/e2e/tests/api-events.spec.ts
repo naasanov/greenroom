@@ -1006,6 +1006,64 @@ test("rsvp scope is ignored on a non-recurring practice", async ({
   expect((await res.json()).myRsvp).toBe("going");
 });
 
+test("rsvp on behalf: a member sets another member's status, non-members are rejected", async ({
+  testApi,
+  db,
+}) => {
+  const a = await newBand(testApi);
+  const b = await client(testApi, "behalf-b@example.com");
+  const gone = await client(testApi, "behalf-gone@example.com");
+  const out = await client(testApi, "behalf-out@example.com");
+  await db.insert(memberships).values([
+    { bandId: a.bandId, userId: b.user.id, role: "member" },
+    { bandId: a.bandId, userId: gone.user.id, role: "member" },
+  ]);
+  await db
+    .update(memberships)
+    .set({ leftAt: new Date() })
+    .where(eq(memberships.userId, gone.user.id));
+  const s = await createPractice(a.api, a.bandId, weekly());
+  const path = occPath(a.bandId, s.id, "20261027T230000Z");
+  const put = (api: Api, data: Json) => api.put(`${path}/rsvp`, { data });
+
+  // The non-admin member B answers for admin A; A's own answer is separate.
+  expect((await put(a.api, { status: "going" })).status()).toBe(200);
+  const res = await put(b.api, { status: "not_going", userId: a.user.id });
+  expect(res.status()).toBe(200);
+  const asB = await res.json();
+  expect(asB.myRsvp).toBe("no_response");
+  const asA = await (await a.api.get(path)).json();
+  expect(asA.myRsvp).toBe("not_going");
+
+  // A answers for B, and B sees it.
+  expect(
+    (await put(a.api, { status: "maybe", userId: b.user.id })).status(),
+  ).toBe(200);
+  const seenByB = await (await b.api.get(path)).json();
+  expect(seenByB.myRsvp).toBe("maybe");
+  expect(seenByB.attendees.map((x: Json) => x.status)).toEqual([
+    "maybe",
+    "not_going",
+  ]);
+
+  // Naming yourself is the same as omitting userId.
+  expect(
+    (await put(a.api, { status: "going", userId: a.user.id })).status(),
+  ).toBe(200);
+  expect((await (await a.api.get(path)).json()).myRsvp).toBe("going");
+
+  // Former members, outsiders and malformed ids are rejected.
+  for (const userId of [gone.user.id, out.user.id]) {
+    expect((await put(a.api, { status: "going", userId })).status()).toBe(404);
+  }
+  expect((await put(a.api, { status: "going", userId: "nope" })).status()).toBe(
+    400,
+  );
+  expect(
+    (await put(out.api, { status: "going", userId: a.user.id })).status(),
+  ).toBe(404);
+});
+
 // ---------------------------------------------------------------- setlists
 
 test("setlist assignment: single beats forward, latest forward wins, conflicts flagged", async ({
