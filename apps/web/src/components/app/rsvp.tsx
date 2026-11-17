@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Check, CircleDashed, HelpCircle, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InstrumentIcon } from "@/components/app/instruments";
@@ -95,9 +96,12 @@ function initials(name: string) {
 /** One attendee list, Google Calendar style, with an RSVP icon per person. */
 export function AttendeeList({
   attendees,
+  renderAction,
   className,
 }: {
   attendees: readonly Attendee[];
+  /** Optional per-row control rendered before the status icon. */
+  renderAction?: (attendee: Attendee) => ReactNode;
   className?: string;
 }) {
   const sorted = sortAttendees(attendees);
@@ -157,6 +161,7 @@ export function AttendeeList({
                 </p>
               ) : null}
             </div>
+            {renderAction?.(a)}
             <RsvpIcon status={a.status} />
           </li>
         ))}

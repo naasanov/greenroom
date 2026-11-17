@@ -295,7 +295,10 @@ export function usePracticeSetlistApi(
   }, [qc, bandId, seriesId, occurrenceKey]);
 }
 
-/** Sets the signed-in user's RSVP; the occurrence cache updates before the server answers. */
+/**
+ * Sets a member's RSVP (the signed-in user's unless `userId` is given); the occurrence
+ * cache updates before the server answers.
+ */
 export function useSetRsvp(
   bandId: string,
   seriesId: string,
@@ -305,25 +308,33 @@ export function useSetRsvp(
   const qc = useQueryClient();
   const key = keys.occurrence(bandId, seriesId, occurrenceKey);
   return useMutation({
-    mutationFn: ({ status, scope }: { status: RsvpStatus; scope: EditScope }) =>
+    mutationFn: ({
+      status,
+      scope,
+      userId: target,
+    }: {
+      status: RsvpStatus;
+      scope: EditScope;
+      userId?: string;
+    }) =>
       api(
         `/bands/${bandId}/practices/${seriesId}/occurrences/${occurrenceKey}/rsvp`,
         {
           method: "PUT",
-          body: { status, scope },
+          body: { status, scope, userId: target },
           schema: typed<PracticeOccurrence>(),
         },
       ),
-    onMutate: async ({ status }) => {
+    onMutate: async ({ status, userId: target = userId }) => {
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<PracticeOccurrence>(key);
       qc.setQueryData<PracticeOccurrence>(key, (occ) =>
         occ
           ? {
               ...occ,
-              myRsvp: status,
+              myRsvp: target === userId ? status : occ.myRsvp,
               attendees: occ.attendees.map((a) =>
-                a.userId === userId ? { ...a, status } : a,
+                a.userId === target ? { ...a, status } : a,
               ),
             }
           : occ,

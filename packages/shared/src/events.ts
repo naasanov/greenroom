@@ -230,10 +230,14 @@ export const RSVP_STATUSES = [
 export const rsvpStatusSchema = z.enum(RSVP_STATUSES);
 export type RsvpStatus = z.infer<typeof rsvpStatusSchema>;
 
-/** `scope` picks which occurrences of a recurring practice the RSVP applies to. */
+/**
+ * `scope` picks which occurrences of a recurring practice the RSVP applies to.
+ * `userId` is the member being answered for; it defaults to the caller.
+ */
 export const setRsvpSchema = z.object({
   status: rsvpStatusSchema,
   scope: editScopeSchema.default("this"),
+  userId: z.string().uuid().optional(),
 });
 export type SetRsvp = z.infer<typeof setRsvpSchema>;
 export type SetRsvpInput = z.input<typeof setRsvpSchema>;
