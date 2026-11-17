@@ -4,17 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  and,
-  desc,
-  inArray,
-  eq,
-  ilike,
-  isNull,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, desc, inArray, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import {
   gigSetlists,
   gigs,
@@ -226,12 +216,11 @@ export class SetlistsService {
     return { ...(await this.get(bandId, setlistId)), gigId };
   }
 
-  /** Past gigs (today or earlier) whose setlist has songs, newest first. */
+  /** Gigs, past or upcoming, whose setlist has songs, newest first. */
   async gigHistory(
     bandId: string,
     query: GigHistoryQuery,
   ): Promise<GigHistoryEntry[]> {
-    const today = new Date().toISOString().slice(0, 10);
     const text = query.q
       ? `%${query.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
       : null;
@@ -259,7 +248,6 @@ export class SetlistsService {
         and(
           eq(gigs.bandId, bandId),
           isNull(gigs.deletedAt),
-          lte(gigs.date, today),
           text
             ? or(ilike(gigs.title, text), ilike(gigs.venueName, text))
             : undefined,

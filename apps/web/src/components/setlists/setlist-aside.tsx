@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from "react";
 import type { GigHistoryEntry, SongSummary } from "@greenroom/shared";
 import { BottomDrawer, SideDrawer } from "@/components/app/bottom-drawer";
@@ -55,6 +56,7 @@ function SearchBox({
   label,
   placeholder,
   action,
+  inputRef,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -62,6 +64,7 @@ function SearchBox({
   placeholder: string;
   /** Icon button beside the field, as tall as the field. */
   action?: ReactNode;
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   return (
     <div className="sticky top-0 z-10 -mx-1 flex gap-2 bg-popover px-1 pt-1 pb-3">
@@ -69,6 +72,7 @@ function SearchBox({
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
+          ref={inputRef}
           aria-label={label}
           placeholder={placeholder}
           autoComplete="off"
@@ -133,11 +137,18 @@ function LibraryView({
     [songs, q],
   );
   const draggable = builder.mode === "side";
+  // Focus waits a frame so the drawer is visible and not inert, and the focus trap has settled.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const entered = useEntered(builder.libraryOpen);
+  useEffect(() => {
+    if (entered) searchRef.current?.focus();
+  }, [entered]);
 
   return (
     <>
       <div data-testid="library-picker">
         <SearchBox
+          inputRef={searchRef}
           value={search}
           onChange={setSearch}
           label="Search the library"
@@ -154,8 +165,8 @@ function LibraryView({
                 type="button"
                 variant="outline"
                 size="icon"
-                aria-label="Copy from a past gig"
-                title="Copy from a past gig"
+                aria-label="Copy from a gig"
+                title="Copy from a gig"
                 className="shrink-0"
                 onClick={() => builder.setHistoryOpen(true)}
               >
@@ -342,13 +353,13 @@ function HistoryView({ builder }: { builder: SetlistBuilder }) {
         <SearchBox
           value={search}
           onChange={setSearch}
-          label="Search past gigs"
+          label="Search gigs"
           placeholder="Search by title or venue"
         />
         {!entries ? (
           history.isError ? (
             <p role="alert" className="text-sm text-destructive">
-              Could not load past gigs.
+              Could not load gigs.
             </p>
           ) : (
             <p role="status" className="text-sm text-muted-foreground">
@@ -356,7 +367,7 @@ function HistoryView({ builder }: { builder: SetlistBuilder }) {
             </p>
           )
         ) : entries.length > 0 ? (
-          <ul className="flex flex-col gap-2" aria-label="Past gigs">
+          <ul className="flex flex-col gap-2" aria-label="Gigs">
             {entries.map((e: GigHistoryEntry) => (
               <HistoryRow key={e.setlistId} entry={e} builder={builder} />
             ))}
@@ -364,7 +375,7 @@ function HistoryView({ builder }: { builder: SetlistBuilder }) {
         ) : (
           <EmptyState
             icon={Search}
-            title={q ? "No past gigs match" : "No past setlists yet"}
+            title={q ? "No gigs match" : "No gig setlists yet"}
           />
         )}
       </div>
@@ -541,7 +552,7 @@ function LibraryHistoryDrawer({ builder }: { builder: SetlistBuilder }) {
         builder.setLibraryOpen(false);
         builder.setHistoryOpen(false);
       }}
-      title={history ? "Copy from a past gig" : "Music Library"}
+      title={history ? "Copy from a gig" : "Music Library"}
       rise
       className={asideClass(builder.mode)}
       headerAction={

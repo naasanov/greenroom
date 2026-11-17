@@ -87,14 +87,38 @@ test("empty setlist is one Add songs button that opens the library", async ({
     page.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Copy from a past gig" }),
+    page.getByRole("button", { name: "Copy from a gig" }),
   ).toHaveCount(0);
   await expect(total(page)).toHaveCount(0);
   await empty.click();
   await expect(page.getByTestId("library-picker")).toBeVisible();
 });
 
-test("the library drawer rises from the bottom and swaps to past gigs in place", async ({
+test("clicking Edit focuses the library search field", async ({ page }) => {
+  await openGig(page, seed.gigs.upcomingClub);
+  await page.getByRole("button", { name: "Edit setlist" }).click();
+  await expect(
+    page.getByRole("searchbox", { name: "Search the library" }),
+  ).toBeFocused();
+});
+
+test("editing a song's duration in the sheet refreshes the setlist row and total", async ({
+  page,
+}) => {
+  await openGig(page, seed.gigs.upcomingClub);
+  const row = rows(page).first();
+  const title = (await row.locator("span.font-semibold").innerText()).trim();
+  const before = await total(page).innerText();
+  await row.getByTestId("setlist-row-open").click();
+  const sheet = page.getByRole("dialog", { name: title });
+  await sheet.getByRole("button", { name: "Edit", exact: true }).click();
+  await sheet.getByLabel("Duration").fill("59:59");
+  await sheet.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(row).toContainText("59:59");
+  await expect(total(page)).not.toHaveText(before);
+});
+
+test("the library drawer rises from the bottom and swaps to gigs in place", async ({
   page,
   isMobile,
 }) => {
@@ -120,7 +144,7 @@ test("the library drawer rises from the bottom and swaps to past gigs in place",
 
   const copy = page
     .getByTestId("library-picker")
-    .getByRole("button", { name: "Copy from a past gig" });
+    .getByRole("button", { name: "Copy from a gig" });
   await expect(copy).toBeVisible();
   const field = page.getByRole("searchbox", { name: "Search the library" });
   expect((await copy.boundingBox())!.height).toBeLessThanOrEqual(
@@ -136,7 +160,7 @@ test("the library drawer rises from the bottom and swaps to past gigs in place",
   await copy.click();
   await expect(page.getByTestId("history-picker")).toBeVisible();
   await expect(page.getByTestId("library-picker")).toBeHidden();
-  const history = page.locator('aside[aria-label="Copy from a past gig"]');
+  const history = page.locator('aside[aria-label="Copy from a gig"]');
   await expect(history).toHaveAttribute("data-state", "open");
   await expect(history).toHaveAttribute("data-same-panel", "");
   await expect(history).not.toHaveAttribute("data-rose", "");
@@ -494,7 +518,7 @@ test("a library song can be dropped at the end of an empty setlist", async ({
   expect(await rowTitles(page)).toEqual(["Skyline Drive"]);
 });
 
-test.describe("copy from a past gig", () => {
+test.describe("copy from a gig", () => {
   test.beforeEach(async ({ testApi }) => {
     await fillSetlist(testApi, seed.gigs.pastBar.id, [
       SONGS.redLine.id,
@@ -507,22 +531,22 @@ test.describe("copy from a past gig", () => {
     await openLibrary(page);
     await page
       .getByTestId("library-picker")
-      .getByRole("button", { name: "Copy from a past gig" })
+      .getByRole("button", { name: "Copy from a gig" })
       .click();
     await expect(page.getByTestId("history-picker")).toBeVisible();
   }
 
-  test("lists past gigs newest first and filters by search", async ({
-    page,
-  }) => {
+  test("lists gigs newest first and filters by search", async ({ page }) => {
     await openGig(page, seed.gigs.tentative);
     await openHistory(page);
     const entries = page.getByTestId("history-entry");
-    await expect(entries).toHaveCount(2);
-    await expect(entries.nth(0)).toContainText("The Rusty Anchor");
-    await expect(entries.nth(0)).toContainText("2 songs");
-    await expect(entries.nth(1)).toContainText("Summer Fest");
-    await page.getByLabel("Search past gigs").fill("Riverside");
+    await expect(entries).toHaveCount(3);
+    await expect(entries.nth(0)).toContainText("Club Meridian");
+    await expect(entries.nth(0)).toContainText("5 songs");
+    await expect(entries.nth(1)).toContainText("The Rusty Anchor");
+    await expect(entries.nth(1)).toContainText("2 songs");
+    await expect(entries.nth(2)).toContainText("Summer Fest");
+    await page.getByLabel("Search gigs").fill("Riverside");
     await expect(entries).toHaveCount(1);
     await expect(entries.first()).toContainText("Summer Fest");
   });
@@ -542,7 +566,10 @@ test.describe("copy from a past gig", () => {
   test("into an empty setlist copies without asking", async ({ page }) => {
     await openGig(page, seed.gigs.tentative);
     await openHistory(page);
-    await page.getByTestId("history-entry").first().click();
+    await page
+      .getByTestId("history-entry")
+      .filter({ hasText: "The Rusty Anchor" })
+      .click();
     await expect(rows(page)).toHaveCount(2);
     expect(await rowTitles(page)).toEqual(["Red Line", "Harbor Lights"]);
     await expect(total(page)).toHaveText(`2 songs · ${noLength(page, 2)}`);

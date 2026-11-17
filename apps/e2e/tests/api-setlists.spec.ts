@@ -260,7 +260,7 @@ test("setlist: add-song-in-place creates the song and appends it", async ({
   ]);
 });
 
-test("setlist: duplicate a past setlist (history search, replace and append)", async ({
+test("setlist: duplicate a gig setlist (history search, replace and append)", async ({
   testApi,
 }) => {
   const { api, bandId } = await newBand(testApi);
@@ -302,10 +302,11 @@ test("setlist: duplicate a past setlist (history search, replace and append)", a
     await api.get(`/bands/${bandId}/setlists/history`)
   ).json();
   expect(hist.map((h: Json) => h.title)).toEqual([
+    "Future",
     "Spring Bash",
     "Winter Show",
   ]);
-  expect(hist[0]).toMatchObject({
+  expect(hist[1]).toMatchObject({
     gigId: old.id,
     setlistId: oldSl,
     venueName: "The Roxy",

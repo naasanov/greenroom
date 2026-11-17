@@ -27,6 +27,7 @@ import {
 } from "@greenroom/shared";
 import { api, getApiUrl } from "@/lib/api";
 import { keys } from "@/lib/queries";
+import { invalidateSetlists } from "@/lib/queries/setlists";
 
 const typed = <T>() => z.custom<T>();
 
@@ -264,6 +265,7 @@ export function useUpdateSong(bandId: string, songId: string) {
     onSuccess: (song) => {
       qc.setQueryData(keys.song(bandId, songId), song);
       void qc.invalidateQueries({ queryKey: songsRoot(bandId) });
+      invalidateSetlists(qc, bandId);
     },
   });
 }
