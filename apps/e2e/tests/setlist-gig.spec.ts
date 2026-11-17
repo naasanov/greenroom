@@ -556,7 +556,11 @@ test.describe("copy from a gig", () => {
   }) => {
     await openGig(page, seed.gigs.tentative);
     await openHistory(page);
-    await page.getByTestId("history-preview-toggle").first().click();
+    await page
+      .getByTestId("history-entry")
+      .filter({ hasText: "The Rusty Anchor" })
+      .getByTestId("history-preview-toggle")
+      .click();
     const preview = page.getByTestId("history-preview");
     await expect(preview).toContainText("Red Line");
     await expect(preview).toContainText("Harbor Lights");

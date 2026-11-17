@@ -137,11 +137,11 @@ function LibraryView({
     [songs, q],
   );
   const draggable = builder.mode === "side";
-  // Focus waits a frame so the drawer is visible and not inert, and the focus trap has settled.
+  // Focus waits two frames so the drawer is visible and not inert, and the focus trap has settled.
   const searchRef = useRef<HTMLInputElement>(null);
   const entered = useEntered(builder.libraryOpen);
   useEffect(() => {
-    if (entered) searchRef.current?.focus();
+    if (entered) searchRef.current?.focus({ preventScroll: true });
   }, [entered]);
 
   return (
@@ -537,7 +537,7 @@ function CopyChoiceDialog({ builder }: { builder: SetlistBuilder }) {
 }
 
 /**
- * One drawer that shows either the music library or the copy-from-a-past-gig
+ * One drawer that shows either the music library or the copy-from-a-gig
  * list, so switching between them swaps content without the panel leaving.
  * Both views stay mounted, so each keeps its search text.
  */
