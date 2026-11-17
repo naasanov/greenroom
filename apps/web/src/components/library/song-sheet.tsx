@@ -283,13 +283,7 @@ function ReferencesSection({
       label="Reference"
       action={
         rows ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="-my-1.5"
-            disabled={update.isPending}
-            onClick={done}
-          >
+          <Button size="sm" disabled={update.isPending} onClick={done}>
             {update.isPending ? "Saving..." : "Done"}
           </Button>
         ) : (
@@ -307,16 +301,21 @@ function ReferencesSection({
     >
       {rows ? (
         <div data-testid="references-edit" className="flex flex-col gap-3">
-          <SongLinkEditor rows={rows} onChange={setRows} />
-          <SuggestedReferenceChips
-            bandId={bandId}
-            sourceUrl={sourceUrlOf(song.references)}
+          <SongLinkEditor
             rows={rows}
-            onAdd={(label, value) =>
-              setRows([
-                ...rows,
-                { id: `row-${crypto.randomUUID()}`, label, value },
-              ])
+            onChange={setRows}
+            extra={
+              <SuggestedReferenceChips
+                bandId={bandId}
+                sourceUrl={sourceUrlOf(song.references)}
+                rows={rows}
+                onAdd={(label, value) =>
+                  setRows([
+                    ...rows,
+                    { id: `row-${crypto.randomUUID()}`, label, value },
+                  ])
+                }
+              />
             }
           />
           {update.isError ? (

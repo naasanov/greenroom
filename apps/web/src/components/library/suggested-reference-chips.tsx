@@ -1,70 +1,14 @@
 "use client";
 
-import { Link2, Plus } from "lucide-react";
-import type { SVGProps } from "react";
-import type { SuggestibleKey } from "@greenroom/shared";
+import { Plus } from "lucide-react";
+import { Favicon } from "@/components/app/link-list";
 import { Button } from "@/components/ui/button";
 import { useReferenceTags, useSuggestedReferences } from "@/lib/queries/songs";
 import { rankSuggestions } from "./song-utils";
 
-type IconProps = SVGProps<SVGSVGElement>;
-
-const svg = (children: React.ReactNode) =>
-  function Icon(props: IconProps) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        {...props}
-      >
-        {children}
-      </svg>
-    );
-  };
-
-const SpotifyIcon = svg(
-  <>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M7.5 9.5c3-1 6.5-.7 9 .8M8 12.5c2.5-.7 5-.5 7.5.8M8.5 15.3c2-.5 4-.3 6 .7" />
-  </>,
-);
-const YouTubeIcon = svg(
-  <>
-    <rect x="3" y="6" width="18" height="12" rx="3" />
-    <path d="m10 9.5 4.5 2.5-4.5 2.5z" />
-  </>,
-);
-const YouTubeMusicIcon = svg(
-  <>
-    <circle cx="12" cy="12" r="9" />
-    <path d="m10.5 9 4 3-4 3z" />
-  </>,
-);
-const AppleMusicIcon = svg(
-  <>
-    <path d="M9 18V6l10-2v12" />
-    <circle cx="6.5" cy="18" r="2.5" />
-    <circle cx="16.5" cy="16" r="2.5" />
-  </>,
-);
-// Providers without an entry here fall back to a generic link glyph.
-const ICONS: Partial<
-  Record<SuggestibleKey, (p: IconProps) => React.JSX.Element>
-> = {
-  spotify: SpotifyIcon,
-  youtubeMusic: YouTubeMusicIcon,
-  youtube: YouTubeIcon,
-  appleMusic: AppleMusicIcon,
-};
-
 /**
- * One thin chip per suggested reference, below the link rows. Tapping a
- * chip hands its label and link to `onAdd`; nothing is added automatically.
+ * One chip per suggested reference, rendered beside the "Add row" button.
+ * Tapping a chip hands its label and link to `onAdd`; nothing is added automatically.
  */
 export function SuggestedReferenceChips({
   bandId,
@@ -89,28 +33,30 @@ export function SuggestedReferenceChips({
   if (chips.length === 0) return null;
 
   return (
-    <div
-      data-testid="suggestion-chips"
-      className="flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {chips.map((chip) => {
-        const Icon = ICONS[chip.key] ?? Link2;
-        return (
-          <Button
-            key={chip.key}
-            type="button"
-            variant="outline"
-            data-testid="suggestion-chip"
-            data-key={chip.key}
-            onClick={() => onAdd(chip.label, chip.value)}
-            className="border-dashed"
-          >
-            <Plus />
-            <Icon />
-            {chip.label}
-          </Button>
-        );
-      })}
-    </div>
+    <>
+      {chips.map((chip) => (
+        <Button
+          key={chip.key}
+          type="button"
+          variant="outline"
+          data-testid="suggestion-chip"
+          data-key={chip.key}
+          onClick={() => onAdd(chip.label, chip.value)}
+          className="border-dashed"
+        >
+          <Plus />
+          <Favicon host={hostOf(chip.value)} compact />
+          {chip.label}
+        </Button>
+      ))}
+    </>
   );
+}
+
+function hostOf(value: string): string | null {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
 }

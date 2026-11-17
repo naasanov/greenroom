@@ -115,20 +115,22 @@ export function SongForm({
           onChange={(rows) =>
             form.setValue("references", rows, { shouldDirty: true })
           }
-        />
-        <SuggestedReferenceChips
-          bandId={bandId}
-          sourceUrl={sourceUrlOf(defaults.references)}
-          rows={references}
-          onAdd={(label, value) =>
-            form.setValue(
-              "references",
-              [
-                ...references,
-                { id: `row-${crypto.randomUUID()}`, label, value },
-              ],
-              { shouldDirty: true },
-            )
+          extra={
+            <SuggestedReferenceChips
+              bandId={bandId}
+              sourceUrl={sourceUrlOf(defaults.references)}
+              rows={references}
+              onAdd={(label, value) =>
+                form.setValue(
+                  "references",
+                  [
+                    ...references,
+                    { id: `row-${crypto.randomUUID()}`, label, value },
+                  ],
+                  { shouldDirty: true },
+                )
+              }
+            />
           }
         />
       </div>

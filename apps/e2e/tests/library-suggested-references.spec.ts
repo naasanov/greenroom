@@ -48,7 +48,7 @@ async function seedAll(testApi: {
   });
 }
 
-test("add mode: chips sit below the link list, show label and icon only, tap adds a row", async ({
+test("add mode: chips sit beside Add row, show label and icon only, tap adds a row", async ({
   page,
   testApi,
 }) => {
@@ -64,8 +64,10 @@ test("add mode: chips sit below the link list, show label and icon only, tap add
   const lastRow = await s.getByTestId("link-row").last().boundingBox();
   const row = await chips(page).first().boundingBox();
   expect(row!.y).toBeGreaterThan(lastRow!.y + lastRow!.height - 1);
+  const add = await s.getByRole("button", { name: "Add row" }).boundingBox();
+  expect(Math.abs(row!.y - add!.y)).toBeLessThan(2);
   // The URL is never shown.
-  await expect(s.getByTestId("suggestion-chips")).not.toContainText("http");
+  await expect(chips(page).first()).not.toContainText("http");
 
   await chip(page, "Apple Music").click();
   await expect(chip(page, "Apple Music")).toHaveCount(0);
@@ -184,29 +186,13 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
     "Spotify",
     "YouTube Music",
   ]);
-  const tops = await chips(page).evaluateAll((els) =>
-    els.map((e) => Math.round(e.getBoundingClientRect().top)),
-  );
-  expect(new Set(tops).size).toBe(1);
-  // Every chip is inside the row's visible box, or the row scrolls sideways.
-  const geo = await page.getByTestId("suggestion-chips").evaluate((row) => {
-    const box = row.getBoundingClientRect();
-    return {
-      scrollable: row.scrollWidth > row.clientWidth,
-      left: box.left,
-      right: box.right,
-      chips: [...row.children].map((c) => {
-        const b = c.getBoundingClientRect();
-        return { left: b.left, right: b.right };
-      }),
-    };
-  });
-  expect(
-    geo.scrollable ||
-      geo.chips.every(
-        (c) => c.left >= geo.left - 1 && c.right <= geo.right + 1,
-      ),
-  ).toBe(true);
+  // Chips wrap instead of scrolling: none spills past the sheet's right edge.
+  const sheetBox = (await sheet(page).boundingBox())!;
+  for (const box of await chips(page).evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect().right),
+  )) {
+    expect(box).toBeLessThanOrEqual(sheetBox.x + sheetBox.width + 1);
+  }
 
   await chip(page, "YouTube").click();
   await expect(chips(page)).toHaveText([
