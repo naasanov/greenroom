@@ -40,9 +40,11 @@ import { CandidatePreview } from "./candidate-preview";
 import { SmartInput } from "./smart-input";
 import { SongLinkEditor } from "./song-link-editor";
 import { SongForm } from "./song-form";
+import { SuggestedReferenceChips } from "./suggested-reference-chips";
 import {
   formatDuration,
   songArt,
+  sourceUrlOf,
   toSongBody,
   type SongFormValues,
 } from "./song-utils";
@@ -263,19 +265,34 @@ function ReferencesSection({
 }) {
   const update = useUpdateSong(bandId, song.id);
   const [rows, setRows] = useState<SongFormValues["references"] | null>(null);
-  const save = () => {
+  const done = () => {
     if (!rows) return;
     const { references } = toSongBody({
       ...valuesFromSong(song),
       references: rows,
     });
+    const { references: before } = toSongBody(valuesFromSong(song));
+    if (JSON.stringify(references) === JSON.stringify(before)) {
+      setRows(null);
+      return;
+    }
     update.mutate({ references }, { onSuccess: () => setRows(null) });
   };
   return (
     <Section
       label="Reference"
       action={
-        rows ? null : (
+        rows ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="-my-1.5"
+            disabled={update.isPending}
+            onClick={done}
+          >
+            {update.isPending ? "Saving..." : "Done"}
+          </Button>
+        ) : (
           <Button
             variant="ghost"
             size="icon"
@@ -291,19 +308,22 @@ function ReferencesSection({
       {rows ? (
         <div data-testid="references-edit" className="flex flex-col gap-3">
           <SongLinkEditor rows={rows} onChange={setRows} />
+          <SuggestedReferenceChips
+            bandId={bandId}
+            sourceUrl={sourceUrlOf(song.references)}
+            rows={rows}
+            onAdd={(label, value) =>
+              setRows([
+                ...rows,
+                { id: `row-${crypto.randomUUID()}`, label, value },
+              ])
+            }
+          />
           {update.isError ? (
             <p role="alert" className="text-sm text-destructive">
               Could not save your changes. Please try again.
             </p>
           ) : null}
-          <div className="flex gap-2">
-            <Button size="sm" disabled={update.isPending} onClick={save}>
-              {update.isPending ? "Saving..." : "Save references"}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRows(null)}>
-              Cancel
-            </Button>
-          </div>
         </div>
       ) : (
         <LinkList

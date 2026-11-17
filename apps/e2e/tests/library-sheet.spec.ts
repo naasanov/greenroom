@@ -172,6 +172,22 @@ test("desktop sheet is non-modal: another song switches it, other clicks close i
   await expect(s).toBeHidden();
 });
 
+test("Done on unchanged references closes the editor without saving", async ({
+  page,
+}) => {
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Original One" }).click();
+  const s = sheet(page);
+  let writes = 0;
+  page.on("request", (r) => {
+    if (r.method() === "PATCH" || r.method() === "PUT") writes++;
+  });
+  await s.getByRole("button", { name: "Change references" }).click();
+  await s.getByRole("button", { name: "Done" }).click();
+  await expect(s.getByTestId("references-edit")).toHaveCount(0);
+  expect(writes).toBe(0);
+});
+
 test("the References pencil edits only the references", async ({ page }) => {
   await openLibrary(page);
   await cards(page).filter({ hasText: "Original One" }).click();
@@ -182,7 +198,7 @@ test("the References pencil edits only the references", async ({ page }) => {
   await s.getByRole("button", { name: "Add row" }).click();
   await s.getByLabel("Reference label").last().fill("Key");
   await s.getByLabel("Reference value").last().fill("A minor");
-  await s.getByRole("button", { name: "Save references" }).click();
+  await s.getByRole("button", { name: "Done" }).click();
   await expect(s.getByTestId("references-edit")).toHaveCount(0);
   await expect(s.getByTestId("reference-text")).toContainText("A minor");
   await expect(

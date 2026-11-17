@@ -377,3 +377,30 @@ test("musiclink real adapter: 429, other non-2xx, bad payloads and timeouts are 
     else process.env.MUSICLINK_API_KEY = priorKey;
   }
 });
+
+test("references-only editing shows chips, and a tap saves through Done", async ({
+  page,
+  testApi,
+}) => {
+  const source = "https://youtu.be/refonly1";
+  await testApi.seedMusicLink(source, {
+    spotify: "https://open.spotify.com/track/refonly",
+    apple_music: "https://music.apple.com/us/song/refonly",
+  });
+  const api = await apiAs(testApi, USERS.ava.email);
+  await api.post(base, {
+    data: {
+      title: "Ref Only Song",
+      references: [{ label: "Chart", value: source }],
+    },
+  });
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Ref Only Song" }).click();
+  const s = sheet(page);
+  await s.getByRole("button", { name: "Change references" }).click();
+  await expect(chips(page)).toHaveText(["Spotify", "Apple Music"]);
+  await chip(page, "Spotify").click();
+  await s.getByRole("button", { name: "Done" }).click();
+  await expect(s.getByTestId("references-edit")).toHaveCount(0);
+  await expect(s.getByText("open.spotify.com")).toBeVisible();
+});

@@ -3,6 +3,7 @@
 import { Link2, Plus } from "lucide-react";
 import type { SVGProps } from "react";
 import type { SuggestibleKey } from "@greenroom/shared";
+import { Button } from "@/components/ui/button";
 import { useReferenceTags, useSuggestedReferences } from "@/lib/queries/songs";
 import { rankSuggestions } from "./song-utils";
 
@@ -90,23 +91,24 @@ export function SuggestedReferenceChips({
   return (
     <div
       data-testid="suggestion-chips"
-      className="flex flex-nowrap gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {chips.map((chip) => {
         const Icon = ICONS[chip.key] ?? Link2;
         return (
-          <button
+          <Button
             key={chip.key}
             type="button"
+            variant="outline"
             data-testid="suggestion-chip"
             data-key={chip.key}
             onClick={() => onAdd(chip.label, chip.value)}
-            className="inline-flex h-7 shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-dashed bg-card px-2 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="border-dashed"
           >
-            <Plus className="size-2.5 opacity-60" aria-hidden="true" />
-            <Icon className="size-3" />
+            <Plus />
+            <Icon />
             {chip.label}
-          </button>
+          </Button>
         );
       })}
     </div>
