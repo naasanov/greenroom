@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   uniqueIndex,
@@ -8,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { bands } from "./bands.js";
 import { gigs } from "./gigs.js";
-import { createdAt, deletedAt, id, updatedAt } from "./helpers.js";
+import { createdAt, deletedAt, id, tstz, updatedAt } from "./helpers.js";
 
 export const songs = pgTable(
   "songs",
@@ -45,6 +46,13 @@ export const songLinks = pgTable(
   },
   (t) => [index("song_links_song_id_idx").on(t.songId)],
 );
+
+// Global MusicLink results keyed by normalized source URL; holds no user data.
+export const songLinkCache = pgTable("song_link_cache", {
+  sourceUrl: text("source_url").primaryKey(),
+  links: jsonb("links").$type<Record<string, string>>().notNull(),
+  fetchedAt: tstz("fetched_at").notNull().defaultNow(),
+});
 
 export const setlists = pgTable(
   "setlists",

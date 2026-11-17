@@ -15,7 +15,7 @@ import {
   importPlaylistSchema,
   listSongsQuerySchema,
   resolveSongSchema,
-  suggestTabSchema,
+  suggestReferencesSchema,
   updateSongSchema,
   type CreateSong,
   type DeletedSong,
@@ -30,8 +30,8 @@ import {
   type SongCreated,
   type SongDetail,
   type SongSummary,
-  type SuggestedReference,
-  type SuggestTab,
+  type ReferenceSuggestion,
+  type SuggestReferences,
   type UpdateSong,
   type User,
 } from "@greenroom/shared";
@@ -44,6 +44,7 @@ import { CurrentUser } from "../auth/decorators.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { ExportService } from "./export.service.js";
 import { ImportsService } from "./imports.service.js";
+import { ReferenceSuggestionsService } from "./reference-suggestions.service.js";
 import { SmartAddService } from "./smart-add.service.js";
 import { SongsService } from "./songs.service.js";
 
@@ -56,6 +57,7 @@ export class SongsController {
     private readonly smartAdd: SmartAddService,
     private readonly imports: ImportsService,
     private readonly exporter: ExportService,
+    private readonly suggestions: ReferenceSuggestionsService,
   ) {}
 
   @Get()
@@ -90,14 +92,12 @@ export class SongsController {
     return this.smartAdd.resolve(m.bandId, body.input);
   }
 
-  @Post("suggest-tab")
+  @Post("suggest-references")
   @HttpCode(200)
-  async suggestTab(
-    @Body(new ZodPipe(suggestTabSchema)) body: SuggestTab,
-  ): Promise<{ suggestedReference: SuggestedReference | null }> {
-    return {
-      suggestedReference: await this.songs.suggestTab(body.title, body.artist),
-    };
+  async suggestReferences(
+    @Body(new ZodPipe(suggestReferencesSchema)) body: SuggestReferences,
+  ): Promise<{ suggestions: ReferenceSuggestion[] }> {
+    return { suggestions: await this.suggestions.suggest(body) };
   }
 
   @Post("import")

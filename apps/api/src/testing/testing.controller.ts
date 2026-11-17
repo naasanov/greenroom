@@ -8,12 +8,14 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { eq, sql } from "drizzle-orm";
 import type { User } from "@greenroom/shared";
 import {
   SCENARIOS,
   isScenario,
   resetDatabase,
   seedScenario,
+  songLinkCache,
   type Database,
   type SeedResult,
 } from "@greenroom/db";
@@ -25,12 +27,14 @@ import { CalendarInviteInboundService } from "../calendar-invites/calendar-invit
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { CalendarInviteService } from "../calendar-invites/calendar-invite.service.js";
 import { DRIZZLE } from "../db/db.constants.js";
+import { normalizeSourceUrl } from "../songs/source-url.js";
 import {
   DriveAncestryCache,
   FakeIntegrationsRegistry,
   type FakeIssue,
   type SentCalendarInvite,
   type SentMagicLink,
+  SuggestionLookupState,
 } from "../integrations/index.js";
 
 // To add a control: inject nothing new, read/mutate the fake on `this.registry`,
@@ -44,6 +48,7 @@ export class TestingController {
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
     private readonly driveCache: DriveAncestryCache,
+    private readonly lookupState: SuggestionLookupState,
     private readonly invites: CalendarInviteService,
     private readonly inviteQueue: CalendarInviteQueue,
     private readonly inbound: CalendarInviteInboundService,
@@ -55,6 +60,7 @@ export class TestingController {
     await resetDatabase(this.db);
     this.registry.resetAll();
     this.driveCache.clear();
+    this.lookupState.reset();
     this.inviteQueue.reset();
     return { ok: true };
   }
@@ -69,6 +75,7 @@ export class TestingController {
     }
     this.registry.resetAll();
     this.driveCache.clear();
+    this.lookupState.reset();
     this.inviteQueue.reset();
     return seedScenario(this.db, body.scenario);
   }
@@ -212,5 +219,85 @@ export class TestingController {
     trackIds: string[];
   }[] {
     return this.registry.spotify.createdPlaylists();
+  }
+
+  /** Seeds the MusicLink fake: links (platform to URL) for a source URL. */
+  @Post("musiclink/seed")
+  @HttpCode(200)
+  seedMusicLink(
+    @Body() body: { sourceUrl: string; links: Record<string, string> },
+  ): {
+    ok: true;
+  } {
+    this.registry.musiclink.seedLinks(body.sourceUrl, body.links);
+    return { ok: true };
+  }
+
+  /** Makes the MusicLink fake fail every lookup, optionally with a Retry-After. */
+  @Post("suggestions/failing")
+  @HttpCode(200)
+  setSuggestionsFailing(
+    @Body() body: { musiclink?: boolean; retryAfterSeconds?: number },
+  ): {
+    ok: true;
+  } {
+    if (body.musiclink !== undefined) {
+      this.registry.musiclink.setFailing(
+        body.musiclink,
+        body.retryAfterSeconds,
+      );
+    }
+    return { ok: true };
+  }
+
+  /** Lookups the MusicLink fake received since the last reset. */
+  @Get("suggestions/calls")
+  suggestionCalls(): { musiclink: string[] } {
+    return { musiclink: this.registry.musiclink.lookups() };
+  }
+
+  /** Ages a cached link row by N days, as if it was fetched that long ago. */
+  @Post("suggestions/age")
+  @HttpCode(200)
+  async ageLinkCache(
+    @Body() body: { sourceUrl: string; days: number },
+  ): Promise<{ ok: true; aged: boolean }> {
+    const key = normalizeSourceUrl(body.sourceUrl);
+    if (!key) throw new BadRequestException("sourceUrl is not allowed");
+    const rows = await this.db
+      .update(songLinkCache)
+      .set({
+        fetchedAt: sql`${songLinkCache.fetchedAt} - make_interval(days => ${body.days})`,
+      })
+      .where(eq(songLinkCache.sourceUrl, key))
+      .returning({ sourceUrl: songLinkCache.sourceUrl });
+    this.lookupState.clearCache();
+    return { ok: true, aged: rows.length > 0 };
+  }
+
+  /** Drops the in-memory suggestion layer so the next lookup reads the table. */
+  @Post("suggestions/clear-memory")
+  @HttpCode(200)
+  clearSuggestionMemory(): { ok: true } {
+    this.lookupState.clearCache();
+    return { ok: true };
+  }
+
+  /** The stored link-cache row for a source URL, or null. */
+  @Get("suggestions/cache-row")
+  async linkCacheRow(@Query("sourceUrl") sourceUrl: string): Promise<{
+    row: { links: Record<string, string>; fetchedAt: string } | null;
+  }> {
+    const key = normalizeSourceUrl(sourceUrl);
+    if (!key) return { row: null };
+    const [row] = await this.db
+      .select()
+      .from(songLinkCache)
+      .where(eq(songLinkCache.sourceUrl, key));
+    return {
+      row: row
+        ? { links: row.links, fetchedAt: row.fetchedAt.toISOString() }
+        : null,
+    };
   }
 }

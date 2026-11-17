@@ -29,8 +29,30 @@ export function parseLink(value: string): URL | null {
   }
 }
 
-function Favicon({ host }: { host: string | null }) {
+/** The site's favicon in a tile, or bare at 16px when `compact`. */
+export function Favicon({
+  host,
+  compact = false,
+}: {
+  host: string | null;
+  compact?: boolean;
+}) {
   const [failed, setFailed] = useState(false);
+  if (compact) {
+    return !host || failed ? (
+      <Globe className="size-4 text-muted-foreground" />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`}
+        alt=""
+        width={16}
+        height={16}
+        className="size-4 rounded-sm"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
   if (!host || failed) {
     return (
       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">

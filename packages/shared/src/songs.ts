@@ -128,15 +128,7 @@ export interface ReferenceTag {
   count: number;
 }
 
-export interface SuggestedReference {
-  label: string;
-  value: string;
-}
-
-export interface SongCreated extends SongDetail {
-  /** A Songsterr tab for the new song, never saved automatically. */
-  suggestedReference: SuggestedReference | null;
-}
+export type SongCreated = SongDetail;
 
 export interface DeletedSong {
   id: string;
@@ -168,11 +160,54 @@ export interface ResolveResult {
   candidates: SongCandidate[];
 }
 
-export const suggestTabSchema = z.object({
-  title: z.string().trim().min(1).max(300),
+/**
+ * The only references the app suggests, in tie-break order. `musiclink` is
+ * the MusicLink platform key; adding a provider is one more entry.
+ */
+export const SUGGESTIBLE_REFERENCES = [
+  { key: "spotify", label: "Spotify", musiclink: "spotify" },
+  { key: "youtubeMusic", label: "YouTube Music", musiclink: "youtube_music" },
+  { key: "youtube", label: "YouTube", musiclink: "youtube" },
+  { key: "appleMusic", label: "Apple Music", musiclink: "apple_music" },
+] as const;
+export type SuggestibleKey = (typeof SUGGESTIBLE_REFERENCES)[number]["key"];
+
+/** Hosts whose links may seed a suggestion lookup; anything else is never sent on. */
+export const SUGGESTION_SOURCE_HOSTS = [
+  "open.spotify.com",
+  "music.youtube.com",
+  "www.youtube.com",
+  "youtube.com",
+  "youtu.be",
+  "music.apple.com",
+] as const;
+
+/** True for https links on an allowed streaming host. */
+export function isSuggestionSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return (
+      url.protocol === "https:" &&
+      (SUGGESTION_SOURCE_HOSTS as readonly string[]).includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const suggestReferencesSchema = z.object({
+  title: z.string().trim().max(300).optional(),
   artist: z.string().trim().max(300).optional(),
+  /** A streaming link to the song; MusicLink resolves the others from it. */
+  sourceUrl: z.string().trim().max(2048).optional(),
 });
-export type SuggestTab = z.infer<typeof suggestTabSchema>;
+export type SuggestReferences = z.infer<typeof suggestReferencesSchema>;
+
+export interface ReferenceSuggestion {
+  key: SuggestibleKey;
+  label: string;
+  value: string;
+}
 
 export const importPlaylistSchema = z.object({
   url: z.string().trim().min(1).max(2048),

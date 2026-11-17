@@ -152,4 +152,48 @@ export class TestApi {
   > {
     return this.call("get", "spotify/created-playlists");
   }
+
+  /** Seeds the MusicLink fake with platform links for a source URL. */
+  async seedMusicLink(
+    sourceUrl: string,
+    links: Record<string, string>,
+  ): Promise<void> {
+    await this.call("post", "musiclink/seed", { data: { sourceUrl, links } });
+  }
+
+  /** Makes the MusicLink fake fail every lookup, optionally with a Retry-After. */
+  async failSuggestions(failing: {
+    musiclink?: boolean;
+    retryAfterSeconds?: number;
+  }): Promise<void> {
+    await this.call("post", "suggestions/failing", { data: failing });
+  }
+
+  /** Lookups the MusicLink fake received since the last reset. */
+  async suggestionCalls(): Promise<{ musiclink: string[] }> {
+    return this.call("get", "suggestions/calls");
+  }
+
+  /** Ages the cached link row for a source URL by N days; false when none exists. */
+  async ageLinkCache(sourceUrl: string, days: number): Promise<boolean> {
+    const res = await this.call<{ aged: boolean }>("post", "suggestions/age", {
+      data: { sourceUrl, days },
+    });
+    return res.aged;
+  }
+
+  /** Drops the in-memory suggestion layer so the next lookup reads the table. */
+  async clearSuggestionMemory(): Promise<void> {
+    await this.call("post", "suggestions/clear-memory");
+  }
+
+  /** The stored link-cache row for a source URL, or null. */
+  async linkCacheRow(
+    sourceUrl: string,
+  ): Promise<{ links: Record<string, string>; fetchedAt: string } | null> {
+    const res = await this.call<{
+      row: { links: Record<string, string>; fetchedAt: string } | null;
+    }>("get", "suggestions/cache-row", { params: { sourceUrl } });
+    return res.row;
+  }
 }

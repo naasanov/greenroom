@@ -22,7 +22,7 @@ import {
   type SongDetail,
   type SongSort,
   type SongSummary,
-  type SuggestedReference,
+  type ReferenceSuggestion,
   type UpdateSong,
 } from "@greenroom/shared";
 import { api, getApiUrl } from "@/lib/api";
@@ -200,24 +200,22 @@ export function useResolveSong(bandId: string, input: string) {
   });
 }
 
-/** Songsterr tab suggestion for a title/artist, or null when none matches. */
-export function useSuggestTab(
+/** Whitelisted suggestions for a source link; no request without an allowed link. */
+export function useSuggestedReferences(
   bandId: string,
-  title: string,
-  artist: string,
-  enabled: boolean,
+  sourceUrl: string | null,
 ) {
   return useQuery({
-    queryKey: ["bands", bandId, "song-suggest-tab", title, artist] as const,
+    queryKey: ["bands", bandId, "song-suggest-references", sourceUrl] as const,
     queryFn: async () => {
-      const res = await api(`/bands/${bandId}/songs/suggest-tab`, {
+      const res = await api(`/bands/${bandId}/songs/suggest-references`, {
         method: "POST",
-        body: { title, ...(artist ? { artist } : {}) },
-        schema: typed<{ suggestedReference: SuggestedReference | null }>(),
+        body: { sourceUrl },
+        schema: typed<{ suggestions: ReferenceSuggestion[] }>(),
       });
-      return res.suggestedReference;
+      return res.suggestions;
     },
-    enabled: enabled && title.length > 0,
+    enabled: !!sourceUrl,
     retry: false,
     staleTime: 60_000,
   });

@@ -8,7 +8,7 @@ import {
   GOOGLE_DRIVE,
   GOOGLE_OAUTH,
   GOOGLE_PLACES,
-  SONGSTERR,
+  MUSICLINK,
   SPOTIFY,
   YOUTUBE,
   FAKE_PRIVATE_PLAYLIST_ID,
@@ -22,7 +22,7 @@ import {
   type GoogleDriveAdapter,
   type GoogleOAuthAdapter,
   type GooglePlacesAdapter,
-  type SongsterrAdapter,
+  type MusicLinkAdapter,
   type SpotifyAdapter,
   type YoutubeAdapter,
 } from "../index.js";
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   const places = app.get<GooglePlacesAdapter>(GOOGLE_PLACES);
   const spotify = app.get<SpotifyAdapter>(SPOTIFY);
   const yt = app.get<YoutubeAdapter>(YOUTUBE);
-  const songsterr = app.get<SongsterrAdapter>(SONGSTERR);
+  const musiclink = app.get<MusicLinkAdapter>(MUSICLINK);
   const gh = app.get<GithubAdapter>(GITHUB);
   const email = app.get<EmailAdapter>(EMAIL);
 
@@ -216,17 +216,24 @@ async function main(): Promise<void> {
     );
   }
 
-  // youtube, songsterr, github, email
+  // youtube, musiclink, github, email
   const v = await yt.getVideoMetadata("https://youtu.be/fakeVid0001");
   assert.ok(v.status === "ok" && v.video.channelName === "Fake Band");
   assert.equal(
     (await yt.getVideoMetadata("https://youtu.be/zzzzzzzzzz")).status,
     "not-found",
   );
-  assert.ok(
-    await songsterr.searchTab({ title: "Mr. Brightside", artist: "Killers" }),
+  reg.musiclink.seedLinks("https://open.spotify.com/track/abc", {
+    youtube: "https://www.youtube.com/watch?v=abc",
+  });
+  assert.deepEqual(
+    (await musiclink.findLinks("https://open.spotify.com/track/abc")).links,
+    { youtube: "https://www.youtube.com/watch?v=abc" },
   );
-  assert.equal(await songsterr.searchTab({ title: "Nothing" }), null);
+  assert.deepEqual(
+    (await musiclink.findLinks("https://open.spotify.com/track/none")).links,
+    {},
+  );
   const issue = await gh.createIssue({
     title: "t",
     body: "b",

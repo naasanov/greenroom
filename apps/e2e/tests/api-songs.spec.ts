@@ -34,7 +34,6 @@ async function bandWithClient(testApi: TestApi, email = "a@example.com") {
 interface Created {
   id: string;
   title: string;
-  suggestedReference: { label: string; value: string } | null;
 }
 
 async function addSong(
@@ -88,7 +87,6 @@ test("CRUD with ordered references and soft delete", async ({ testApi }) => {
       { label: "Chart", value: "https://example.com/chart" },
     ],
   });
-  expect(created.suggestedReference).toBeNull();
 
   const got = await (await api.get(`${base}/${created.id}`)).json();
   expect(got).toMatchObject({
@@ -499,39 +497,109 @@ test("YouTube links fill the duration on create and on link edit when empty", as
   expect(kept.durationSeconds).toBe(3725);
 });
 
-test("create suggests a Songsterr tab without saving it", async ({
+test("suggest-references returns whitelisted links, never saved", async ({
   testApi,
 }) => {
   const { api, base } = await bandWithClient(testApi);
-  const tab =
-    "https://www.songsterr.com/a/wsa/the-killers-mr-brightside-tab-s1";
-
-  const hit = await addSong(api, base, {
-    title: "Mr. Brightside",
-    artist: "The Killers",
+  const source = "https://open.spotify.com/track/abc";
+  await testApi.seedMusicLink(source, {
+    apple_music: "https://music.apple.com/x",
+    youtube_music: "https://music.youtube.com/watch?v=x",
+    tidal: "https://tidal.com/x",
+    deezer: "https://deezer.com/x",
   });
-  expect(hit.suggestedReference).toEqual({ label: "Songsterr", value: tab });
-  const stored = await (await api.get(`${base}/${hit.id}`)).json();
+  const hit = await api.post(`${base}/suggest-references`, {
+    data: {
+      title: "Mr. Brightside",
+      artist: "The Killers",
+      sourceUrl: source,
+    },
+  });
+  expect(hit.status()).toBe(200);
+  // Whitelist order; tidal and deezer are never returned.
+  expect((await hit.json()).suggestions).toEqual([
+    {
+      key: "youtubeMusic",
+      label: "YouTube Music",
+      value: "https://music.youtube.com/watch?v=x",
+    },
+    {
+      key: "appleMusic",
+      label: "Apple Music",
+      value: "https://music.apple.com/x",
+    },
+  ]);
+
+  // No source link, or an unseeded one (MusicLink's empty result), is no match.
+  const miss = await api.post(`${base}/suggest-references`, {
+    data: { title: "Totally Original" },
+  });
+  expect((await miss.json()).suggestions).toEqual([]);
+  const empty = await api.post(`${base}/suggest-references`, {
+    data: { title: "T", sourceUrl: "https://open.spotify.com/track/none" },
+  });
+  expect((await empty.json()).suggestions).toEqual([]);
+
+  // Lookup failures are silent: still 200 with no suggestions.
+  await testApi.failSuggestions({ musiclink: true });
+  const failing = "https://open.spotify.com/track/failing";
+  const failed = await api.post(`${base}/suggest-references`, {
+    data: { title: "Seven Nation Army", sourceUrl: failing },
+  });
+  expect(failed.status()).toBe(200);
+  expect((await failed.json()).suggestions).toEqual([]);
+  expect((await testApi.suggestionCalls()).musiclink).toContain(failing);
+
+  const created = await addSong(api, base, { title: "Mr. Brightside" });
+  const stored = await (await api.get(`${base}/${created.id}`)).json();
   expect(stored.references).toEqual([]);
+  await api.dispose();
+});
 
-  const miss = await addSong(api, base, { title: "Totally Original" });
-  expect(miss.suggestedReference).toBeNull();
+test("MusicLink lookups are cached per source URL and never retried", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const ask = (n: number) =>
+    api.post(`${base}/suggest-references`, {
+      data: { title: "T", sourceUrl: `https://open.spotify.com/track/t${n}` },
+    });
+  await testApi.seedMusicLink("https://open.spotify.com/track/t0", {
+    apple_music: "https://music.apple.com/t0",
+  });
+  const first = await (await ask(0)).json();
+  const again = await (await ask(0)).json();
+  expect(again).toEqual(first);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(1);
 
-  // No suggestion when the song already carries a Songsterr row.
-  const has = await addSong(api, base, {
-    title: "Seven Nation Army",
-    artist: "The White Stripes",
-    references: [{ label: "songsterr", value: "https://x.test/tab" }],
-  });
-  expect(has.suggestedReference).toBeNull();
+  // A rate-limited lookup reaches the adapter once; the next one is held back.
+  await testApi.failSuggestions({ musiclink: true, retryAfterSeconds: 600 });
+  await ask(1);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(2);
+  await ask(1);
+  await ask(2);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(2);
+  await api.dispose();
+});
 
-  const direct = await api.post(`${base}/suggest-tab`, {
-    data: { title: "Seven Nation Army", artist: "White Stripes" },
+test("a Retry-After from MusicLink pauses further lookups", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const ask = (n: number) =>
+    api.post(`${base}/suggest-references`, {
+      data: { title: "T", sourceUrl: `https://open.spotify.com/track/r${n}` },
+    });
+  await testApi.failSuggestions({ musiclink: true, retryAfterSeconds: 600 });
+  const limited = await ask(0);
+  expect(limited.status()).toBe(200);
+  expect((await limited.json()).suggestions).toEqual([]);
+  await testApi.failSuggestions({ musiclink: false });
+  await testApi.seedMusicLink("https://open.spotify.com/track/r1", {
+    apple_music: "https://music.apple.com/r1",
   });
-  expect(direct.status()).toBe(200);
-  expect((await direct.json()).suggestedReference).toMatchObject({
-    label: "Songsterr",
-  });
+  expect((await (await ask(1)).json()).suggestions).toEqual([]);
+  expect((await testApi.suggestionCalls()).musiclink).toHaveLength(1);
   await api.dispose();
 });
 

@@ -11,7 +11,6 @@ import type {
   SongCreated,
   SongDetail,
   SongSummary,
-  SuggestedReference,
 } from "@greenroom/shared";
 import {
   ConfirmDialog,
@@ -41,9 +40,11 @@ import { CandidatePreview } from "./candidate-preview";
 import { SmartInput } from "./smart-input";
 import { SongLinkEditor } from "./song-link-editor";
 import { SongForm } from "./song-form";
+import { SuggestedReferenceChips } from "./suggested-reference-chips";
 import {
   formatDuration,
   songArt,
+  sourceUrlOf,
   toSongBody,
   type SongFormValues,
 } from "./song-utils";
@@ -264,19 +265,28 @@ function ReferencesSection({
 }) {
   const update = useUpdateSong(bandId, song.id);
   const [rows, setRows] = useState<SongFormValues["references"] | null>(null);
-  const save = () => {
+  const done = () => {
     if (!rows) return;
     const { references } = toSongBody({
       ...valuesFromSong(song),
       references: rows,
     });
+    const { references: before } = toSongBody(valuesFromSong(song));
+    if (JSON.stringify(references) === JSON.stringify(before)) {
+      setRows(null);
+      return;
+    }
     update.mutate({ references }, { onSuccess: () => setRows(null) });
   };
   return (
     <Section
       label="Reference"
       action={
-        rows ? null : (
+        rows ? (
+          <Button size="sm" disabled={update.isPending} onClick={done}>
+            {update.isPending ? "Saving..." : "Done"}
+          </Button>
+        ) : (
           <Button
             variant="ghost"
             size="icon"
@@ -291,20 +301,28 @@ function ReferencesSection({
     >
       {rows ? (
         <div data-testid="references-edit" className="flex flex-col gap-3">
-          <SongLinkEditor rows={rows} onChange={setRows} />
+          <SongLinkEditor
+            rows={rows}
+            onChange={setRows}
+            extra={
+              <SuggestedReferenceChips
+                bandId={bandId}
+                sourceUrl={sourceUrlOf(song.references)}
+                rows={rows}
+                onAdd={(label, value) =>
+                  setRows([
+                    ...rows,
+                    { id: `row-${crypto.randomUUID()}`, label, value },
+                  ])
+                }
+              />
+            }
+          />
           {update.isError ? (
             <p role="alert" className="text-sm text-destructive">
               Could not save your changes. Please try again.
             </p>
           ) : null}
-          <div className="flex gap-2">
-            <Button size="sm" disabled={update.isPending} onClick={save}>
-              {update.isPending ? "Saving..." : "Save references"}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setRows(null)}>
-              Cancel
-            </Button>
-          </div>
         </div>
       ) : (
         <LinkList
@@ -469,11 +487,6 @@ export function SongSheet({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [offer, setOffer] = useState<{
-    songId: string;
-    ref: SuggestedReference;
-  } | null>(null);
-  const [dismissedTab, setDismissedTab] = useState<string | null>(null);
   if (resetKey !== prevKey) {
     setPrevKey(resetKey);
     setEditing(false);
@@ -511,14 +524,6 @@ export function SongSheet({
       {
         onSuccess: (created) => {
           handleDirty(false);
-          const ref = created.suggestedReference;
-          if (
-            ref &&
-            ref.value !== dismissedTab &&
-            !created.references.some((r) => r.value === ref.value)
-          ) {
-            setOffer({ songId: created.id, ref });
-          }
           onCreated(created);
         },
         onError: (e) => {
@@ -543,19 +548,6 @@ export function SongSheet({
       if (!next) handleDirty(false);
       setEditing(next);
     }
-  }
-
-  function addOfferedTab() {
-    if (!song || !offer) return;
-    update.mutate(
-      {
-        references: [
-          ...song.references.map(({ label, value }) => ({ label, value })),
-          offer.ref,
-        ],
-      },
-      { onSuccess: () => setOffer(null) },
-    );
   }
 
   // The sheet is non-modal on desktop, or everywhere when `nonModal`: a press on
@@ -645,10 +637,8 @@ export function SongSheet({
         bandId={bandId}
         defaults={draft.values}
         art={draft.meta.imageUrl}
-        suggestTab
         onSubmit={(v) => submitCreate(v, false)}
         onDirtyChange={handleDirty}
-        onDismissTab={setDismissedTab}
         notice={
           duplicateId ? (
             <div
@@ -706,7 +696,6 @@ export function SongSheet({
         bandId={bandId}
         defaults={valuesFromSong(song)}
         art={songArt(song)}
-        suggestTab={false}
         onSubmit={submitEdit}
         onDirtyChange={handleDirty}
         notice={
@@ -730,25 +719,6 @@ export function SongSheet({
   } else {
     body = (
       <div className="flex flex-col gap-5">
-        {song && offer && offer.songId === song.id ? (
-          <div
-            data-testid="songsterr-offer"
-            className="flex items-center gap-2 rounded-2xl bg-gig-soft px-3 py-2 text-sm text-gig-soft-foreground"
-          >
-            <span className="flex-1">Found a tab on Songsterr. Add it?</span>
-            <Button type="button" size="sm" onClick={addOfferedTab}>
-              Add tab
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setOffer(null)}
-            >
-              No thanks
-            </Button>
-          </div>
-        ) : null}
         <SongView
           bandId={bandId}
           song={shown}

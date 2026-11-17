@@ -127,9 +127,12 @@ function TagInput({
 export function SongLinkEditor({
   rows,
   onChange,
+  extra,
 }: {
   rows: LinkRow[];
   onChange: (rows: LinkRow[]) => void;
+  /** Rendered after the "Add row" button, wrapping with it. */
+  extra?: React.ReactNode;
 }) {
   const { currentBand } = useCurrentBand();
   const tags = useReferenceTags(currentBand?.id).data ?? [];
@@ -170,19 +173,22 @@ export function SongLinkEditor({
           />
         </div>
       ))}
-      <Button
-        type="button"
-        variant="outline"
-        className="self-start border-dashed"
-        onClick={() =>
-          onChange([
-            ...rows,
-            { id: `row-${crypto.randomUUID()}`, label: "", value: "" },
-          ])
-        }
-      >
-        <Plus /> Add row
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="border-dashed"
+          onClick={() =>
+            onChange([
+              ...rows,
+              { id: `row-${crypto.randomUUID()}`, label: "", value: "" },
+            ])
+          }
+        >
+          <Plus /> Add row
+        </Button>
+        {extra}
+      </div>
     </div>
   );
 }

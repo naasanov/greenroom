@@ -212,24 +212,6 @@ test("duplicate warning links to the song and allows add anyway", async ({
   );
 });
 
-test("Songsterr suggestion is added with one tap", async ({
-  page,
-  testApi,
-  loginAs,
-}) => {
-  await startAdd(page, testApi, loginAs);
-  await smart(page).fill("brightside");
-  await pickCandidate(page);
-  const suggestion = sheet(page).getByTestId("songsterr-suggestion");
-  await expect(suggestion).toContainText("Found a tab on Songsterr. Add it?");
-  await suggestion.getByRole("button", { name: "Add tab" }).click();
-  await expect(suggestion).toHaveCount(0);
-  await sheet(page).getByRole("button", { name: "Done" }).click();
-  await expect(
-    sheet(page).getByTestId("reference-link").filter({ hasText: "Songsterr" }),
-  ).toBeVisible();
-});
-
 test("a pasted playlist link switches to the import flow", async ({
   page,
   testApi,

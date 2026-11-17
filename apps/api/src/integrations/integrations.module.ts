@@ -12,8 +12,9 @@ import { GOOGLE_OAUTH } from "./google-oauth/google-oauth.adapter.js";
 import { RealGoogleOAuthAdapter } from "./google-oauth/google-oauth.real.js";
 import { GOOGLE_PLACES } from "./google-places/google-places.adapter.js";
 import { RealGooglePlacesAdapter } from "./google-places/google-places.real.js";
-import { SONGSTERR } from "./songsterr/songsterr.adapter.js";
-import { RealSongsterrAdapter } from "./songsterr/songsterr.real.js";
+import { MUSICLINK } from "./musiclink/musiclink.adapter.js";
+import { RealMusicLinkAdapter } from "./musiclink/musiclink.real.js";
+import { SuggestionLookupState } from "./suggestion-lookup-state.js";
 import { SPOTIFY } from "./spotify/spotify.adapter.js";
 import { RealSpotifyAdapter } from "./spotify/spotify.real.js";
 import { YOUTUBE } from "./youtube/youtube.adapter.js";
@@ -37,6 +38,7 @@ function bind(
 
 const providers: Provider[] = [
   FakeIntegrationsRegistry,
+  SuggestionLookupState,
   bind(GOOGLE_OAUTH, (r) => r.googleOAuth, RealGoogleOAuthAdapter),
   DriveAncestryCache,
   {
@@ -51,7 +53,7 @@ const providers: Provider[] = [
   bind(GOOGLE_PLACES, (r) => r.googlePlaces, RealGooglePlacesAdapter),
   bind(SPOTIFY, (r) => r.spotify, RealSpotifyAdapter),
   bind(YOUTUBE, (r) => r.youtube, RealYoutubeAdapter),
-  bind(SONGSTERR, (r) => r.songsterr, RealSongsterrAdapter),
+  bind(MUSICLINK, (r) => r.musiclink, RealMusicLinkAdapter),
   bind(GITHUB, (r) => r.github, RealGithubAdapter),
   bind(EMAIL, (r) => r.email, RealEmailAdapter),
 ];
@@ -61,13 +63,14 @@ const providers: Provider[] = [
   providers,
   exports: [
     FakeIntegrationsRegistry,
+    SuggestionLookupState,
     DriveAncestryCache,
     GOOGLE_OAUTH,
     GOOGLE_DRIVE,
     GOOGLE_PLACES,
     SPOTIFY,
     YOUTUBE,
-    SONGSTERR,
+    MUSICLINK,
     GITHUB,
     EMAIL,
   ],
