@@ -224,7 +224,7 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
           )}
           {sent ? (
             <DialogFooter>
-              <Button size="lg" onClick={() => setOpen(false)}>
+              <Button size="lg" autoFocus onClick={() => setOpen(false)}>
                 Done
               </Button>
             </DialogFooter>

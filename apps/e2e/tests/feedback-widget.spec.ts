@@ -22,6 +22,7 @@ test("opens, sends, and confirms; the issue reaches the fake", async ({
   await expect(dialog.getByLabel("Area")).toHaveValue("Events");
   await send.click();
   await expect(page.getByTestId("feedback-sent")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Done" })).toBeFocused();
   const [issue] = await testApi.githubIssues();
   expect(issue!.body).toContain("The widget works");
   expect(issue!.body).toContain("/events");
