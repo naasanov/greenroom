@@ -218,6 +218,9 @@ test("the library picker sorts songs and shares the Music Library sort", async (
 }) => {
   await openGig(page, seed.gigs.tentative);
   await openLibrary(page);
+  await expect(
+    page.getByRole("searchbox", { name: "Search the library" }),
+  ).toBeFocused();
 
   const names = async () =>
     (
@@ -557,9 +560,7 @@ test.describe("copy from a gig", () => {
     await openGig(page, seed.gigs.tentative);
     await openHistory(page);
     await page
-      .getByTestId("history-entry")
-      .filter({ hasText: "The Rusty Anchor" })
-      .getByTestId("history-preview-toggle")
+      .getByRole("button", { name: /Preview songs in The Rusty Anchor/ })
       .click();
     const preview = page.getByTestId("history-preview");
     await expect(preview).toContainText("Red Line");

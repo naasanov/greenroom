@@ -137,11 +137,26 @@ function LibraryView({
     [songs, q],
   );
   const draggable = builder.mode === "side";
-  // Focus waits two frames so the drawer is visible and not inert, and the focus trap has settled.
   const searchRef = useRef<HTMLInputElement>(null);
   const entered = useEntered(builder.libraryOpen);
+  // Retries per frame until the drawer's visibility transition lets focus land, and
+  // gives up once focus moves elsewhere (e.g. the Sort menu) so it never steals it.
   useEffect(() => {
-    if (entered) searchRef.current?.focus({ preventScroll: true });
+    if (!entered) return;
+    const input = searchRef.current;
+    if (!input) return;
+    const start = document.activeElement;
+    let frames = 0;
+    let id = 0;
+    const tick = () => {
+      input.focus({ preventScroll: true });
+      const active = document.activeElement;
+      const moved = active !== start && active !== document.body;
+      if (active === input || moved || ++frames >= 30) return;
+      id = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(id);
   }, [entered]);
 
   return (
