@@ -2,6 +2,7 @@
 
 import {
   CheckSquare,
+  ExternalLink,
   FolderOpen,
   FolderPlus,
   Grid2x2,
@@ -43,14 +44,19 @@ import {
   useSetFileSongs,
   useTrashFiles,
 } from "@/lib/queries/files";
-import { useGoogleIntegrations } from "@/lib/queries/google";
+import { useDriveStatus, useGoogleIntegrations } from "@/lib/queries/google";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "./breadcrumbs";
 import { FileRow, FileTile, type EntryProps } from "./file-entry";
 import { FilesSkeleton } from "./files-skeleton";
 import { FileViewer } from "./file-viewer";
-import { driveOpenUrl, entryHref, isGoogleDoc, isProtected } from "./file-utils";
+import {
+  driveOpenUrl,
+  entryHref,
+  isGoogleDoc,
+  isProtected,
+} from "./file-utils";
 import type { EntryActions } from "./item-menu";
 import { LinkGigDialog } from "./link-gig-dialog";
 import { LinkSongsDrawer } from "./link-songs-drawer";
@@ -115,6 +121,8 @@ export function FilesView({
   const integrations = useGoogleIntegrations(bandId);
   const drive = integrations.data?.drive;
   const driveReady = drive ? drive.linked && !!drive.folderId : undefined;
+  const driveFolderUrl = useDriveStatus(bandId, driveReady === true).data
+    ?.folderUrl;
   const listing = useFilesFolder(
     bandId,
     folderId,
@@ -391,6 +399,23 @@ export function FilesView({
               >
                 <CheckSquare />
               </Button>
+              {driveFolderUrl ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                  className="text-muted-foreground"
+                >
+                  <a
+                    href={driveFolderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open in Drive"
+                  >
+                    <ExternalLink />
+                  </a>
+                </Button>
+              ) : null}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button className="ml-1 hidden md:inline-flex">
