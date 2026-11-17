@@ -236,7 +236,7 @@ test("untouched drawer closes silently; dirty drawer asks to discard", async ({
   expect(seed.gigs.upcomingClub.id).toBeTruthy();
 });
 
-test("a new practice can start from a past gig's setlist", async ({
+test("a new practice can start from a gig's setlist", async ({
   page,
   testApi,
 }) => {
@@ -255,9 +255,32 @@ test("a new practice can start from a past gig's setlist", async ({
   const pane = await pickSide(page, "practice");
   await pane.getByLabel("Title").fill("Setlist jam");
   await pane.getByLabel("Date", { exact: true }).fill(isoDay(3));
-  await pane.getByLabel("Setlist (optional)").selectOption({ index: 1 });
+  await pane.getByLabel("Setlist (optional)").selectOption(sl.id);
   await pane.getByRole("button", { name: "Create practice" }).click();
   const dialog = page.getByRole("dialog", { name: "Setlist jam" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("setlist-row")).toHaveCount(1);
+});
+
+test("a new practice can copy the setlist of an upcoming gig", async ({
+  page,
+  testApi,
+}) => {
+  const api = await apiAs(testApi, AVA);
+  const bandId = seed.bands.nightOwls.id;
+  const sl = await (
+    await api.get(`/bands/${bandId}/gigs/${seed.gigs.upcomingClub.id}/setlist`)
+  ).json();
+  await api.dispose();
+
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const pane = await pickSide(page, "practice");
+  await pane.getByLabel("Title").fill("Dress rehearsal");
+  await pane.getByLabel("Date", { exact: true }).fill(isoDay(3));
+  await pane.getByLabel("Setlist (optional)").selectOption(sl.id);
+  await pane.getByRole("button", { name: "Create practice" }).click();
+  const dialog = page.getByRole("dialog", { name: "Dress rehearsal" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("setlist-row")).toHaveCount(5);
 });

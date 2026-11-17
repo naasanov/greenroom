@@ -151,7 +151,10 @@ test("tapping a day while a gig is open hands off to the create drawer", async (
   await sawExiting(page, a.title);
   await expect(live(page, "New event")).toBeVisible();
   await expect(page).toHaveURL(/\/events$/);
-  await expect(drawer(page, a.title)).toHaveCount(0);
+  // The create drawer's setlist picker lists gig titles, so exclude it from the match.
+  await expect(
+    drawer(page, a.title).filter({ hasNotText: "New event" }),
+  ).toHaveCount(0);
   await expect(page.locator("[data-vaul-drawer]")).toHaveCount(1);
 });
 

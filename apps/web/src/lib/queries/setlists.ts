@@ -32,6 +32,15 @@ export const setlistKeys = {
     ["bands", bandId, "setlist-history"] as const,
 };
 
+/** Refetches every cached setlist and gig-setlist query, which embed song data. */
+export function invalidateSetlists(qc: QueryClient, bandId: string) {
+  void qc.invalidateQueries({ queryKey: ["bands", bandId, "setlists"] });
+  void qc.invalidateQueries({
+    queryKey: ["bands", bandId, "gigs"],
+    predicate: (q) => q.queryKey[4] === "setlist",
+  });
+}
+
 /** The song fields an optimistic setlist row needs. */
 export type SetlistSong = Pick<
   SongSummary,
@@ -67,7 +76,7 @@ export function useSetlist(bandId: string, setlistId: string | undefined) {
   });
 }
 
-/** Past gigs with a setlist, newest first; the caller filters out the current gig. */
+/** Gigs with a setlist, newest first; the caller filters out the current gig. */
 export function useSetlistHistory(bandId: string, q: string, enabled: boolean) {
   return useQuery({
     queryKey: setlistKeys.history(bandId, q),

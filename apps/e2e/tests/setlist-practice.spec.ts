@@ -123,7 +123,7 @@ test("adding songs to a practice with no setlist forks from that occurrence", as
     page.getByRole("button", { name: "Edit setlist" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Copy from a past gig" }),
+    page.getByRole("button", { name: "Copy from a gig" }),
   ).toHaveCount(0);
   await expect(
     page.getByText("Changes apply to this and later practices."),

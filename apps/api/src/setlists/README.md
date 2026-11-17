@@ -9,8 +9,8 @@ All routes are under `/bands/:bandId/...` and use `@BandMember()` (non-members g
 | `PUT /setlists/:setlistId/items`            | `{ songIds }`: replaces the whole order (reorder, add, remove in one call).                                                                                                |
 | `POST /setlists/:setlistId/items`           | `{ songId }`: append (tap-to-add).                                                                                                                                         |
 | `DELETE /setlists/:setlistId/items/:songId` | Remove one song.                                                                                                                                                           |
-| `POST /setlists/:setlistId/copy`            | `{ sourceSetlistId, mode: replace (default) \| append }`: duplicate a past setlist into this one.                                                                          |
-| `GET /setlists/history?q=&limit=`           | Past gigs (date today or earlier) whose setlist has songs, newest first; `q` matches title or venue. Each entry has `setlistId` to copy from.                              |
+| `POST /setlists/:setlistId/copy`            | `{ sourceSetlistId, mode: replace (default) \| append }`: duplicate another setlist into this one.                                                                          |
+| `GET /setlists/history?q=&limit=`           | Gigs, past or upcoming, whose setlist has songs, newest first; `q` matches title or venue. Each entry has `setlistId` to copy from.                              |
 | `POST /setlists/:setlistId/songs`           | Add-song-in-place: body is the songs create body (`force` included); creates the song and appends it. Returns `{ song, setlist }`. 409 `DUPLICATE_SONG` like songs create. |
 
 Practice occurrence setlists are managed through the events routes (`POST|PUT|DELETE /practices/:seriesId/occurrences/:key/setlist`, see `events/README.md`); their items use the routes above.
