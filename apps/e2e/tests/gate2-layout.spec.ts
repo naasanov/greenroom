@@ -1,7 +1,13 @@
 import type { BandSeedResult } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { agendaCard, agendaSheet, openAgenda } from "./agenda-helpers.js";
-import { AVA, calendar, eventIn, showGigDate } from "./events-helpers.js";
+import {
+  AVA,
+  calendar,
+  eventIn,
+  pageAwayFromDay,
+  showGigDate,
+} from "./events-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -177,17 +183,15 @@ test("tapping an agenda card brings its month into view, even on a repeat tap", 
   await page.goto("/events");
   await openAgenda(page);
   const title = page.getByTestId("calendar-title");
-  const next = calendar(page).getByRole("button", { name: "Next" });
   const card = agendaCard(page, gig.title);
   await card.scrollIntoViewIfNeeded();
-  await next.click();
-  await next.click();
-  await next.click();
+  // The gig can sit in a neighbouring month's grid, where a card tap would not navigate.
+  await pageAwayFromDay(page, gig.date);
   const away = await title.textContent();
   await card.click();
   await expect(title).not.toHaveText(away!);
   const home = await title.textContent();
-  await next.click();
+  await pageAwayFromDay(page, gig.date);
   await expect(title).not.toHaveText(home!);
   await card.click();
   await expect(title).toHaveText(home!);
