@@ -13,6 +13,9 @@ import { cards, openLibrary, sheet } from "./library-helpers.js";
 
 const FILES = `/bands/${BAND}/files`;
 
+// Gigs folder steps wait on a chain of API calls (link, status, folder listing).
+const SLOW = { timeout: 20_000 };
+
 async function pickerFolder(ava: APIRequestContext, name: string) {
   const picker = await (await ava.get(`${DRIVE}/fake-picker`)).json();
   return picker.folders.find((f: { name: string }) => f.name === name)
@@ -65,7 +68,7 @@ test.describe("Drive import: gigs root step", () => {
     await picker.getByRole("button", { name: "Band stuff" }).click();
     await expect(
       picker.getByRole("heading", { name: "Where do your gigs go?" }),
-    ).toBeVisible();
+    ).toBeVisible(SLOW);
     await expect(picker).toContainText("nothing in Drive is moved or renamed");
     await expect(picker).toContainText("not gigs until you link them");
     await expect(
@@ -73,10 +76,11 @@ test.describe("Drive import: gigs root step", () => {
     ).toBeChecked();
     await picker.getByRole("radio", { name: "Shows" }).check();
     await picker.getByRole("button", { name: "Confirm" }).click();
-    await expect(picker).toBeHidden();
+    await expect(picker).toBeHidden(SLOW);
 
     await expect(page.getByTestId("settings-google-gigs-folder")).toContainText(
       "Gigs folder: Shows",
+      SLOW,
     );
     const status = await driveStatus(ava);
     expect(status.folderId).toBe(band);
@@ -91,18 +95,22 @@ test.describe("Drive import: gigs root step", () => {
     await openDriveChooser(page);
     const picker = page.getByTestId("drive-picker");
     await picker.getByRole("button", { name: "Band stuff" }).click();
+    await expect(
+      picker.getByRole("heading", { name: "Where do your gigs go?" }),
+    ).toBeVisible(SLOW);
     const reused = (await driveStatus(ava)).gigsFolderId;
     await picker
       .getByRole("radio", { name: "Create a new Gigs folder" })
       .check();
     await picker.getByRole("button", { name: "Confirm" }).click();
-    await expect(picker).toBeHidden();
+    await expect(picker).toBeHidden(SLOW);
 
     await expect
       .poll(async () => (await driveStatus(ava)).gigsFolderId)
       .not.toBe(reused);
     await expect(page.getByTestId("settings-google-gigs-folder")).toContainText(
       "Gigs folder: Gigs",
+      SLOW,
     );
   });
 
@@ -114,13 +122,17 @@ test.describe("Drive import: gigs root step", () => {
     await openDriveChooser(page);
     const picker = page.getByTestId("drive-picker");
     await picker.getByRole("button", { name: "Band stuff" }).click();
+    await expect(
+      picker.getByRole("heading", { name: "Where do your gigs go?" }),
+    ).toBeVisible(SLOW);
     const kept = (await driveStatus(ava)).gigsFolderId;
     expect(kept).toBeTruthy();
     await picker.getByRole("button", { name: "Confirm" }).click();
-    await expect(picker).toBeHidden();
+    await expect(picker).toBeHidden(SLOW);
     expect((await driveStatus(ava)).gigsFolderId).toBe(kept);
     await expect(page.getByTestId("settings-google-gigs-folder")).toContainText(
       "Gigs folder: Gigs",
+      SLOW,
     );
   });
 
@@ -141,13 +153,13 @@ test.describe("Drive import: gigs root step", () => {
 
     await page.goto("/settings?tab=connections");
     const line = page.getByTestId("settings-google-gigs-folder");
-    await expect(line).toContainText("Gigs folder: Gigs");
+    await expect(line).toContainText("Gigs folder: Gigs", SLOW);
     await line.getByRole("button", { name: "Change" }).click();
     const dialog = page.getByTestId("gigs-root-dialog");
     await dialog.getByRole("radio", { name: "Shows" }).check();
     await dialog.getByRole("button", { name: "Confirm" }).click();
-    await expect(dialog).toBeHidden();
-    await expect(line).toContainText("Gigs folder: Shows");
+    await expect(dialog).toBeHidden(SLOW);
+    await expect(line).toContainText("Gigs folder: Shows", SLOW);
     expect((await driveStatus(ava)).gigsFolderId).toBe(shows.id);
   });
 });
