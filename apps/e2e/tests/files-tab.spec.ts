@@ -382,6 +382,23 @@ test("opens a file in the viewer", async ({ page }) => {
   await expect(viewer).toBeHidden();
 });
 
+test("the header links to the band's Drive folder in a new tab", async ({
+  page,
+}) => {
+  const status = await (
+    await m.ava.get(`/bands/${BAND}/integrations/google/drive/status`)
+  ).json();
+  await page.goto("/files");
+  const link = page
+    .getByRole("link", { name: "Open in Drive" })
+    .filter({ visible: true });
+  await expect(link).toHaveAttribute("href", status.folderUrl, {
+    timeout: 20_000,
+  });
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", /noopener/);
+});
+
 test("a Google document opens in Drive in a new tab", async ({ page }) => {
   const doc = await m.fake.external({
     action: "add",
@@ -468,6 +485,9 @@ test("an unlinked band sees the Drive link prompt", async ({
   ).toBeAttached();
   await page.goto("/files");
   await expect(page.getByTestId("drive-link-prompt")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in Drive" })).toHaveCount(
+    0,
+  );
   await expect(page.getByTestId("file-row")).toHaveCount(0);
   expect(folderCalls).toEqual([]);
   expect(failures).toEqual([]);
