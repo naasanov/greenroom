@@ -12,3 +12,5 @@ applies-to: apps/e2e/**
 
 **How to apply:** avoid starting the full suite near midnight; check `git status` after running format. See [[e2e-test-scope]].
 - On the factory, Playwright WebKit dies at launch with a Bus error (exit 135), even outside the tests (seen 2026-10-27), so local runs use `pnpm test:e2e -- --project=desktop <filters>` and mobile coverage comes from CI.
+- If the system Postgres on the factory is down (the `postgres` user owns the data dir, `dev` cannot restart it), local e2e still works against a private cluster: `initdb -D <tmp>/pg --auth=trust -U greenroom`, `pg_ctl -o "-p 5433"`, create `greenroom` and `greenroom_test`, then export `DATABASE_URL` and `TEST_DATABASE_URL` pointing at port 5433 (seen 2026-11-17).
+- Never wrap `pnpm test:e2e` in a short `timeout`: killing it mid-run orphans the detached API (4100) and web (3100) servers, which keep serving the old build and make every later run fail oddly. A cold turbo build alone can take several minutes on the factory.
