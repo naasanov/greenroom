@@ -43,7 +43,7 @@ test("label input suggests used tags; keyboard, click and new names work", async
 
   await label.fill("tab");
   const list = s.getByRole("listbox", { name: "Suggested tags" });
-  await expect(list.getByRole("option")).toHaveText([/Guitar tab/]);
+  await expect(list.getByRole("option")).toHaveText(["Guitar tab"]);
   await label.press("ArrowDown");
   await label.press("Enter");
   await expect(label).toHaveValue("Guitar tab");

@@ -2,24 +2,43 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
-import type { ReferenceTag } from "@greenroom/shared";
-import type { LinkRow } from "@/components/app/link-list";
+import {
+  SUGGESTIBLE_REFERENCES,
+  findMagicReference,
+  type ReferenceTag,
+} from "@greenroom/shared";
+import { Favicon, type LinkRow } from "@/components/app/link-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCurrentBand } from "@/lib/current-band";
 import { useReferenceTags } from "@/lib/queries/songs";
 import { cn } from "@/lib/utils";
+import { invalidMagicKey } from "./song-utils";
 
 const MAX_SUGGESTIONS = 6;
 
-/** Prefix matches first, then contains matches; the tag typed in full is dropped. */
+/**
+ * Band tags first, then magic keys the band has not used (matched
+ * case-insensitively). Prefix matches rank before contains matches, the tag
+ * typed in full is dropped, and magic keys show their canonical label.
+ */
 export function matchTags(tags: ReferenceTag[], query: string): ReferenceTag[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  const seen = new Set<string>();
   const starts: ReferenceTag[] = [];
   const contains: ReferenceTag[] = [];
-  for (const t of tags) {
+  const candidates = [
+    ...tags.map((t) => ({
+      ...t,
+      label: findMagicReference(t.label)?.label ?? t.label,
+    })),
+    ...SUGGESTIBLE_REFERENCES.map((r) => ({ label: r.label, count: 0 })),
+  ];
+  for (const t of candidates) {
     const l = t.label.toLowerCase();
+    if (seen.has(l)) continue;
+    seen.add(l);
     if (l === q) continue;
     if (l.startsWith(q)) starts.push(t);
     else if (l.includes(q)) contains.push(t);
@@ -27,7 +46,7 @@ export function matchTags(tags: ReferenceTag[], query: string): ReferenceTag[] {
   return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
 }
 
-/** Label input with a combobox listbox of the band's previously used tags. */
+/** Label input with a combobox listbox of the band's tags and the magic keys. */
 function TagInput({
   value,
   tags,
@@ -44,14 +63,25 @@ function TagInput({
   const open = options.length > 0;
   const activeIndex = active < options.length ? active : -1;
 
+  const magic = findMagicReference(value);
   const pick = (label: string) => {
-    onChange(label);
+    onChange(findMagicReference(label)?.label ?? label);
     setActive(-1);
   };
 
   return (
     <div className="relative min-w-0 flex-1">
+      {magic ? (
+        <span
+          data-testid="label-favicon"
+          data-key={magic.key}
+          className="pointer-events-none absolute top-[22px] left-3 -translate-y-1/2"
+        >
+          <Favicon host={magic.hosts[0]} compact />
+        </span>
+      ) : null}
       <Input
+        className={magic ? "pl-9" : undefined}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
@@ -109,9 +139,6 @@ function TagInput({
               )}
             >
               <span className="truncate">{t.label}</span>
-              <span className="text-xs text-muted-foreground">
-                {t.count} {t.count === 1 ? "song" : "songs"}
-              </span>
             </li>
           ))}
         </ul>
@@ -141,38 +168,48 @@ export function SongLinkEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      {rows.map((row) => (
-        <div
-          key={row.id}
-          data-testid="link-row"
-          className="flex flex-col gap-2 rounded-2xl border bg-card p-2 shadow-soft"
-        >
-          <div className="flex items-start gap-2">
-            <TagInput
-              value={row.label}
-              tags={tags}
-              onChange={(label) => update(row.id, { label })}
+      {rows.map((row) => {
+        const invalid = invalidMagicKey(row);
+        return (
+          <div
+            key={row.id}
+            data-testid="link-row"
+            className="flex flex-col gap-2 rounded-2xl border bg-card p-2 shadow-soft"
+          >
+            <div className="flex items-start gap-2">
+              <TagInput
+                value={row.label}
+                tags={tags}
+                onChange={(label) => update(row.id, { label })}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Remove row"
+                onClick={() => onChange(rows.filter((r) => r.id !== row.id))}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+            <Input
+              value={row.value}
+              onChange={(e) => update(row.id, { value: e.target.value })}
+              placeholder="Link or text"
+              aria-label="Reference value"
+              inputMode="url"
+              autoCapitalize="none"
+              aria-invalid={invalid ? true : undefined}
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Remove row"
-              onClick={() => onChange(rows.filter((r) => r.id !== row.id))}
-            >
-              <Trash2 />
-            </Button>
+            {invalid ? (
+              <p role="alert" className="px-1 text-sm text-destructive">
+                {invalid.label} needs an https link on{" "}
+                {invalid.hosts.join(" or ")}
+              </p>
+            ) : null}
           </div>
-          <Input
-            value={row.value}
-            onChange={(e) => update(row.id, { value: e.target.value })}
-            placeholder="Link or text"
-            aria-label="Reference value"
-            inputMode="url"
-            autoCapitalize="none"
-          />
-        </div>
-      ))}
+        );
+      })}
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
