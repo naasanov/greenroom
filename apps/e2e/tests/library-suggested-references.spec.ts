@@ -299,13 +299,9 @@ test("musiclink real adapter: first track item, whitelisted https platforms only
     });
 
     globalThis.fetch = reply(200, { success: true, data: [] });
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({ links: {} });
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({ links: {} });
     globalThis.fetch = reply(404, { success: false });
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({ links: {} });
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({ links: {} });
   } finally {
     globalThis.fetch = real;
     if (priorKey === undefined) delete process.env.MUSICLINK_API_KEY;
@@ -327,51 +323,37 @@ test("musiclink real adapter: 429, other non-2xx, bad payloads and timeouts are 
     };
   try {
     globalThis.fetch = reply(429, {}, { "retry-after": "90" });
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
       retryAfterSeconds: 90,
     });
     globalThis.fetch = reply(429, {});
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
     globalThis.fetch = reply(500, {});
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
     globalThis.fetch = reply(200, ["nope"]);
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
     globalThis.fetch = reply(200, { success: true, data: "nope" });
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
     globalThis.fetch = async () => {
       throw new Error("timeout");
     };
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
 
     delete process.env.MUSICLINK_API_KEY;
     calls = 0;
     globalThis.fetch = reply(200, { success: true, data: [] });
-    expect(
-      await adapter.findLinks("https://music.apple.com/us/song/a"),
-    ).toEqual({
+    expect(await adapter.findLinks("https://x.test/a")).toEqual({
       links: null,
     });
     expect(calls).toBe(0);

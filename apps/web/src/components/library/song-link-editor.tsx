@@ -18,32 +18,42 @@ import { invalidMagicKey } from "./song-utils";
 const MAX_SUGGESTIONS = 6;
 
 /**
- * Band tags first, then magic keys the band has not used (matched
- * case-insensitively). Prefix matches rank before contains matches, the tag
- * typed in full is dropped, and magic keys show their canonical label.
+ * Band tags rank first, then magic keys the band has not used. Within each
+ * group prefix matches precede contains matches, the tag typed in full is
+ * dropped, and magic keys show their canonical label.
  */
 export function matchTags(tags: ReferenceTag[], query: string): ReferenceTag[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const seen = new Set<string>();
-  const starts: ReferenceTag[] = [];
-  const contains: ReferenceTag[] = [];
+  const bandStarts: ReferenceTag[] = [];
+  const bandContains: ReferenceTag[] = [];
+  const magicStarts: ReferenceTag[] = [];
+  const magicContains: ReferenceTag[] = [];
   const candidates = [
     ...tags.map((t) => ({
-      ...t,
-      label: findMagicReference(t.label)?.label ?? t.label,
+      tag: { ...t, label: findMagicReference(t.label)?.label ?? t.label },
+      band: true,
     })),
-    ...SUGGESTIBLE_REFERENCES.map((r) => ({ label: r.label, count: 0 })),
+    ...SUGGESTIBLE_REFERENCES.map((r) => ({
+      tag: { label: r.label, count: 0 },
+      band: false,
+    })),
   ];
-  for (const t of candidates) {
-    const l = t.label.toLowerCase();
+  for (const { tag, band } of candidates) {
+    const l = tag.label.toLowerCase();
     if (seen.has(l)) continue;
     seen.add(l);
     if (l === q) continue;
-    if (l.startsWith(q)) starts.push(t);
-    else if (l.includes(q)) contains.push(t);
+    if (l.startsWith(q)) (band ? bandStarts : magicStarts).push(tag);
+    else if (l.includes(q)) (band ? bandContains : magicContains).push(tag);
   }
-  return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
+  return [
+    ...bandStarts,
+    ...bandContains,
+    ...magicStarts,
+    ...magicContains,
+  ].slice(0, MAX_SUGGESTIONS);
 }
 
 /** Label input with a combobox listbox of the band's tags and the magic keys. */
@@ -77,7 +87,7 @@ function TagInput({
           data-key={magic.key}
           className="pointer-events-none absolute top-[22px] left-3 -translate-y-1/2"
         >
-          <Favicon host={magic.hosts[0]} compact />
+          <Favicon key={magic.key} host={magic.hosts[0]} compact />
         </span>
       ) : null}
       <Input

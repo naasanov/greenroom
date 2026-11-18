@@ -69,6 +69,30 @@ test("band tags that differ only in case appear once, canonically", async ({
   ).toHaveText(["Spotify"]);
 });
 
+test("band tags rank before unused magic keys, even on a contains match", async ({
+  page,
+  testApi,
+}) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  const songs = await (await api.get(base)).json();
+  for (const song of songs.slice(0, 3)) {
+    await api.patch(`${base}/${song.id}`, {
+      data: {
+        references: [
+          { label: "My Spotify list", value: "https://x.example.com" },
+        ],
+      },
+    });
+  }
+  await editWithNewRow(page);
+  await labelBox(page).fill("spot");
+  await expect(
+    sheet(page)
+      .getByRole("listbox", { name: "Suggested tags" })
+      .getByRole("option"),
+  ).toHaveText(["My Spotify list", "Spotify"]);
+});
+
 test("label input shows the provider favicon only for magic keys", async ({
   page,
 }) => {
