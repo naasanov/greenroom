@@ -23,7 +23,12 @@ import { cn } from "@/lib/utils";
 import { exportDateLabel, useGigForExport } from "@/lib/queries/spotify-export";
 import { OpenReferencesDialog } from "./open-references-dialog";
 import { PickTarget, TargetRow } from "./pick-dnd";
-import { SongLine, setlistSummary, toSetlistSong } from "./song-row";
+import {
+  SongChordsLink,
+  SongLine,
+  setlistSummary,
+  toSetlistSong,
+} from "./song-row";
 import type { SetlistBuilder } from "./use-setlist-builder";
 
 export const SETLIST_TARGET = "setlist";
@@ -276,6 +281,11 @@ export function SetlistSection({
                     >
                       <SongLine song={song} />
                     </div>
+                    <SongChordsLink
+                      bandId={builder.bandId}
+                      songId={item.songId}
+                      title={item.title}
+                    />
                     <Button
                       type="button"
                       variant="ghost"

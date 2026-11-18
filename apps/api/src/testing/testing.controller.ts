@@ -256,6 +256,23 @@ export class TestingController {
     return { musiclink: this.registry.musiclink.lookups() };
   }
 
+  /** Makes the Ultimate Guitar fake throw UgUnavailableError on every call. */
+  @Post("ug/failing")
+  @HttpCode(200)
+  setUgFailing(@Body() body: { failing: boolean }): { ok: true } {
+    this.registry.ultimateGuitar.setFailing(body.failing);
+    return { ok: true };
+  }
+
+  /** Searches and tab fetches the Ultimate Guitar fake received since reset. */
+  @Get("ug/calls")
+  ugCalls(): { searches: string[]; fetches: string[] } {
+    return {
+      searches: this.registry.ultimateGuitar.searches(),
+      fetches: this.registry.ultimateGuitar.fetches(),
+    };
+  }
+
   /** Ages a cached link row by N days, as if it was fetched that long ago. */
   @Post("suggestions/age")
   @HttpCode(200)

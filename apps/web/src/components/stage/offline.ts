@@ -1,8 +1,13 @@
 import { z } from "zod";
 import type { CalendarEvent, SongDetail } from "@greenroom/shared";
 import { api } from "@/lib/api";
-import { fetchStageSnapshot } from "@/lib/queries/stage";
-import { pruneSnapshots, stageShellPath, writeSnapshot } from "./stage-storage";
+import { fetchChordsIndex, fetchStageSnapshot } from "@/lib/queries/stage";
+import {
+  pruneSnapshots,
+  readSnapshot,
+  stageShellPath,
+  writeSnapshot,
+} from "./stage-storage";
 
 export const SHELL_CACHE = "greenroom-shell-v1";
 const HORIZON_DAYS = 60;
@@ -75,6 +80,7 @@ export async function syncUpcomingStageData(
     );
     const gigs = events.filter((e) => e.type === "gig").slice(0, MAX_GIGS);
     const songCache = new Map<string, Promise<SongDetail>>();
+    const chordsIndex = fetchChordsIndex(bandId);
     const kept = new Set<string>();
     // One gig at a time, each waiting for an idle moment so taps are never starved.
     for (const gig of gigs) {
@@ -83,8 +89,11 @@ export async function syncUpcomingStageData(
         const snap = await fetchStageSnapshot(bandId, gig.id, {
           gigTitle: gig.title,
           songCache,
+          chordsIndex,
         });
         if (!snap) continue;
+        const prior = readSnapshot(gig.id);
+        if (!snap.chords && prior?.chords) snap.chords = prior.chords;
         writeSnapshot(snap);
         kept.add(gig.id);
         await cacheStageShell(gig.id);

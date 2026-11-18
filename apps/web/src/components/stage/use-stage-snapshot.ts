@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isApiError } from "@/lib/api";
+import type { SongChordSheet } from "@greenroom/shared";
 import {
   fetchGigBandId,
   fetchStageSnapshot,
@@ -17,6 +18,8 @@ export interface StageData {
   status: "loading" | "ready" | "empty" | "error";
   /** The device holds both the setlist and the page needed to open it offline. */
   offlineReady: boolean;
+  /** Replaces one song's stored sheet in state and device storage. */
+  saveSheet: (sheet: SongChordSheet) => void;
 }
 
 /** Cached snapshot first, then a live refresh when online. */
@@ -25,6 +28,22 @@ export function useStageSnapshot(gigId: string): StageData {
   const [snapshot, setSnapshot] = useState<StageSnapshot | null>(null);
   const [status, setStatus] = useState<StageData["status"]>("loading");
   const [shellCached, setShellCached] = useState(false);
+  const latest = useRef<StageSnapshot | null>(null);
+  useEffect(() => {
+    latest.current = snapshot;
+  }, [snapshot]);
+
+  const saveSheet = useCallback((sheet: SongChordSheet) => {
+    const prev = latest.current;
+    if (!prev?.chords || prev.chords[sheet.songId] === sheet) return;
+    const next = {
+      ...prev,
+      chords: { ...prev.chords, [sheet.songId]: sheet },
+    };
+    latest.current = next;
+    writeSnapshot(next);
+    setSnapshot(next);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +66,8 @@ export function useStageSnapshot(gigId: string): StageData {
           setStatus("empty");
           return;
         }
+        // A failed chords fetch keeps the sheets already on the device.
+        if (!live.chords && cached?.chords) live.chords = cached.chords;
         writeSnapshot(live);
         setSnapshot(live);
         setStatus("ready");
@@ -90,5 +111,10 @@ export function useStageSnapshot(gigId: string): StageData {
     };
   }, [gigId, snapshot, shellCached]);
 
-  return { snapshot, status, offlineReady: !!snapshot && shellCached };
+  return {
+    snapshot,
+    status,
+    offlineReady: !!snapshot && shellCached,
+    saveSheet,
+  };
 }

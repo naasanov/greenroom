@@ -10,6 +10,7 @@ import {
   GOOGLE_PLACES,
   MUSICLINK,
   SPOTIFY,
+  ULTIMATE_GUITAR,
   YOUTUBE,
   FAKE_PRIVATE_PLAYLIST_ID,
   FAKE_PUBLIC_PLAYLIST_ID,
@@ -24,6 +25,8 @@ import {
   type GooglePlacesAdapter,
   type MusicLinkAdapter,
   type SpotifyAdapter,
+  type UltimateGuitarAdapter,
+  UgUnavailableError,
   type YoutubeAdapter,
 } from "../index.js";
 import {
@@ -53,6 +56,7 @@ async function main(): Promise<void> {
   const spotify = app.get<SpotifyAdapter>(SPOTIFY);
   const yt = app.get<YoutubeAdapter>(YOUTUBE);
   const musiclink = app.get<MusicLinkAdapter>(MUSICLINK);
+  const ug = app.get<UltimateGuitarAdapter>(ULTIMATE_GUITAR);
   const gh = app.get<GithubAdapter>(GITHUB);
   const email = app.get<EmailAdapter>(EMAIL);
 
@@ -233,6 +237,25 @@ async function main(): Promise<void> {
   assert.deepEqual(
     (await musiclink.findLinks("https://open.spotify.com/track/none")).links,
     {},
+  );
+  assert.deepEqual(await ug.search("nothing here"), []);
+  const ugHits = await ug.search("Wonderwall Fake Band");
+  assert.equal(ugHits.length, 4);
+  assert.deepEqual(
+    ugHits.filter((h) => h.type === "Chords").map((h) => [h.rating, h.votes]),
+    [
+      [4.9, 3],
+      [4.6, 2500],
+      [4.8, 400],
+    ],
+  );
+  const ugTab = await ug.fetchTab(ugHits[1]?.url ?? "");
+  assert.ok(!ugTab.isOfficial && ugTab.capo === 2 && ugTab.key === "Em");
+  assert.match(ugTab.content, /\[Verse 1\]/);
+  assert.ok((await ug.fetchTab(ugHits[0]?.url ?? "")).isOfficial);
+  await assert.rejects(
+    ug.fetchTab("https://tabs.ultimate-guitar.com/tab/fake/broken-chords-1"),
+    UgUnavailableError,
   );
   const issue = await gh.createIssue({
     title: "t",
