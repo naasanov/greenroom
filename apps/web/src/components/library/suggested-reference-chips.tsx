@@ -1,10 +1,19 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
+import { UG_HOST_LIST, isUltimateGuitarUrl } from "@greenroom/shared";
 import { Favicon } from "@/components/app/link-list";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useChordsIndex, useChordsSuggestion } from "@/lib/queries/chords";
 import { useReferenceTags, useSuggestedReferences } from "@/lib/queries/songs";
 import { rankSuggestions } from "./song-utils";
+import { useDebounced } from "./use-debounced";
 
 /**
  * One chip per suggested reference, rendered beside the "Add row" button.
@@ -13,24 +22,38 @@ import { rankSuggestions } from "./song-utils";
 export function SuggestedReferenceChips({
   bandId,
   sourceUrl,
+  title,
+  artist,
   rows,
   onAdd,
 }: {
   bandId: string;
   sourceUrl: string | null;
+  /** The song's title and artist, for the Ultimate Guitar chords suggestion. */
+  title?: string;
+  artist?: string | null;
   rows: { label: string; value: string }[];
   onAdd: (label: string, value: string) => void;
 }) {
   const found = useSuggestedReferences(bandId, sourceUrl);
   const tags = useReferenceTags(bandId);
   // Wait for the band's tags so the order settles once and stays put.
-  if (!found.data || tags.isPending) return null;
+  const chordsChip = (
+    <ChordsChip
+      bandId={bandId}
+      title={title ?? ""}
+      artist={artist}
+      rows={rows}
+      onAdd={onAdd}
+    />
+  );
+  if (!found.data || tags.isPending) return chordsChip;
   const chips = rankSuggestions(
     found.data,
     rows,
     (tags.data ?? []).map((t) => t.label),
   );
-  if (chips.length === 0) return null;
+  if (chips.length === 0) return chordsChip;
 
   return (
     <>
@@ -49,6 +72,79 @@ export function SuggestedReferenceChips({
           {chip.label}
         </Button>
       ))}
+      {chordsChip}
+    </>
+  );
+}
+
+const versionText = (v: { rating: number; votes: number }) =>
+  `${v.rating.toFixed(1)}, ${v.votes} ratings`;
+
+/** "Ultimate Guitar" chip for the best Ultimate Guitar match, plus a menu of other versions. */
+function ChordsChip({
+  bandId,
+  title,
+  artist,
+  rows,
+  onAdd,
+}: {
+  bandId: string;
+  title: string;
+  artist?: string | null;
+  rows: { label: string; value: string }[];
+  onAdd: (label: string, value: string) => void;
+}) {
+  const index = useChordsIndex(bandId);
+  const hasUg = rows.some((r) => isUltimateGuitarUrl(r.value));
+  // Lookups wait for a settled title of 3+ characters so partial typing stays quiet.
+  const settledTitle = useDebounced(title.trim(), 800);
+  const settledArtist = useDebounced(artist ?? null, 800);
+  const lookup = useChordsSuggestion(
+    bandId,
+    settledTitle,
+    settledArtist,
+    index.data?.enabled === true && !hasUg && settledTitle.length >= 3,
+  );
+  const match = lookup.data?.match;
+  if (index.data?.enabled !== true || hasUg || !match) return null;
+  const others = lookup.data?.versions ?? [];
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        data-testid="reference-chip-ultimate-guitar"
+        onClick={() => onAdd("Ultimate Guitar", match.url)}
+        className="border-dashed"
+      >
+        <Plus />
+        <Favicon host={UG_HOST_LIST[0]} compact />
+        Ultimate Guitar
+      </Button>
+      {others.length > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="reference-chip-ultimate-guitar-others"
+            >
+              Other versions <ChevronDown />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {others.map((v) => (
+              <DropdownMenuItem
+                key={v.url}
+                data-testid="reference-chip-ultimate-guitar-version"
+                onSelect={() => onAdd("Ultimate Guitar", v.url)}
+              >
+                {versionText(v)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
     </>
   );
 }

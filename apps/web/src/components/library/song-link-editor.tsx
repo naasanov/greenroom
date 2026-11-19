@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import {
-  SUGGESTIBLE_REFERENCES,
+  MAGIC_REFERENCES,
   findMagicReference,
   type ReferenceTag,
 } from "@greenroom/shared";
@@ -35,7 +35,7 @@ export function matchTags(tags: ReferenceTag[], query: string): ReferenceTag[] {
       tag: { ...t, label: findMagicReference(t.label)?.label ?? t.label },
       band: true,
     })),
-    ...SUGGESTIBLE_REFERENCES.map((r) => ({
+    ...MAGIC_REFERENCES.map((r) => ({
       tag: { label: r.label, count: 0 },
       band: false,
     })),

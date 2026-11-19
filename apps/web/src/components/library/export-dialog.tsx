@@ -95,8 +95,9 @@ function Result({
             data-testid="export-skipped"
             className="text-sm text-muted-foreground"
           >
-            Skipped {skipped.length} without a Spotify link:{" "}
-            {skipped.map((s) => s.title).join(", ")}
+            {`Skipped ${skipped.length} ${
+              skipped.length === 1 ? "song" : "songs"
+            } without a Spotify link.`}
           </p>
         ) : null}
       </div>
@@ -216,7 +217,7 @@ function YoutubeQueueSection({
         disabled={!queue.url}
         onClick={open}
       >
-        <ExternalLink /> Open in YouTube Music
+        <ExternalLink /> Export to YouTube Music
       </Button>
       <p
         role="status"
@@ -234,8 +235,9 @@ function YoutubeQueueSection({
           data-testid="export-youtube-skipped"
           className="text-sm text-muted-foreground"
         >
-          Skipped {queue.noLink.length} without a YouTube link:{" "}
-          {queue.noLink.join(", ")}
+          {`Skipped ${queue.noLink.length} ${
+            queue.noLink.length === 1 ? "song" : "songs"
+          } without a YouTube link.`}
         </p>
       ) : null}
       {queue.overflow.length > 0 ? (
@@ -243,8 +245,7 @@ function YoutubeQueueSection({
           data-testid="export-youtube-overflow"
           className="text-sm text-muted-foreground"
         >
-          YouTube queues hold {YOUTUBE_QUEUE_MAX} songs. Left out:{" "}
-          {queue.overflow.join(", ")}
+          {`YouTube queues hold ${YOUTUBE_QUEUE_MAX} songs. Left out ${queue.overflow.length}.`}
         </p>
       ) : null}
     </div>
@@ -358,56 +359,55 @@ function ExportBody({
 
   const error = exportMutation.error;
   return (
-    <form
-      className="flex flex-col gap-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (name.trim()) run(name.trim());
-      }}
-    >
-      <FormField label="Playlist name" htmlFor="export-playlist-name">
-        <Input
-          id="export-playlist-name"
-          autoFocus
-          autoComplete="off"
-          maxLength={100}
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            exportMutation.reset();
-          }}
-        />
-      </FormField>
-      {exportMutation.isError ? (
-        <p
-          role="alert"
-          data-testid="export-error"
-          className="text-sm text-destructive"
+    <div className="flex flex-col gap-5">
+      <form
+        className="flex flex-col gap-3"
+        data-testid="export-spotify"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) run(name.trim());
+        }}
+      >
+        <FormField label="Playlist name" htmlFor="export-playlist-name">
+          <Input
+            id="export-playlist-name"
+            autoFocus
+            autoComplete="off"
+            maxLength={100}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              exportMutation.reset();
+            }}
+          />
+        </FormField>
+        {exportMutation.isError ? (
+          <p
+            role="alert"
+            data-testid="export-error"
+            className="text-sm text-destructive"
+          >
+            {isApiError(error, 422) &&
+            error.code === SONG_ERROR_CODES.nothingToExport
+              ? "None of these songs have a Spotify link, so there is nothing to export."
+              : "Could not export to Spotify. Please try again."}
+          </p>
+        ) : null}
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={!name.trim() || exportMutation.isPending}
         >
-          {isApiError(error, 422) &&
-          error.code === SONG_ERROR_CODES.nothingToExport
-            ? "None of these songs have a Spotify link, so there is nothing to export."
-            : "Could not export to Spotify. Please try again."}
-        </p>
-      ) : null}
-      <Button
-        type="submit"
-        size="lg"
-        disabled={!name.trim() || exportMutation.isPending}
-      >
-        {exportMutation.isPending ? "Exporting..." : "Export"}
-      </Button>
-      <div
-        role="separator"
-        className="flex items-center gap-3 text-xs text-muted-foreground"
-      >
-        <span className="h-px flex-1 bg-border" />
-        Or
-        <span className="h-px flex-1 bg-border" />
+          {exportMutation.isPending ? "Exporting..." : "Export to Spotify"}
+        </Button>
+      </form>
+      <div className="border-t pt-5">
+        <YoutubeQueueSection rows={rows} />
       </div>
-      <CopyListButton lines={copyLines} />
-      <YoutubeQueueSection rows={rows} />
-    </form>
+      <div className="border-t pt-5">
+        <CopyListButton lines={copyLines} />
+      </div>
+    </div>
   );
 }
 
@@ -439,12 +439,10 @@ export function ExportDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            Export to Spotify
+            Export songs
           </DialogTitle>
           <DialogDescription>
-            Creates a new private playlist in your Spotify account. Songs
-            without a Spotify link are skipped. You can also copy the song list
-            as text or open it as a YouTube Music queue.
+            Send this song list to Spotify or YouTube Music, or copy it as text.
           </DialogDescription>
         </DialogHeader>
         {open ? (

@@ -12,3 +12,4 @@ applies-to: apps/e2e/**
 
 **How to apply:** avoid starting the full suite near midnight; check `git status` after running format. See [[e2e-test-scope]].
 - On the factory, Playwright WebKit dies at launch with a Bus error (exit 135), even outside the tests (seen 2026-10-27), so local runs use `pnpm test:e2e -- --project=desktop <filters>` and mobile coverage comes from CI.
+- On the factory, page loads under parallel agent builds take about 35s, so stage specs stall on their spinner at the default 30s timeout. Run targeted specs with `--timeout=120000`. Gig deep links (`/gigs/<id>`) do not open the event drawer there, so `deep-links`, `setlist-gig` and the library-chords setlist icon test fail locally but pass in CI (seen 2026-11-18, #95).

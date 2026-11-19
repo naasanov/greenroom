@@ -18,7 +18,8 @@
     "build": "tsgo -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "typecheck": "tsgo -p tsconfig.json --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:unit": "node --test \"dist/**/*.test.js\""
   },
   "dependencies": {
     "zod": "^4.0.0"

@@ -4,17 +4,41 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  FileQuestion,
   Music2,
   Share2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MediaItem } from "@greenroom/shared";
+import { isHeicFile } from "@/components/files/file-utils";
 import { Button } from "@/components/ui/button";
 import { downloadUrl, shareItems, useShareSheet } from "./media-download";
 import { MediaThumb, isVideo } from "./media-tile";
 
 const SWIPE_PX = 50;
+
+/** Shown for an image the browser cannot display (an unconverted HEIC, or a file that failed to load). */
+function DownloadCard({ item }: { item: MediaItem }) {
+  return (
+    <div
+      data-testid="viewer-download-card"
+      className="flex flex-col items-center gap-3 text-center"
+    >
+      <FileQuestion className="size-12 opacity-70" />
+      <p className="text-sm">No preview for this image.</p>
+      <Button asChild variant="secondary">
+        <a
+          data-testid="viewer-open-download"
+          href={downloadUrl(item)}
+          download={item.name}
+        >
+          <Download /> Open / Download
+        </a>
+      </Button>
+    </div>
+  );
+}
 
 function Content({ item }: { item: MediaItem }) {
   const [broken, setBroken] = useState(false);
@@ -38,6 +62,9 @@ function Content({ item }: { item: MediaItem }) {
         className="max-h-full max-w-full"
       />
     );
+  }
+  if (isHeicFile(item.mimeType, item.name) || (broken && !item.thumbnailUrl)) {
+    return <DownloadCard item={item} />;
   }
   if (broken && item.thumbnailUrl) {
     return (

@@ -135,6 +135,15 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Per-gig (performance-specific tweaks): go in gig-wide notes on the gig itself — e.g. "longer version of Song X," "skip the bridge on Song Y."
 - Decision: NO per-song-per-gig notes layer. That's a full matrix of data to build/maintain and is overkill for a handful of gigs; a line in the gig's notes carries the same info. Can promote to something structured later if it turns out to happen constantly.
 
+## Chords & lyrics (decided 2026-11-18)
+- Each song can have one chord sheet, readable in a full-screen reader (from the song sheet, setlist rows with a chords icon, and stage mode). Sheets come from an Ultimate Guitar import or are written by hand in a plain chords-over-lyrics editor.
+- **Stored at concert pitch.** An import that lists "capo N" is transposed up N semitones before saving; the page's capo, key and tuning are kept as metadata only. The reader shows chords at band transpose + personal transpose - personal capo.
+- **Band key vs personal:** band transpose is shared and set explicitly ("Set as band key" with a confirm). Personal transpose, capo, font size, scroll speed, lyrics-only and theme are per device.
+- **Ultimate Guitar:** public chord tabs only; Official/Pro tabs cannot be imported and say so. The server fetches pages (throttled, one at a time, redirects limited to UG hosts) and caches searches. Adding a Chords reference link imports it automatically; "Other versions" lists the top-rated alternatives.
+- **Magic reference key:** "Ultimate Guitar" is a magic reference key like Spotify (label autocomplete, favicon, UG-host links only); the suggested chip is labeled Ultimate Guitar with its favicon. Import detection stays URL-based, so older "Chords" rows still work.
+- **Stage mode:** swipe changes songs (tap does nothing), and the current song's sheet is embedded and cached for offline use.
+- **Rollout flag:** `CHORDS_BANDS` on the API (`*`, or a comma list of band ids or slugs; unset means off). Staging runs `*`; prod stays off until the band has tried it.
+
 # Gig data class (fields)
 - Core/required: title, date & time. A gig can be dropped on the calendar with just these (e.g. a tentative gig) and fleshed out later — most other fields are optional by design, matching how bands actually book ("something that weekend, details TBD").
 - Date & time: start and end, plus a separate call/load-in time (distinct from go-on time — "be there at 6, play at 9").

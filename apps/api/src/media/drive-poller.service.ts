@@ -12,10 +12,17 @@ import { GoogleLinksService } from "../google-connect/index.js";
 import {
   GOOGLE_DRIVE,
   type DriveChange,
+  type DriveFile,
   type GoogleDriveAdapter,
 } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
-import { insertSubfolder, upsertDriveItem } from "./media-ingest.js";
+import { HeicConversionService } from "./heic-conversion.service.js";
+import { isHeic } from "./heic-util.js";
+import {
+  applyConvertedFile,
+  insertSubfolder,
+  upsertDriveItem,
+} from "./media-ingest.js";
 import { FOLDER_MIME } from "./media-util.js";
 
 export const DRIVE_POLL_QUEUE = "drive-changes-poll";
@@ -39,6 +46,7 @@ export class DrivePollerService implements OnModuleInit {
     @Inject(GOOGLE_DRIVE) private readonly drive: GoogleDriveAdapter,
     private readonly links: GoogleLinksService,
     private readonly jobs: JobsService,
+    private readonly heic: HeicConversionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -65,12 +73,14 @@ export class DrivePollerService implements OnModuleInit {
    * Applies pending changes for one band and advances its cursor in a single
    * transaction. A per-band advisory lock serialises concurrent passes: a
    * scheduled pass skips when locked, a manual one (wait) queues behind it.
+   * HEIC files seen in the pass are converted after the transaction commits.
    */
   async pollBand(bandId: string, wait = false): Promise<PollResult> {
     const skipped: PollResult = { bandId, status: "skipped", changes: 0 };
     const token = await this.links.getAccessToken(bandId, "drive");
     if (!token) return skipped;
-    return this.db.transaction(async (tx) => {
+    const heic: DriveFile[] = [];
+    const result = await this.db.transaction(async (tx) => {
       const key = `drive-poll:${bandId}`;
       if (wait) {
         await tx.execute(
@@ -98,13 +108,38 @@ export class DrivePollerService implements OnModuleInit {
         ...changes.filter((c) => c.file?.mimeType === FOLDER_MIME),
         ...changes.filter((c) => c.file?.mimeType !== FOLDER_MIME),
       ];
-      for (const change of ordered) await this.apply(tx, bandId, state, change);
+      for (const change of ordered) {
+        const file = await this.apply(tx, bandId, state, change);
+        if (file) heic.push(file);
+      }
       await tx
         .update(driveSyncCursors)
         .set({ pageToken: newStartPageToken, lastPolledAt: new Date() })
         .where(eq(driveSyncCursors.bandId, bandId));
       return { bandId, status: "polled" as const, changes: changes.length };
     });
+    await this.convertHeic(bandId, token, heic);
+    return result;
+  }
+
+  /**
+   * Best effort, outside the poll transaction. The conversion shows up as one
+   * more Drive change on the next pass, where the file is already a JPEG.
+   */
+  private async convertHeic(
+    bandId: string,
+    token: string,
+    files: DriveFile[],
+  ): Promise<void> {
+    for (const f of files) {
+      try {
+        const res = await this.heic.convert(token, f);
+        if (!res.converted) continue;
+        await applyConvertedFile(this.db, bandId, res.file);
+      } catch (err) {
+        this.log.warn(`HEIC convert failed for ${f.id}: ${String(err)}`);
+      }
+    }
   }
 
   private async loadState(tx: Tx, bandId: string) {
@@ -130,7 +165,7 @@ export class DrivePollerService implements OnModuleInit {
     bandId: string,
     state: Awaited<ReturnType<DrivePollerService["loadState"]>>,
     change: DriveChange,
-  ): Promise<void> {
+  ): Promise<DriveFile | null> {
     const { gigByFolder, subByDriveId } = state;
     const now = new Date();
 
@@ -138,7 +173,7 @@ export class DrivePollerService implements OnModuleInit {
       const folder = subByDriveId.get(change.fileId);
       if (folder) {
         await this.dropFolder(tx, state, folder, "missing");
-        return;
+        return null;
       }
       await tx
         .update(mediaItems)
@@ -149,7 +184,7 @@ export class DrivePollerService implements OnModuleInit {
             eq(mediaItems.driveFileId, change.fileId),
           ),
         );
-      return;
+      return null;
     }
 
     const f = change.file;
@@ -159,13 +194,13 @@ export class DrivePollerService implements OnModuleInit {
       let existing = subByDriveId.get(f.id);
       if (existing && f.trashed) {
         await this.dropFolder(tx, state, existing, "trashed");
-        return;
+        return null;
       }
       if (existing && existing.gigId !== parentGig) {
         await this.dropFolder(tx, state, existing, "removed");
         existing = undefined;
       }
-      if (!parentGig || f.trashed) return;
+      if (!parentGig || f.trashed) return null;
       if (existing) {
         if (existing.name !== f.name) {
           await tx
@@ -174,11 +209,11 @@ export class DrivePollerService implements OnModuleInit {
             .where(eq(mediaFolders.id, existing.id));
           existing.name = f.name;
         }
-        return;
+        return null;
       }
       const row = await insertSubfolder(tx, bandId, parentGig, f);
       if (row) subByDriveId.set(f.id, row);
-      return;
+      return null;
     }
 
     const sub = f.parentId ? subByDriveId.get(f.parentId) : undefined;
@@ -201,7 +236,7 @@ export class DrivePollerService implements OnModuleInit {
           .update(mediaItems)
           .set({ deletedAt: now })
           .where(eq(mediaItems.id, existing.id));
-      return;
+      return null;
     }
     if (f.trashed) {
       if (existing)
@@ -209,9 +244,10 @@ export class DrivePollerService implements OnModuleInit {
           .update(mediaItems)
           .set({ trashedAt: existing.trashedAt ?? now })
           .where(eq(mediaItems.id, existing.id));
-      return;
+      return null;
     }
     await upsertDriveItem(tx, bandId, target, f, existing);
+    return isHeic(f.mimeType, f.name) ? f : null;
   }
 
   /** Removes a subfolder row; its items are hidden according to why it went. */

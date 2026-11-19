@@ -45,6 +45,17 @@ test("magic keys are offered unused, once, with no song count", async ({
   await expect(labelBox(page)).toHaveValue("Spotify");
 });
 
+test("typing ult offers the Ultimate Guitar magic key", async ({ page }) => {
+  await editWithNewRow(page);
+  await labelBox(page).fill("ult");
+  const options = sheet(page)
+    .getByRole("listbox", { name: "Suggested tags" })
+    .getByRole("option");
+  await expect(options).toHaveText(["Ultimate Guitar"]);
+  await options.first().click();
+  await expect(labelBox(page)).toHaveValue("Ultimate Guitar");
+});
+
 test("band tags that differ only in case appear once, canonically", async ({
   page,
   testApi,
@@ -103,8 +114,26 @@ test("label input shows the provider favicon only for magic keys", async ({
   await expect(icon).toHaveCount(1);
   await expect(icon).toHaveAttribute("data-key", "youtube");
   await expect(icon.locator("img, svg")).toBeVisible();
+  await labelBox(page).fill("ultimate guitar");
+  await expect(icon).toHaveAttribute("data-key", "ultimateGuitar");
+  await expect(icon.locator("img, svg")).toBeVisible();
   await labelBox(page).fill("Chart");
   await expect(icon).toHaveCount(0);
+});
+
+test("Ultimate Guitar with a non-UG link errors and blocks the form", async ({
+  page,
+}) => {
+  await editWithNewRow(page);
+  const s = sheet(page);
+  await labelBox(page).fill("Ultimate Guitar");
+  await valueBox(page).fill("https://example.com/x");
+  await expect(s.getByRole("alert")).toContainText("ultimate-guitar.com");
+  await s.getByRole("button", { name: "Save" }).click();
+  await expect(s.getByRole("button", { name: "Edit" })).toHaveCount(0);
+
+  await valueBox(page).fill("https://tabs.ultimate-guitar.com/tab/x/y-1");
+  await expect(s.getByRole("alert")).toHaveCount(0);
 });
 
 test("a magic key with an off-provider link errors and blocks the form", async ({

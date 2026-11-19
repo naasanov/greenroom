@@ -16,9 +16,9 @@ const label = (iso: string) => {
 };
 
 const dialog = (page: Page) =>
-  page.getByRole("dialog", { name: "Export to Spotify" });
+  page.getByRole("dialog", { name: "Export songs" });
 const exportButton = (page: Page) =>
-  dialog(page).getByRole("button", { name: "Export", exact: true });
+  dialog(page).getByRole("button", { name: "Export to Spotify", exact: true });
 
 test("library export asks to connect, resumes, and shows skipped songs", async ({
   page,
@@ -33,7 +33,9 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByLabel("Playlist name")).toHaveValue(
     "The Night Owls library",
   );
-  await expect(dialog(page).getByRole("separator")).toHaveText("Or");
+  await expect(exportButton(page)).toBeVisible();
+  await expect(dialog(page).getByTestId("export-youtube-open")).toBeVisible();
+  await expect(dialog(page).getByTestId("export-copy")).toBeVisible();
   // The name field carries a visible label above it.
   await expect(
     dialog(page).locator("label", { hasText: "Playlist name" }),
@@ -49,8 +51,8 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(reopened.getByTestId("export-summary")).toContainText(
     "Exported 3 songs to “Owls all songs”.",
   );
-  await expect(reopened.getByTestId("export-skipped")).toContainText(
-    "Skipped 5 without a Spotify link:",
+  await expect(reopened.getByTestId("export-skipped")).toHaveText(
+    "Skipped 5 songs without a Spotify link.",
   );
   const link = reopened.getByRole("link", { name: "Open in Spotify" });
   await expect(link).toHaveAttribute("target", "_blank");
@@ -128,7 +130,7 @@ test("gig setlist export from the drawer", async ({
     `Exported 2 songs to “${name}”.`,
   );
   await expect(dialog(page).getByTestId("export-skipped")).toHaveText(
-    "Skipped 1 without a Spotify link: Midnight Train",
+    "Skipped 1 song without a Spotify link.",
   );
   await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
   const [playlist] = await testApi.spotifyCreatedPlaylists();
@@ -288,8 +290,8 @@ test("library export can open a YouTube Music queue without logging in", async (
   await expect(youtube.getByTestId("export-youtube-summary")).toContainText(
     "3 songs",
   );
-  await expect(youtube.getByTestId("export-youtube-skipped")).toContainText(
-    "Skipped 5 without a YouTube link:",
+  await expect(youtube.getByTestId("export-youtube-skipped")).toHaveText(
+    "Skipped 5 songs without a YouTube link.",
   );
   let queueUrl = "";
   await page.context().route("**://www.youtube.com/**", (route) => {

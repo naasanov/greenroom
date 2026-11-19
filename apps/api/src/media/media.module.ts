@@ -7,6 +7,9 @@ import { testingEnabled } from "../testing/testing.enabled.js";
 import { DriveController } from "./drive.controller.js";
 import { DrivePollerService } from "./drive-poller.service.js";
 import { DriveStructureService } from "./drive-structure.service.js";
+import { HeicBackfillService } from "./heic-backfill.service.js";
+import { HeicConversionService } from "./heic-conversion.service.js";
+import { HeicConverterService } from "./heic-converter.service.js";
 import { MediaController } from "./media.controller.js";
 import { MediaService } from "./media.service.js";
 import { MediaTestController } from "./media-test.controller.js";
@@ -82,6 +85,9 @@ const linkThrottlers = [
     MediaZipService,
     UploadsService,
     PublicLinksService,
+    HeicConverterService,
+    HeicConversionService,
+    HeicBackfillService,
   ],
   exports: [
     DriveStructureService,

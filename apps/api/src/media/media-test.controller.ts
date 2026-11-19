@@ -20,6 +20,10 @@ import {
   FakeIntegrationsRegistry,
   type DriveFile,
 } from "../integrations/index.js";
+import {
+  HeicBackfillService,
+  type HeicBackfillResult,
+} from "./heic-backfill.service.js";
 import { UploadsService } from "./uploads.service.js";
 import { DrivePollerService, type PollResult } from "./drive-poller.service.js";
 
@@ -29,6 +33,8 @@ interface ExternalBody {
   parentId?: string;
   name?: string;
   content?: string;
+  /** Binary content; wins over `content`. */
+  contentBase64?: string;
   mimeType?: string;
 }
 
@@ -40,6 +46,7 @@ export class MediaTestController {
     private readonly registry: FakeIntegrationsRegistry,
     private readonly poller: DrivePollerService,
     private readonly uploads: UploadsService,
+    private readonly heicBackfill: HeicBackfillService,
     private readonly ancestry: DriveAncestryCache,
     @Inject(DRIZZLE) private readonly db: Database,
   ) {}
@@ -82,7 +89,9 @@ export class MediaTestController {
         return d.externalAddFile(
           need(b.name, "name"),
           need(b.parentId, "parentId"),
-          b.content ?? "",
+          b.contentBase64
+            ? Buffer.from(b.contentBase64, "base64")
+            : (b.content ?? ""),
           b.mimeType,
         );
       case "folder":
@@ -154,6 +163,17 @@ export class MediaTestController {
       .where(eq(uploadSessions.id, sessionId));
     if (!row?.url) throw new BadRequestException("No Drive session");
     return row.url;
+  }
+
+  /** Runs the HEIC backfill once; `?dryRun=1` only counts. */
+  @Post("heic-backfill")
+  @HttpCode(200)
+  heicBackfillRun(
+    @Query("dryRun") dryRun?: string,
+  ): Promise<HeicBackfillResult> {
+    return this.heicBackfill.run({
+      dryRun: !!dryRun && !/^(0|false)$/i.test(dryRun),
+    });
   }
 
   /** Runs one poller pass synchronously for all linked bands. */
