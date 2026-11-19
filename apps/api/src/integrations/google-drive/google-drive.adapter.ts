@@ -97,6 +97,13 @@ export interface DriveByteRange {
   end?: number;
 }
 
+export interface UpdateContentInput {
+  /** New file name; omitted keeps the current one. */
+  name?: string;
+  mimeType: string;
+  data: Buffer;
+}
+
 /**
  * Every method takes the band's linked Google account access token first.
  * Resumable session URIs are bound to the account that started them.
@@ -118,6 +125,12 @@ export interface GoogleDriveAdapter {
     accessToken: string,
     fileId: string,
     newParentId: string,
+  ): Promise<DriveFileResult>;
+  /** Replaces the file's bytes and mime type in one non-resumable request, optionally renaming it. */
+  updateContent(
+    accessToken: string,
+    fileId: string,
+    input: UpdateContentInput,
   ): Promise<DriveFileResult>;
   /** Moves to Drive trash (recoverable). */
   trash(accessToken: string, fileId: string): Promise<DriveFileResult>;

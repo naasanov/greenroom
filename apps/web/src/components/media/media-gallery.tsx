@@ -102,7 +102,7 @@ import { UploadTray } from "./upload/upload-tray";
 const isTrayKey = (id: string) => id.startsWith("up-");
 /** Matches the `scroll-mt-28` on sections (7rem at the default font size). */
 const SECTION_OFFSET = 112;
-const ACCEPT = "image/*,video/*,audio/*,application/pdf";
+const ACCEPT = "image/*,.heic,.heif,video/*,audio/*,application/pdf";
 
 const useDensity = createLocalChoice<Density>(
   "greenroom:media-density",

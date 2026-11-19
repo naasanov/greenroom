@@ -13,6 +13,7 @@ import {
   type StartUploadInput,
   type UploadChunkInput,
   type UploadChunkResult,
+  type UpdateContentInput,
   type UploadStatusResult,
   DRIVE_EXPORT_MIME,
   isNativeGoogleMime,
@@ -138,6 +139,20 @@ export class RealGoogleDriveAdapter implements GoogleDriveAdapter {
     return this.update(accessToken, fileId, {
       addParents: current.includes(newParentId) ? undefined : newParentId,
       removeParents: remove.length > 0 ? remove.join(",") : undefined,
+    });
+  }
+
+  async updateContent(
+    accessToken: string,
+    fileId: string,
+    input: UpdateContentInput,
+  ): Promise<DriveFileResult> {
+    return this.update(accessToken, fileId, {
+      requestBody: {
+        ...(input.name ? { name: input.name } : {}),
+        mimeType: input.mimeType,
+      },
+      media: { mimeType: input.mimeType, body: Readable.from([input.data]) },
     });
   }
 

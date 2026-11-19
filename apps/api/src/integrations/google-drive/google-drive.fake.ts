@@ -12,6 +12,7 @@ import {
   type DriveFileResult,
   type GoogleDriveAdapter,
   type StartUploadInput,
+  type UpdateContentInput,
   type UploadChunkInput,
   type UploadChunkResult,
   type UploadStatusResult,
@@ -92,6 +93,23 @@ export class FakeGoogleDriveAdapter implements GoogleDriveAdapter {
     this.lastAccessToken = accessToken;
     await this.latency("move");
     return this.mutate(fileId, (f) => void (f.parentId = newParentId));
+  }
+
+  async updateContent(
+    accessToken: string,
+    fileId: string,
+    input: UpdateContentInput,
+  ): Promise<DriveFileResult> {
+    this.lastAccessToken = accessToken;
+    await this.latency("updateContent");
+    if (!this.files.has(fileId)) return { status: "not-found" };
+    this.contents.set(fileId, Buffer.from(input.data));
+    return this.mutate(fileId, (f) => {
+      if (input.name) f.name = input.name;
+      f.mimeType = input.mimeType;
+      f.size = input.data.length;
+      f.md5Checksum = createHash("md5").update(input.data).digest("hex");
+    });
   }
 
   async trash(accessToken: string, fileId: string): Promise<DriveFileResult> {

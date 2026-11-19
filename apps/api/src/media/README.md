@@ -49,10 +49,12 @@ Per band with Drive linked and a cursor (skipped on a revoked link), inside one 
 - New folder directly under a gig folder: a `media_folders` row. Subfolder renames update the row. Subfolders moved out, trashed, or deleted drop the row (items: removed, trashed, or missing respectively).
 - Rename: updates the name and sets `name_customized`. Move among the gig's folders: updates `folder_id`. Move out of the gig's folders: soft delete (`deleted_at`). Trash: `trashed_at`. Permanent delete: `missing = true`. Un-trashing or moving back restores the item.
 - Idempotent: items upsert on `(band_id, drive_file_id)`, folders on `drive_folder_id`.
+- HEIC/HEIF files that were ingested or refreshed in a pass are converted to JPEG (see "HEIC conversion") after the transaction commits, so no Drive download or upload runs under the advisory lock. Conversion is best effort and sequential; a failure leaves the HEIC item as ingested.
+- The conversion's own Drive change (renamed `.jpg`, mime `image/jpeg`) arrives on the next pass. It is not HEIC, so nothing converts again, and a rename from `X.HEIC` to `X.jpg` of the same stem does not set `name_customized`. A file that failed to convert produces no further change, so it is not retried until it changes in Drive.
 
 ## Fake-only routes
 
-`/__test__/media/*` exist only when `testingEnabled()`: `GET files`, `GET files/:id/content`, `POST external` (`{ action: add|folder|rename|move|trash|delete, fileId?, parentId?, name?, content?, mimeType? }`), `POST poll` (one synchronous pass, returns per-band results). Plus `GET .../drive/fake-picker` above.
+`/__test__/media/*` exist only when `testingEnabled()`: `GET files`, `GET files/:id/content`, `POST external` (`{ action: add|folder|rename|move|trash|delete, fileId?, parentId?, name?, content?, contentBase64?, mimeType? }`), `POST poll` (one synchronous pass, returns per-band results). Plus `GET .../drive/fake-picker` above.
 
 ## Uploads
 
@@ -81,6 +83,32 @@ Files uploads (`upload_sessions.gig_id` null, `target_drive_folder_id` set) shar
 - Edits while uploading are stored on the session and applied at completion: the file is moved in Drive if the folder changed since the Drive session started, renamed to the session's `fileName`, the media item is created with `name_customized`, then the song link runs `MediaService.linkSong` (song-title rename unless customized).
 - Stale cleanup: pg-boss queue `upload-sessions-cleanup`, daily, marks `pending` / `uploading` sessions untouched for 7 days as `failed`.
 - Fake-only: `/__test__/media/uploads/:sessionId/{interrupt,expire,age}` and `/__test__/media/uploads/cleanup`.
+- HEIC/HEIF: the type allowlist also accepts a file whose type is empty or `application/octet-stream` when the name ends in `.heic` or `.heif` (Chrome on Mac). When the Drive file is complete, `finalize` (gig uploads, before the `media_items` insert) and `finalizeFile` (Files tab, before the session completes) run the conversion below. The item or `file` carries the JPEG's name, size, `image/jpeg` and thumbnail, and the session's `fileName` / `mimeType` (and `totalBytes` for Files uploads) are updated to match. A `.heic` with an empty or generic type is checked against the allowlist as `image/heic`, so a link that excludes images rejects it. A retried `finalize` on a HEIC session reads the live Drive file first: if an earlier attempt already converted it, the JPEG is used as is and is not renamed back. Conversion never fails the upload: if it cannot run, the original HEIC stays and the item still completes, typed `image/heic` or `image/heif`.
+
+## HEIC conversion
+
+Browsers other than Safari cannot show HEIC, so the server replaces each HEIC/HEIF image with a JPEG. `HeicConversionService.convert` does the work and is shared by uploads, the poller and the backfill:
+
+- Detection (`heic-util.ts` `isHeic`): mime `image/heic`, `image/heif` (and the `-sequence` / `x-` variants), or an empty / `application/octet-stream` type with a `.heic` / `.heif` name. Other image types are never touched, whatever the extension.
+- Steps: re-read the Drive file (skip if gone, trashed, or already not HEIC, which makes every caller idempotent), skip files over 50 MB (`HEIC_MAX_BYTES`), `drive.download`, read the primary image's size from its `ispe` box and skip anything over `HEIC_MAX_PIXELS` (see "Memory"), decode and re-encode at JPEG quality 0.9, then one `drive.updateContent` call that replaces the bytes and mime type of the same Drive file and renames `X.HEIC` to `X.jpg`. There is a single stored copy and the Drive file id never changes. A sibling already named `X.jpg` in the folder makes it `X (2).jpg`, `X (3).jpg`...
+- Fail soft: a corrupt file, a file over the byte or pixel cap, a file whose dimensions cannot be read, or a failed Drive download or update logs a warning and keeps the original untouched.
+- One conversion at a time per process (an in-process promise chain); a conversion holds the file, the decoded pixels and the JPEG in memory.
+- `GoogleDriveAdapter.updateContent(token, fileId, { name?, mimeType, data })` is the non-resumable content update (Drive `files.update` with media). The invalidating wrapper clears the ancestry cache after it because it can rename.
+- Library: `heic-convert` (libheif-js WASM, jpeg-js; pure JS, no native binaries) rather than `sharp`: sharp's prebuilt libvips has no HEVC decoder, and we need no resize. It installs under `pnpm install --frozen-lockfile` and runs on `node:22-alpine` (musl) unchanged. The decoder applies the HEIC rotation and mirror boxes, so orientation is correct in the JPEG; EXIF and other metadata are not carried over. Decoding is CPU-bound WASM, roughly a second or two for a phone photo.
+- Memory: `heic-decode` allocates width x height x 4 bytes before any size check, libheif keeps further copies in the WASM heap, and `jpeg-js` encodes synchronously, so peak memory scales with pixels, not file size. Before decoding, `heicDimensions` (`heic-util.ts`) walks the ISO-BMFF `meta` box with bounds checks, finds the primary item (`pitm`) and its `ispe` property (via `ipma`/`ipco`). `HEIC_MAX_PIXELS` is 16 megapixels (a 12 MP phone photo is 4032x3024); larger images, and files whose dimensions are missing or unparseable, are treated like oversize: a warning is logged, the original HEIC is kept and the upload still completes. Staging runs the API on 256 MB and prod on 512 MB (`infra/fly/*.api.toml`), so the cap and the one-at-a-time chain are the only guards. The cap is an estimate: measure peak RSS on staging with a real 12 MP photo before relying on it, and lower `HEIC_MAX_PIXELS` if the machine comes close to its limit. `heic-convert` is imported lazily on first conversion (`HeicConverterService`) so its WASM is not compiled at API boot.
+- Web: `MediaViewer` and the Files viewer show a download card (`Open / Download` in the gig viewer) for a HEIC that is still stored as HEIC, or an image that fails to load, instead of a broken image.
+
+### Backfill
+
+`HeicBackfillService.run({ dryRun?, bandId? })` converts the live (not deleted, trashed or missing) `media_items` that are HEIC, using each band's Drive link, and updates the row to the JPEG's name, mime, size and thumbnail. It is a manual step after deploy, never part of it, and safe to re-run: converted items no longer match, ones that were kept (corrupt, too large, gone from Drive, band not linked) are simply tried again, and a row whose Drive file is already a JPEG (an earlier pass converted it but the row was not updated) is brought up to date and counted as converted. Files-tab files that are not gig media are not covered.
+
+```
+node apps/api/dist/scripts/backfill-heic.js --dry-run     # count only
+node apps/api/dist/scripts/backfill-heic.js               # convert
+node apps/api/dist/scripts/backfill-heic.js --band <bandId>
+```
+
+It boots a lean Nest context (database, integrations, Google links) with no HTTP server, pg-boss workers or poller, and prints `{ dryRun, found, converted, kept }`. Conversions it causes reach the poller as ordinary Drive changes. `--band` without a value exits with a usage error. Fake-only: `POST /__test__/media/heic-backfill[?dryRun=1]` (`0` and `false` mean a real run).
 
 ## Public upload links
 
