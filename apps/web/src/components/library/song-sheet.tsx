@@ -44,6 +44,7 @@ import { SongForm } from "./song-form";
 import { SuggestedReferenceChips } from "./suggested-reference-chips";
 import {
   formatDuration,
+  hasInvalidMagicRow,
   songArt,
   sourceUrlOf,
   toSongBody,
@@ -284,7 +285,11 @@ function ReferencesSection({
       label="Reference"
       action={
         rows ? (
-          <Button size="sm" disabled={update.isPending} onClick={done}>
+          <Button
+            size="sm"
+            disabled={update.isPending || hasInvalidMagicRow(rows)}
+            onClick={done}
+          >
             {update.isPending ? "Saving..." : "Done"}
           </Button>
         ) : (

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -28,6 +29,8 @@ import {
 } from "@greenroom/db";
 import {
   SONG_ERROR_CODES,
+  findMagicReference,
+  validateMagicReferenceValue,
   type CreateSong,
   type DeletedSong,
   type ListSongsQuery,
@@ -53,6 +56,31 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const escapeLike = (s: string): string => s.replace(/[\\%_]/g, "\\$&");
+
+/**
+ * Canonicalizes magic-key labels and requires a provider link for them. Rows
+ * identical to a stored (label, value) pair are not re-validated, so legacy
+ * rows never block unrelated edits.
+ */
+function normalizeReferences(
+  refs: ReferenceInput[],
+  stored: ReferenceInput[],
+): ReferenceInput[] {
+  const unchanged = new Set(stored.map((r) => `${r.label}\u0000${r.value}`));
+  return refs.map((r, i) => {
+    const magic = findMagicReference(r.label);
+    if (!magic) return r;
+    if (
+      !unchanged.has(`${r.label}\u0000${r.value}`) &&
+      !validateMagicReferenceValue(magic, r.value)
+    ) {
+      throw new BadRequestException(
+        `Reference row ${i + 1} (${magic.label}) must be an https link on ${magic.hosts.join(", ")}`,
+      );
+    }
+    return { label: magic.label, value: r.value };
+  });
+}
 
 @Injectable()
 export class SongsService {
@@ -153,6 +181,7 @@ export class SongsService {
         });
       }
     }
+    const references = normalizeReferences(input.references ?? [], []);
     const durationSeconds =
       input.durationSeconds ?? (await this.youtubeDuration(input.youtubeUrl));
     const row = await this.db.transaction(async (tx) => {
@@ -169,7 +198,7 @@ export class SongsService {
           youtubeUrl: input.youtubeUrl ?? null,
         })
         .returning();
-      await this.insertReferences(tx, created!.id, input.references ?? []);
+      await this.insertReferences(tx, created!.id, references);
       return created!;
     });
     return this.detail(row);
@@ -183,7 +212,16 @@ export class SongsService {
     input: UpdateSong,
   ): Promise<SongDetail> {
     const existing = await this.findRow(this.db, bandId, songId);
-    const { references, ...fields } = input;
+    const { references: rawRefs, ...fields } = input;
+    const references = rawRefs
+      ? normalizeReferences(
+          rawRefs,
+          await this.db
+            .select({ label: songLinks.label, value: songLinks.value })
+            .from(songLinks)
+            .where(eq(songLinks.songId, songId)),
+        )
+      : undefined;
     // A changed YouTube link fills an empty duration; a set duration is never overwritten.
     if (
       fields.durationSeconds == null &&

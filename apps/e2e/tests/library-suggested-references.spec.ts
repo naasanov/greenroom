@@ -165,8 +165,8 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
     data: {
       title: "Other Song",
       references: [
-        { label: "Apple Music", value: "https://x.test/a" },
-        { label: "YouTube", value: "https://x.test/y" },
+        { label: "Apple Music", value: "https://music.apple.com/us/song/a" },
+        { label: "YouTube", value: "https://youtu.be/y" },
       ],
     },
   });
