@@ -51,7 +51,7 @@ async function openSong(page: Page, title: string) {
   await expect(sheet(page).getByTestId("song-view")).toBeVisible();
 }
 
-test("Chords chip adds a reference, saving auto-imports the sheet, reader transposes", async ({
+test("Ultimate Guitar chip adds a reference, saving auto-imports the sheet, reader transposes", async ({
   page,
 }) => {
   await openLibrary(page);
@@ -62,10 +62,10 @@ test("Chords chip adds a reference, saving auto-imports the sheet, reader transp
   await sheet(page).getByRole("button", { name: "Enter manually" }).click();
   await expect(sheet(page).getByLabel("Title")).toHaveValue("Wonderwall");
 
-  const chip = sheet(page).getByTestId("reference-chip-chords");
+  const chip = sheet(page).getByTestId("reference-chip-ultimate-guitar");
   await expect(chip).toBeVisible();
   await expect(
-    sheet(page).getByTestId("reference-chip-chords-others"),
+    sheet(page).getByTestId("reference-chip-ultimate-guitar-others"),
   ).toBeVisible();
   await chip.click();
   await expect(chip).toHaveCount(0);
@@ -74,7 +74,7 @@ test("Chords chip adds a reference, saving auto-imports the sheet, reader transp
       .getByTestId("link-row")
       .last()
       .getByRole("combobox", { name: "Reference label" }),
-  ).toHaveValue("Chords");
+  ).toHaveValue("Ultimate Guitar");
   await expect(
     sheet(page)
       .getByTestId("link-row")

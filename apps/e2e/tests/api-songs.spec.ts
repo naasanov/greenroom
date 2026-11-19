@@ -714,6 +714,36 @@ test("playlist import runs as a job and reports progress and a summary", async (
   await other.api.dispose();
 });
 
+test("Ultimate Guitar is a magic key: UG hosts only, canonical label", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const bad = await api.post(base, {
+    data: {
+      title: "Bad UG",
+      references: [
+        { label: "Ultimate Guitar", value: "https://example.com/x" },
+      ],
+    },
+  });
+  expect(bad.status()).toBe(400);
+  expect(JSON.stringify(await bad.json())).toContain("Ultimate Guitar");
+
+  const ok = await addSong(api, base, {
+    title: "Good UG",
+    references: [
+      {
+        label: "ultimate guitar",
+        value: "https://tabs.ultimate-guitar.com/tab/x/y-chords-1",
+      },
+    ],
+  });
+  const detail = await (await api.get(`${base}/${ok.id}`)).json();
+  expect(detail.references.map((r: { label: string }) => r.label)).toEqual([
+    "Ultimate Guitar",
+  ]);
+});
+
 function randomId(): string {
   return "00000000-0000-4000-8000-000000000000";
 }

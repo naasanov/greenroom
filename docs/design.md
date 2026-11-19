@@ -140,6 +140,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - **Stored at concert pitch.** An import that lists "capo N" is transposed up N semitones before saving; the page's capo, key and tuning are kept as metadata only. The reader shows chords at band transpose + personal transpose - personal capo.
 - **Band key vs personal:** band transpose is shared and set explicitly ("Set as band key" with a confirm). Personal transpose, capo, font size, scroll speed, lyrics-only and theme are per device.
 - **Ultimate Guitar:** public chord tabs only; Official/Pro tabs cannot be imported and say so. The server fetches pages (throttled, one at a time, redirects limited to UG hosts) and caches searches. Adding a Chords reference link imports it automatically; "Other versions" lists the top-rated alternatives.
+- **Magic reference key:** "Ultimate Guitar" is a magic reference key like Spotify (label autocomplete, favicon, UG-host links only); the suggested chip is labeled Ultimate Guitar with its favicon. Import detection stays URL-based, so older "Chords" rows still work.
 - **Stage mode:** swipe changes songs (tap does nothing), and the current song's sheet is embedded and cached for offline use.
 - **Rollout flag:** `CHORDS_BANDS` on the API (`*`, or a comma list of band ids or slugs; unset means off). Staging runs `*`; prod stays off until the band has tried it.
 

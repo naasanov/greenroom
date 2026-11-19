@@ -55,11 +55,13 @@ export const CHORD_ERROR_CODES = {
   noSheet: "NO_CHORD_SHEET",
 } as const;
 
-const UG_HOSTS = new Set([
-  "ultimate-guitar.com",
+/** Ultimate Guitar hosts; the first gives a real favicon. */
+export const UG_HOST_LIST = [
   "www.ultimate-guitar.com",
   "tabs.ultimate-guitar.com",
-]);
+  "ultimate-guitar.com",
+] as const;
+const UG_HOSTS: ReadonlySet<string> = new Set(UG_HOST_LIST);
 
 export function isUltimateGuitarUrl(url: string): boolean {
   try {

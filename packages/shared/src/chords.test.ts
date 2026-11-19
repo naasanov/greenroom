@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  SUGGESTIBLE_REFERENCES,
+  findMagicReference,
+  validateMagicReferenceValue,
+} from "./songs.js";
+import {
   CHORD_ERROR_CODES,
   chordsImportSchema,
   formatChord,
@@ -262,5 +267,25 @@ test("isUltimateGuitarUrl rejects ports, credentials and lookalike hosts", () =>
   assert.equal(
     isUltimateGuitarUrl("https://user@tabs.ultimate-guitar.com/x"),
     false,
+  );
+});
+
+test("Ultimate Guitar is a magic reference key on UG hosts only", () => {
+  const ug = findMagicReference(" ultimate GUITAR ");
+  assert.equal(ug?.label, "Ultimate Guitar");
+  assert.ok(ug);
+  assert.ok(isUltimateGuitarUrl(`https://${ug.hosts[0]}/x`));
+  assert.ok(
+    validateMagicReferenceValue(ug, "https://tabs.ultimate-guitar.com/tab/x"),
+  );
+  assert.ok(
+    !validateMagicReferenceValue(ug, "http://tabs.ultimate-guitar.com/tab/x"),
+  );
+  assert.ok(!validateMagicReferenceValue(ug, "https://example.com/x"));
+  assert.ok(
+    !validateMagicReferenceValue(ug, "https://tabs.ultimate-guitar.com:8443/x"),
+  );
+  assert.ok(
+    !SUGGESTIBLE_REFERENCES.some((r) => (r.key as string) === "ultimateGuitar"),
   );
 });

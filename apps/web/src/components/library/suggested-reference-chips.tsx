@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown, Guitar, Plus } from "lucide-react";
-import { isUltimateGuitarUrl } from "@greenroom/shared";
+import { ChevronDown, Plus } from "lucide-react";
+import { UG_HOST_LIST, isUltimateGuitarUrl } from "@greenroom/shared";
 import { Favicon } from "@/components/app/link-list";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,7 +80,7 @@ export function SuggestedReferenceChips({
 const versionText = (v: { rating: number; votes: number }) =>
   `${v.rating.toFixed(1)}, ${v.votes} ratings`;
 
-/** "Chords" chip for the best Ultimate Guitar match, plus a menu of other versions. */
+/** "Ultimate Guitar" chip for the best Ultimate Guitar match, plus a menu of other versions. */
 function ChordsChip({
   bandId,
   title,
@@ -113,13 +113,13 @@ function ChordsChip({
       <Button
         type="button"
         variant="outline"
-        data-testid="reference-chip-chords"
-        onClick={() => onAdd("Chords", match.url)}
+        data-testid="reference-chip-ultimate-guitar"
+        onClick={() => onAdd("Ultimate Guitar", match.url)}
         className="border-dashed"
       >
         <Plus />
-        <Guitar />
-        Chords
+        <Favicon host={UG_HOST_LIST[0]} compact />
+        Ultimate Guitar
       </Button>
       {others.length > 0 ? (
         <DropdownMenu>
@@ -127,7 +127,7 @@ function ChordsChip({
             <Button
               type="button"
               variant="ghost"
-              data-testid="reference-chip-chords-others"
+              data-testid="reference-chip-ultimate-guitar-others"
             >
               Other versions <ChevronDown />
             </Button>
@@ -136,8 +136,8 @@ function ChordsChip({
             {others.map((v) => (
               <DropdownMenuItem
                 key={v.url}
-                data-testid="reference-chip-chords-version"
-                onSelect={() => onAdd("Chords", v.url)}
+                data-testid="reference-chip-ultimate-guitar-version"
+                onSelect={() => onAdd("Ultimate Guitar", v.url)}
               >
                 {versionText(v)}
               </DropdownMenuItem>
