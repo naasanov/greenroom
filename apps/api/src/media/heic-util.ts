@@ -43,6 +43,9 @@ export function heicMime(mimeType: string, name: string): string {
   return /\.heif$/i.test(name) ? "image/heif" : "image/heic";
 }
 
+/** Most child boxes read from one level; real HEICs have a few dozen. */
+export const MAX_BOXES_PER_LEVEL = 10_000;
+
 interface Box {
   type: string;
   /** Offset of the first byte after the box header. */
@@ -50,11 +53,12 @@ interface Box {
   end: number;
 }
 
-/** Child boxes of `[start, end)`; throws on a size that does not fit. */
+/** Child boxes of `[start, end)`; throws on a size that does not fit or too many boxes. */
 function boxesIn(buf: Buffer, start: number, end: number): Box[] {
   const out: Box[] = [];
   let pos = start;
   while (pos < end) {
+    if (out.length >= MAX_BOXES_PER_LEVEL) throw new Error("too many boxes");
     if (end - pos < 8) throw new Error("truncated box header");
     let size = buf.readUInt32BE(pos);
     const type = buf.toString("latin1", pos + 4, pos + 8);

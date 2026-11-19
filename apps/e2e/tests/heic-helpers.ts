@@ -26,6 +26,22 @@ export const UNPARSEABLE_HEIC = Buffer.concat([
   Buffer.alloc(64, 0xab),
 ]);
 
+function box(type: string, ...payload: Buffer[]): Buffer {
+  const body = Buffer.concat(payload);
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(8 + body.length, 0);
+  head.write(type, 4, "latin1");
+  return Buffer.concat([head, body]);
+}
+
+/** A well-formed container whose `ipco` holds `count` empty 8-byte `free` boxes. */
+export function manyBoxesHeic(count: number): Buffer {
+  const ipco = box("ipco", Buffer.concat(Array(count).fill(box("free"))));
+  const pitm = box("pitm", Buffer.from([0, 0, 0, 0, 0, 1]));
+  const meta = box("meta", Buffer.alloc(4), pitm, box("iprp", ipco));
+  return Buffer.concat([HEIC.subarray(0, HEIC.readUInt32BE(0)), meta]);
+}
+
 /** A copy of the HEIC whose `ispe` width and height fields are overwritten. */
 export function withDimensions(
   heic: Buffer,

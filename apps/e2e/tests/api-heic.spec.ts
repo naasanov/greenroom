@@ -21,6 +21,7 @@ import {
   HEIC,
   UNPARSEABLE_HEIC,
   isJpeg,
+  manyBoxesHeic,
   uploadGigFile,
   withDimensions,
 } from "./heic-helpers.js";
@@ -251,6 +252,25 @@ test("a HEIC whose dimensions cannot be parsed is kept", async ({
   expect(await fake.calls()).not.toContain("updateContent");
   const file = (await fake.byName("junk.heic"))!;
   expect(await fake.content(file.id)).toEqual(UNPARSEABLE_HEIC);
+});
+
+test("a HEIC with an absurd number of child boxes is kept without being parsed or converted", async ({
+  testApi,
+}) => {
+  const { ava, fake } = await setup(testApi);
+  // 200k tiny boxes in ipco, far over the per-level cap.
+  const flood = manyBoxesHeic(200_000);
+  await fake.calls(true);
+  const done = await uploadGigFile(ava, flood, "flood.heic", "image/heic");
+  expect(done.status).toBe("complete");
+  expect(done.item).toMatchObject({
+    name: "flood.heic",
+    mimeType: "image/heic",
+  });
+  expect(await driveNames(fake)).toEqual(["flood.heic"]);
+  expect(await fake.calls()).not.toContain("updateContent");
+  const file = (await fake.byName("flood.heic"))!;
+  expect(await fake.content(file.id)).toEqual(flood);
 });
 
 test("a public upload link limited to other types rejects a .heic", async ({
