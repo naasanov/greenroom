@@ -22,6 +22,8 @@ export function withAncestryInvalidation(
     getFile: (t, f) => inner.getFile(t, f),
     rename: (t, f, n): Promise<DriveFileResult> => after(inner.rename(t, f, n)),
     move: (t, f, p): Promise<DriveFileResult> => after(inner.move(t, f, p)),
+    updateContent: (t, f, i): Promise<DriveFileResult> =>
+      after(inner.updateContent(t, f, i)),
     trash: (t, f): Promise<DriveFileResult> => after(inner.trash(t, f)),
     startResumableUpload: (t, i) => inner.startResumableUpload(t, i),
     uploadChunk: (t, s, c) => inner.uploadChunk(t, s, c),

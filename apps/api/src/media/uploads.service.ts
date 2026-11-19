@@ -46,6 +46,8 @@ import {
   DriveStructureService,
   type DriveContext,
 } from "./drive-structure.service.js";
+import { HeicConversionService } from "./heic-conversion.service.js";
+import { heicMime, isHeic } from "./heic-util.js";
 import { toItemDto } from "./media-util.js";
 import { MediaService } from "./media.service.js";
 
@@ -91,6 +93,7 @@ export class UploadsService implements OnModuleInit {
     private readonly structure: DriveStructureService,
     private readonly media: MediaService,
     private readonly jobs: JobsService,
+    private readonly heic: HeicConversionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -131,7 +134,12 @@ export class UploadsService implements OnModuleInit {
   ): Promise<UploadSession> {
     const maxBytes = limits.maxFileBytes ?? MAX_UPLOAD_FILE_BYTES;
     const allow = limits.allowMime ?? memberUploadTypeAllowed;
-    if (!allow(input.mimeType)) {
+    // A HEIC with no usable type is checked as image/heic against the allowlist.
+    const allowed =
+      allow(input.mimeType) ||
+      (isHeic(input.mimeType, input.fileName) &&
+        allow(heicMime(input.mimeType, input.fileName)));
+    if (!allowed) {
       throw new UnprocessableEntityException({
         code: UPLOAD_ERROR_CODES.typeNotAllowed,
         message: "This file type can't be uploaded",
@@ -546,11 +554,13 @@ export class UploadsService implements OnModuleInit {
       const existing = s.mediaItemId ? await this.liveItem(s) : null;
       if (existing) return { row: s, item: toItemDto(existing) };
     }
-    const drive = this.structure.drive;
     const parent = await this.parentOf(ctx, s);
-    if (file.parentId !== parent) await drive.move(ctx.token, file.id, parent);
-    if (file.name !== s.fileName)
-      await drive.rename(ctx.token, file.id, s.fileName);
+    const { stored, name, converted } = await this.settleDriveFile(
+      ctx,
+      s,
+      file,
+      parent,
+    );
     let songId = s.songId;
     if (songId) {
       const [song] = await this.db
@@ -564,10 +574,10 @@ export class UploadsService implements OnModuleInit {
       gigId: s.gigId!,
       folderId: s.folderId,
       driveFileId: file.id,
-      name: s.fileName,
-      mimeType: file.mimeType,
-      sizeBytes: file.size,
-      thumbnailUrl: file.thumbnailLink,
+      name,
+      mimeType: heicMime(stored.mimeType, name),
+      sizeBytes: stored.size,
+      thumbnailUrl: stored.thumbnailLink,
       uploadedByUserId: s.uploadedByUserId,
       uploadedViaLinkId: s.uploadedViaLinkId,
       nameCustomized: s.nameCustomized,
@@ -602,10 +612,41 @@ export class UploadsService implements OnModuleInit {
         mediaItemId: inserted!.id,
         driveFileId: file.id,
         songId,
+        ...(converted ? { fileName: name, mimeType: stored.mimeType } : {}),
       })
       .where(eq(uploadSessions.id, s.id))
       .returning();
     return { row: done!, item };
+  }
+
+  /**
+   * Moves and renames the finished Drive file to the session's choices and
+   * converts a HEIC. A HEIC session reads the live file first: a retry after
+   * an earlier attempt converted it finds the JPEG, which is left as it is.
+   * `converted` is true when the stored file is the JPEG, now or before.
+   */
+  private async settleDriveFile(
+    ctx: DriveContext,
+    s: SessionRow,
+    file: DriveFile,
+    parent: string,
+  ): Promise<{ stored: DriveFile; name: string; converted: boolean }> {
+    const drive = this.structure.drive;
+    let cur = file;
+    if (isHeic(s.mimeType, s.fileName)) {
+      const live = await drive.getFile(ctx.token, file.id);
+      if (live.status === "ok" && !live.file.trashed) cur = live.file;
+    }
+    const alreadyJpeg =
+      isHeic(s.mimeType, s.fileName) && !isHeic(cur.mimeType, cur.name);
+    if (cur.parentId !== parent) await drive.move(ctx.token, cur.id, parent);
+    if (alreadyJpeg) return { stored: cur, name: cur.name, converted: true };
+    if (cur.name !== s.fileName)
+      await drive.rename(ctx.token, cur.id, s.fileName);
+    const conv = await this.heic.convert(ctx.token, cur, s.fileName);
+    return conv.converted
+      ? { stored: conv.file, name: conv.file.name, converted: true }
+      : { stored: cur, name: s.fileName, converted: false };
   }
 
   /** Completes a Files upload: the Drive file is the result, no media item exists. */
@@ -620,18 +661,22 @@ export class UploadsService implements OnModuleInit {
       .where(eq(uploadSessions.id, start.id));
     const s = current!;
     if (s.status === "complete") return { row: s };
-    const drive = this.structure.drive;
-    if (file.parentId !== s.targetDriveFolderId)
-      await drive.move(ctx.token, file.id, s.targetDriveFolderId!);
-    if (file.name !== s.fileName)
-      await drive.rename(ctx.token, file.id, s.fileName);
+    const { stored, name, converted } = await this.settleDriveFile(
+      ctx,
+      s,
+      file,
+      s.targetDriveFolderId!,
+    );
+    const totalBytes = converted ? stored.size : s.totalBytes;
     const [done] = await this.db
       .update(uploadSessions)
       .set({
         status: "complete",
-        bytesReceived: s.totalBytes,
+        totalBytes,
+        bytesReceived: totalBytes,
         driveFileId: file.id,
-        mimeType: file.mimeType,
+        mimeType: heicMime(stored.mimeType, name),
+        ...(converted ? { fileName: name } : {}),
       })
       .where(eq(uploadSessions.id, s.id))
       .returning();

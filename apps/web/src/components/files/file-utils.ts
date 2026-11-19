@@ -10,9 +10,16 @@ export const isGoogleDoc = (e: FileEntry) =>
 export const driveOpenUrl = (e: FileEntry) =>
   `https://drive.google.com/open?id=${encodeURIComponent(e.id)}`;
 
+/** HEIC/HEIF by mime type or extension; browsers other than Safari cannot render these. */
+export function isHeicFile(mimeType: string | null, name: string): boolean {
+  return (
+    /^image\/(x-)?hei[cf]/i.test(mimeType ?? "") || /\.(heic|heif)$/i.test(name)
+  );
+}
+
 export function previewKind(e: FileEntry): PreviewKind {
   const m = e.mimeType ?? "";
-  if (isGoogleDoc(e)) return "none";
+  if (isGoogleDoc(e) || isHeicFile(m, e.name)) return "none";
   if (m.startsWith("image/")) return "image";
   if (m.startsWith("video/")) return "video";
   if (m.startsWith("audio/")) return "audio";

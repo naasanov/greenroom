@@ -72,7 +72,8 @@ export function sniffImageMime(buf: Buffer): string {
 
 export async function readAll(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
-  for await (const c of stream) chunks.push(Buffer.from(c as Buffer));
+  for await (const c of stream)
+    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c as Uint8Array));
   return Buffer.concat(chunks);
 }
 
