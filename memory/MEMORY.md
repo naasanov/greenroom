@@ -41,3 +41,5 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting; factory runs desktop only (WebKit crashes)
 - [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together
 - [Known flaky e2e specs](flaky-e2e-specs.md) — files-import (desktop) and media-upload wake lock (mobile, tray-tile race fixed 2026-11-15) fail intermittently in CI; rerun once, never weaken assertions
+- [Untrusted file parsing caps](untrusted-file-parsing-caps.md) — cap bytes, pixels and element counts before decoding user files
+- [Upload type allowlist](upload-type-allowlist.md) — type exceptions must still pass the per-link allow callback
