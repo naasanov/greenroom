@@ -14,6 +14,7 @@
       [
         "agenda-member.spec.ts",
         "agenda-timeline.spec.ts",
+        "api-chords.spec.ts",
         "api-feedback.spec.ts",
         "api-files-uploads.spec.ts",
         "api-lineups.spec.ts",
@@ -34,6 +35,7 @@
         "onboarding.spec.ts",
         "privacy.spec.ts",
         "shell.spec.ts",
+        "stage-chords.spec.ts",
         "stage-mode.spec.ts"
       ],
       [
@@ -74,6 +76,7 @@
         "files-import.spec.ts",
         "gate2-layout.spec.ts",
         "google-link-ui.spec.ts",
+        "library-chords.spec.ts",
         "library-sheet.spec.ts",
         "library-tag-autocomplete.spec.ts",
         "media-morph.spec.ts",
@@ -136,6 +139,7 @@
         "setlist-practice.spec.ts",
         "settings-leave.spec.ts",
         "shell.spec.ts",
+        "stage-chords.spec.ts",
         "stage-mode.spec.ts"
       ],
       [
@@ -147,6 +151,7 @@
         "events-handoff.spec.ts",
         "gate2-layout.spec.ts",
         "library-add.spec.ts",
+        "library-chords.spec.ts",
         "library-sheet.spec.ts",
         "library-tag-autocomplete.spec.ts",
         "media-upload.spec.ts",
@@ -217,6 +222,7 @@
       "library-add.spec.ts": 18,
       "library-import.spec.ts": 10.2,
       "library-list.spec.ts": 7.8,
+      "library-chords.spec.ts": 15,
       "library-sheet.spec.ts": 11.4,
       "library-spotify.spec.ts": 9.5,
       "library-tag-autocomplete.spec.ts": 1.7,
@@ -289,6 +295,7 @@
       "library-add.spec.ts": 45.1,
       "library-import.spec.ts": 26.5,
       "library-list.spec.ts": 25.4,
+      "library-chords.spec.ts": 35,
       "library-sheet.spec.ts": 28.9,
       "library-spotify.spec.ts": 17.3,
       "library-tag-autocomplete.spec.ts": 3.4,

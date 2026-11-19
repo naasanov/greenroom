@@ -43,16 +43,18 @@ test("opens from a gig with title, next song and position", async ({
   );
 });
 
-test("tap advances, arrow goes back, notes show under the title", async ({
+test("tap does not advance, arrows navigate, notes show under the title", async ({
   page,
 }) => {
   await openStage(page);
   const view = page.getByTestId("stage-view");
   await view.click({ position: { x: 200, y: 300 } });
+  await expect(position(page)).toHaveText("1 of 5");
+  await page.keyboard.press("ArrowRight");
   await expect(title(page)).toHaveText("Midnight Train");
   await expect(position(page)).toHaveText("2 of 5");
-  await view.click({ position: { x: 200, y: 300 } });
-  await view.click({ position: { x: 200, y: 300 } });
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
   await expect(title(page)).toHaveText("Original One");
   await expect(page.getByTestId("stage-notes")).toContainText(
     "Count in 4 bars",
@@ -63,16 +65,36 @@ test("tap advances, arrow goes back, notes show under the title", async ({
   await expect(title(page)).toHaveText("Original One");
 });
 
-test("swipe right goes back", async ({ page, isMobile }) => {
+test("swipe left advances and swipe right goes back", async ({
+  page,
+  isMobile,
+}) => {
   test.skip(isMobile, "Mouse drag swipe; touch swipes are not emulated here");
   await openStage(page);
-  await page.keyboard.press("ArrowRight");
+  const drag = async (fromX: number, toX: number, toY = 305) => {
+    await page.mouse.move(fromX, 300);
+    await page.mouse.down();
+    await page.mouse.move(toX, toY, { steps: 5 });
+    await page.mouse.up();
+  };
+  await drag(250, 100);
   await expect(title(page)).toHaveText("Midnight Train");
-  await page.mouse.move(100, 300);
+  await drag(250, 100);
+  await expect(position(page)).toHaveText("3 of 5");
+  await drag(100, 250);
+  await expect(title(page)).toHaveText("Midnight Train");
+  await drag(100, 250);
+  await expect(position(page)).toHaveText("1 of 5");
+});
+
+test("a vertical drag does not navigate", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Mouse drag; touch swipes are not emulated here");
+  await openStage(page);
+  await page.mouse.move(200, 400);
   await page.mouse.down();
-  await page.mouse.move(250, 305, { steps: 5 });
+  await page.mouse.move(210, 200, { steps: 5 });
   await page.mouse.up();
-  await expect(title(page)).toHaveText("Skyline Drive");
+  await expect(position(page)).toHaveText("1 of 5");
 });
 
 test("position survives a reload and the exit control leaves", async ({

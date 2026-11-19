@@ -18,10 +18,18 @@ export function readSnapshot(gigId: string): StageSnapshot | null {
 }
 
 export function writeSnapshot(snapshot: StageSnapshot): void {
+  const key = SNAPSHOT_PREFIX + snapshot.gigId;
+  try {
+    localStorage.setItem(key, JSON.stringify(snapshot));
+    return;
+  } catch {
+    // Fall through: a full quota is retried below without the bulky chord sheets.
+  }
+  if (!snapshot.chords) return;
   try {
     localStorage.setItem(
-      SNAPSHOT_PREFIX + snapshot.gigId,
-      JSON.stringify(snapshot),
+      key,
+      JSON.stringify({ ...snapshot, chords: undefined }),
     );
   } catch {
     // Blocked or full storage only costs offline support.

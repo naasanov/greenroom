@@ -3,6 +3,7 @@ import {
   gigs,
   setlistItems,
   setlists,
+  songLinks,
   type Database,
 } from "@greenroom/db";
 import { request as pwRequest, type APIRequestContext } from "@playwright/test";
@@ -713,6 +714,116 @@ test("playlist import runs as a job and reports progress and a summary", async (
   await other.api.dispose();
 });
 
+test("Ultimate Guitar is a magic key: UG hosts only, canonical label", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const bad = await api.post(base, {
+    data: {
+      title: "Bad UG",
+      references: [
+        { label: "Ultimate Guitar", value: "https://example.com/x" },
+      ],
+    },
+  });
+  expect(bad.status()).toBe(400);
+  expect(JSON.stringify(await bad.json())).toContain("Ultimate Guitar");
+
+  const ok = await addSong(api, base, {
+    title: "Good UG",
+    references: [
+      {
+        label: "ultimate guitar",
+        value: "https://tabs.ultimate-guitar.com/tab/x/y-chords-1",
+      },
+    ],
+  });
+  const detail = await (await api.get(`${base}/${ok.id}`)).json();
+  expect(detail.references.map((r: { label: string }) => r.label)).toEqual([
+    "Ultimate Guitar",
+  ]);
+});
+
 function randomId(): string {
   return "00000000-0000-4000-8000-000000000000";
 }
+
+test("magic reference keys: canonical label, provider-host links only", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const bad = await api.post(base, {
+    data: {
+      title: "Bad Link",
+      references: [
+        { label: "Chart", value: "https://example.com/c" },
+        { label: " spotify ", value: "https://example.com/x" },
+      ],
+    },
+  });
+  expect(bad.status()).toBe(400);
+  const message = JSON.stringify(await bad.json());
+  expect(message).toContain("row 2");
+  expect(message).toContain("Spotify");
+  expect(await (await api.get(base)).json()).toHaveLength(0);
+
+  const ok = await addSong(api, base, {
+    title: "Good Links",
+    references: [
+      { label: "spotify", value: "https://open.spotify.com/track/abc" },
+      { label: "YOUTUBE", value: "https://youtu.be/abc" },
+      { label: "apple music", value: "https://music.apple.com/us/song/x" },
+      { label: "youtube music", value: "https://music.youtube.com/watch?v=a" },
+      { label: "Chart", value: "anything goes" },
+    ],
+  });
+  const detail = await (await api.get(`${base}/${ok.id}`)).json();
+  expect(detail.references.map((r: { label: string }) => r.label)).toEqual([
+    "Spotify",
+    "YouTube",
+    "Apple Music",
+    "YouTube Music",
+    "Chart",
+  ]);
+
+  for (const value of [
+    "http://open.spotify.com/track/abc",
+    "https://open.spotify.com.evil.test/x",
+    "not a link",
+  ]) {
+    const res = await api.patch(`${base}/${ok.id}`, {
+      data: { references: [{ label: "Spotify", value }] },
+    });
+    expect(res.status(), value).toBe(400);
+  }
+});
+
+test("updates only validate magic rows that changed", async ({
+  testApi,
+  db,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const song = await addSong(api, base, { title: "Legacy" });
+  // A legacy invalid row, written as older code could.
+  await db.insert(songLinks).values({
+    songId: song.id,
+    label: "spotify",
+    value: "https://example.com/legacy",
+    position: 0,
+  });
+  const keep = { label: "spotify", value: "https://example.com/legacy" };
+  const res = await api.patch(`${base}/${song.id}`, {
+    data: {
+      references: [keep, { label: "Chart", value: "https://c.example.com" }],
+    },
+  });
+  expect(res.status(), await res.text()).toBe(200);
+  expect((await res.json()).references[0].label).toBe("Spotify");
+
+  const edited = await api.patch(`${base}/${song.id}`, {
+    data: {
+      references: [{ label: "Spotify", value: "https://example.com/legacy2" }],
+    },
+  });
+  expect(edited.status()).toBe(400);
+});

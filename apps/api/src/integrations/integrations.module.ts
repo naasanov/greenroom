@@ -17,6 +17,8 @@ import { RealMusicLinkAdapter } from "./musiclink/musiclink.real.js";
 import { SuggestionLookupState } from "./suggestion-lookup-state.js";
 import { SPOTIFY } from "./spotify/spotify.adapter.js";
 import { RealSpotifyAdapter } from "./spotify/spotify.real.js";
+import { ULTIMATE_GUITAR } from "./ultimate-guitar/ultimate-guitar.adapter.js";
+import { RealUltimateGuitarAdapter } from "./ultimate-guitar/ultimate-guitar.real.js";
 import { YOUTUBE } from "./youtube/youtube.adapter.js";
 import { RealYoutubeAdapter } from "./youtube/youtube.real.js";
 
@@ -54,6 +56,7 @@ const providers: Provider[] = [
   bind(SPOTIFY, (r) => r.spotify, RealSpotifyAdapter),
   bind(YOUTUBE, (r) => r.youtube, RealYoutubeAdapter),
   bind(MUSICLINK, (r) => r.musiclink, RealMusicLinkAdapter),
+  bind(ULTIMATE_GUITAR, (r) => r.ultimateGuitar, RealUltimateGuitarAdapter),
   bind(GITHUB, (r) => r.github, RealGithubAdapter),
   bind(EMAIL, (r) => r.email, RealEmailAdapter),
 ];
@@ -71,6 +74,7 @@ const providers: Provider[] = [
     SPOTIFY,
     YOUTUBE,
     MUSICLINK,
+    ULTIMATE_GUITAR,
     GITHUB,
     EMAIL,
   ],

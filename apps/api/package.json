@@ -7,6 +7,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
+    "test:unit": "node --test \"dist/**/*.test.js\"",
     "typecheck": "tsgo -p tsconfig.json --noEmit",
     "lint": "eslint ."
   },

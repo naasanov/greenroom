@@ -35,6 +35,7 @@ import {
   useSongSummary,
   useUpdateSong,
 } from "@/lib/queries/songs";
+import { SongChordsSection } from "@/components/chords/song-chords-section";
 import { SongFiles } from "./song-files";
 import { CandidatePreview } from "./candidate-preview";
 import { SmartInput } from "./smart-input";
@@ -43,6 +44,7 @@ import { SongForm } from "./song-form";
 import { SuggestedReferenceChips } from "./suggested-reference-chips";
 import {
   formatDuration,
+  hasInvalidMagicRow,
   songArt,
   sourceUrlOf,
   toSongBody,
@@ -283,7 +285,11 @@ function ReferencesSection({
       label="Reference"
       action={
         rows ? (
-          <Button size="sm" disabled={update.isPending} onClick={done}>
+          <Button
+            size="sm"
+            disabled={update.isPending || hasInvalidMagicRow(rows)}
+            onClick={done}
+          >
             {update.isPending ? "Saving..." : "Done"}
           </Button>
         ) : (
@@ -308,6 +314,8 @@ function ReferencesSection({
               <SuggestedReferenceChips
                 bandId={bandId}
                 sourceUrl={sourceUrlOf(song.references)}
+                title={song.title}
+                artist={song.artist}
                 rows={rows}
                 onAdd={(label, value) =>
                   setRows([
@@ -366,6 +374,13 @@ function SongView({
           </p>
         </div>
       </div>
+      {detail ? (
+        <SongChordsSection
+          bandId={bandId}
+          song={song}
+          references={detail.references}
+        />
+      ) : null}
       <Section label="Duration">
         <p className="text-sm">{duration ?? "Not set"}</p>
       </Section>

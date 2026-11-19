@@ -74,6 +74,7 @@ export async function startWorkerServers(): Promise<() => Promise<void>> {
     API_PORT: String(API_PORT),
     DATABASE_URL: TEST_DATABASE_URL,
     INTEGRATIONS_MODE: "fake",
+    CHORDS_BANDS: "*",
     NODE_ENV: "test",
     WEB_URL,
     WEB_ORIGIN: WEB_URL,

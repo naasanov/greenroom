@@ -11,7 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SongLinkEditor } from "./song-link-editor";
 import { SuggestedReferenceChips } from "./suggested-reference-chips";
-import { parseDuration, sourceUrlOf, type SongFormValues } from "./song-utils";
+import {
+  hasInvalidMagicRow,
+  parseDuration,
+  sourceUrlOf,
+  type SongFormValues,
+} from "./song-utils";
 
 const formSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
@@ -20,9 +25,9 @@ const formSchema = z.object({
     .string()
     .refine((v) => parseDuration(v) !== undefined, "Use m:ss, like 3:45"),
   notes: z.string().max(10_000),
-  references: z.array(
-    z.object({ id: z.string(), label: z.string(), value: z.string() }),
-  ),
+  references: z
+    .array(z.object({ id: z.string(), label: z.string(), value: z.string() }))
+    .refine((rows) => !hasInvalidMagicRow(rows), "Fix the reference links"),
 });
 
 /**
@@ -56,6 +61,10 @@ export function SongForm({
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
   const references = useWatch({ control: form.control, name: "references" });
+  const [title, artist] = useWatch({
+    control: form.control,
+    name: ["title", "artist"],
+  });
 
   return (
     <form
@@ -119,6 +128,8 @@ export function SongForm({
             <SuggestedReferenceChips
               bandId={bandId}
               sourceUrl={sourceUrlOf(defaults.references)}
+              title={title}
+              artist={artist}
               rows={references}
               onAdd={(label, value) =>
                 form.setValue(

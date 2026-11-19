@@ -1,7 +1,10 @@
 import {
   SUGGESTIBLE_REFERENCES,
+  findMagicReference,
   isSuggestionSourceUrl,
+  validateMagicReferenceValue,
   songSortSchema,
+  type MagicReference,
   type ReferenceSuggestion,
   type SongSort,
 } from "@greenroom/shared";
@@ -84,6 +87,24 @@ export function toSongBody(values: SongFormValues) {
         value: r.value.trim(),
       })),
   };
+}
+
+/** The row's magic key when its link is filled in but off that provider's hosts, else undefined. */
+export function invalidMagicKey(row: {
+  label: string;
+  value: string;
+}): MagicReference | undefined {
+  const magic = findMagicReference(row.label);
+  const value = row.value.trim();
+  return magic && value && !validateMagicReferenceValue(magic, value)
+    ? magic
+    : undefined;
+}
+
+export function hasInvalidMagicRow(
+  rows: { label: string; value: string }[],
+): boolean {
+  return rows.some((r) => invalidMagicKey(r) !== undefined);
 }
 
 function hostOf(value: string): string | null {

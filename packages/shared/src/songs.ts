@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UG_HOST_LIST, isUltimateGuitarUrl } from "./chords.js";
 
 export const SONG_ERROR_CODES = {
   duplicateSong: "DUPLICATE_SONG",
@@ -161,16 +162,75 @@ export interface ResolveResult {
 }
 
 /**
- * The only references the app suggests, in tie-break order. `musiclink` is
- * the MusicLink platform key; adding a provider is one more entry.
+ * The references MusicLink can suggest, in tie-break order. `musiclink` is the
+ * MusicLink platform key and `hosts` the only hosts a value may use.
  */
 export const SUGGESTIBLE_REFERENCES = [
-  { key: "spotify", label: "Spotify", musiclink: "spotify" },
-  { key: "youtubeMusic", label: "YouTube Music", musiclink: "youtube_music" },
-  { key: "youtube", label: "YouTube", musiclink: "youtube" },
-  { key: "appleMusic", label: "Apple Music", musiclink: "apple_music" },
+  {
+    key: "spotify",
+    label: "Spotify",
+    musiclink: "spotify",
+    hosts: ["open.spotify.com", "spotify.link"],
+  },
+  {
+    key: "youtubeMusic",
+    label: "YouTube Music",
+    musiclink: "youtube_music",
+    hosts: ["music.youtube.com"],
+  },
+  {
+    key: "youtube",
+    label: "YouTube",
+    musiclink: "youtube",
+    hosts: ["www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be"],
+  },
+  {
+    key: "appleMusic",
+    label: "Apple Music",
+    musiclink: "apple_music",
+    hosts: ["music.apple.com"],
+  },
 ] as const;
 export type SuggestibleKey = (typeof SUGGESTIBLE_REFERENCES)[number]["key"];
+
+/** Every magic label key: the suggestible references plus Ultimate Guitar. */
+export const MAGIC_REFERENCES = [
+  ...SUGGESTIBLE_REFERENCES,
+  {
+    key: "ultimateGuitar",
+    label: "Ultimate Guitar",
+    hosts: UG_HOST_LIST,
+  },
+] as const;
+export type MagicReference = (typeof MAGIC_REFERENCES)[number];
+
+/** The magic key whose label equals `label` (trimmed, case-insensitive). */
+export function findMagicReference(label: string): MagicReference | undefined {
+  const l = label.trim().toLowerCase();
+  return MAGIC_REFERENCES.find((r) => r.label.toLowerCase() === l);
+}
+
+/** True for an https link on one of the magic key's hosts (Ultimate Guitar also bans ports and credentials). */
+export function validateMagicReferenceValue(
+  entry: MagicReference,
+  value: string,
+): boolean {
+  if (entry.key === "ultimateGuitar") {
+    return (
+      value.trim().toLowerCase().startsWith("https:") &&
+      isUltimateGuitarUrl(value)
+    );
+  }
+  try {
+    const url = new URL(value.trim());
+    return (
+      url.protocol === "https:" &&
+      (entry.hosts as readonly string[]).includes(url.hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Hosts whose links may seed a suggestion lookup; anything else is never sent on. */
 export const SUGGESTION_SOURCE_HOSTS = [

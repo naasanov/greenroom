@@ -1,4 +1,6 @@
-import { Music2 } from "lucide-react";
+import { Guitar, Music2 } from "lucide-react";
+import Link from "next/link";
+import { useChordsIndex } from "@/lib/queries/chords";
 import type { SongSummary } from "@greenroom/shared";
 import { Thumbnail } from "@/components/app/list-card";
 import { formatDuration, songArt } from "@/components/library/song-utils";
@@ -47,6 +49,31 @@ export function SongLine({ song }: { song: SongLineData }) {
         </span>
       ) : null}
     </>
+  );
+}
+
+/** A small link to the chord reader; renders only for songs that have a sheet. */
+export function SongChordsLink({
+  bandId,
+  songId,
+  title,
+}: {
+  bandId: string;
+  songId: string;
+  title: string;
+}) {
+  const index = useChordsIndex(bandId);
+  if (!index.data?.songIds.includes(songId)) return null;
+  return (
+    <Link
+      href={`/songs/${songId}/chords`}
+      data-testid="song-row-chords"
+      aria-label={`Open chords for ${title}`}
+      onClick={(e) => e.stopPropagation()}
+      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <Guitar className="size-4" />
+    </Link>
   );
 }
 
