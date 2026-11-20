@@ -6,7 +6,12 @@ import {
 } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
 import { gigLineup, gigs, memberships, type Database } from "@greenroom/db";
-import type { CreateGig, Gig, UpdateGig } from "@greenroom/shared";
+import {
+  loadInDate,
+  type CreateGig,
+  type Gig,
+  type UpdateGig,
+} from "@greenroom/shared";
 import { CalendarInviteQueue } from "../calendar-invites/calendar-invite.queue.js";
 import { DRIZZLE } from "../db/db.constants.js";
 import { addDays, isValidTimeZone, localTime, zonedInstant } from "./time.js";
@@ -53,7 +58,7 @@ export function toGig(g: GigRow): Gig {
   };
 }
 
-/** Local fields to column values; end rolls to the next day when it is not after the start. */
+/** Local fields to column values; end rolls to the next day when it is not after the start, load-in to the previous day when it is later. */
 function toColumns(f: GigForm) {
   if (!isValidTimeZone(f.timeZone ?? "UTC")) {
     throw new BadRequestException("Unknown time zone");
@@ -72,7 +77,13 @@ function toColumns(f: GigForm) {
     if (endsAt <= startsAt)
       endsAt = zonedInstant(addDays(f.date, 1), f.endTime, tz);
   }
-  const loadInAt = f.loadInTime ? zonedInstant(f.date, f.loadInTime, tz) : null;
+  const loadInAt = f.loadInTime
+    ? zonedInstant(
+        loadInDate(f.date, f.startTime, f.loadInTime),
+        f.loadInTime,
+        tz,
+      )
+    : null;
   return {
     title: f.title,
     date: f.date,

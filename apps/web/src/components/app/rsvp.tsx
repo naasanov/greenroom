@@ -7,22 +7,17 @@ import { cn } from "@/lib/utils";
 
 export type RsvpStatus = "going" | "maybe" | "none" | "declined";
 
-const RSVP: Record<
-  RsvpStatus,
-  { label: string; badge: string; order: number }
-> = {
-  going: { label: "Going", badge: "bg-going text-background", order: 0 },
-  maybe: { label: "Maybe", badge: "bg-maybe text-background", order: 1 },
+const RSVP: Record<RsvpStatus, { label: string; badge: string }> = {
+  going: { label: "Going", badge: "bg-going text-background" },
+  maybe: { label: "Maybe", badge: "bg-maybe text-background" },
   none: {
     label: "No response",
     badge:
       "border border-dashed border-muted-foreground/50 text-muted-foreground",
-    order: 2,
   },
   declined: {
     label: "Not going",
     badge: "bg-declined/15 text-declined",
-    order: 3,
   },
 };
 
@@ -72,14 +67,16 @@ export interface Attendee {
   instruments?: string[];
 }
 
-/** Going, maybe, no response, then not going; stable within a group. */
-export function sortAttendees<T extends Pick<Attendee, "status">>(
+/** Alphabetical by name, case-insensitive; stable for equal names. */
+export function sortAttendees<T extends Pick<Attendee, "name">>(
   attendees: readonly T[],
 ): T[] {
   return attendees
     .map((a, i) => ({ a, i }))
     .sort(
-      (x, y) => RSVP[x.a.status].order - RSVP[y.a.status].order || x.i - y.i,
+      (x, y) =>
+        x.a.name.localeCompare(y.a.name, undefined, { sensitivity: "base" }) ||
+        x.i - y.i,
     )
     .map(({ a }) => a);
 }

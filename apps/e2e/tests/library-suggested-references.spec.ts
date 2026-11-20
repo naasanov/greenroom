@@ -20,6 +20,17 @@ test.beforeEach(async ({ testApi, loginAs }) => {
   await loginAs(USERS.ava.email);
 });
 
+/** Reveals chips hidden behind the dots chip, when there are any. */
+async function revealAll(page: Page) {
+  const more = sheet(page).getByTestId("suggestion-chips-more");
+  if (
+    (await more.count()) > 0 &&
+    (await more.getAttribute("aria-expanded")) === "false"
+  ) {
+    await more.click();
+  }
+}
+
 /** Opens the add form prefilled from the Spotify fake's "Take Me Out". */
 async function addFromSpotify(page: Page) {
   await openLibrary(page);
@@ -148,7 +159,7 @@ test("a failing lookup shows no chip and no error, and saving still works", asyn
   await expect(page).toHaveURL(/\/songs\/[0-9a-f-]+$/);
 });
 
-test("ranking: used labels first, fixed order next, four chips in one row, next chip order holds", async ({
+test("ranking: used labels first, fixed order next, next chip order holds", async ({
   page,
   testApi,
 }) => {
@@ -180,6 +191,9 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
   await cards(page).filter({ hasText: "Ranked Song" }).click();
   await sheet(page).getByRole("button", { name: "Edit" }).click();
   // Used first (YouTube, Apple Music in whitelist order), then the rest in fixed order.
+  // Four chips fit on desktop; on narrow viewports the rest sit behind the dots chip.
+  await expect(chips(page).first()).toBeVisible();
+  await revealAll(page);
   await expect(chips(page)).toHaveText([
     "YouTube",
     "Apple Music",
@@ -195,6 +209,7 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
   }
 
   await chip(page, "YouTube").click();
+  await revealAll(page);
   await expect(chips(page)).toHaveText([
     "Apple Music",
     "Spotify",
@@ -204,6 +219,7 @@ test("ranking: used labels first, fixed order next, four chips in one row, next 
   await sheet(page).getByLabel("Artist").fill("Franz Ferdinand");
   await sheet(page).getByLabel("Title").fill("Ranked Song Two");
   await page.waitForTimeout(900);
+  await revealAll(page);
   await expect(chips(page)).toHaveText([
     "Apple Music",
     "Spotify",
@@ -389,4 +405,111 @@ test("references-only editing shows chips, and a tap saves through Done", async 
   await s.getByRole("button", { name: "Done" }).click();
   await expect(s.getByTestId("references-edit")).toHaveCount(0);
   await expect(s.getByText("open.spotify.com")).toBeVisible();
+});
+
+test("skeleton chips hold the row while suggestions load, then give way to chips", async ({
+  page,
+  testApi,
+}) => {
+  await seedAll(testApi);
+  // A DOM observer records skeletons independent of request timing, which WebKit routing does not control.
+  await page.addInitScript(() => {
+    const SKELETON = '[data-testid="suggestion-chip-skeleton"]';
+    const CHIP = '[data-testid="suggestion-chip"]';
+    const w = window as unknown as Record<string, unknown>;
+    w.__chipSkeleton = { seen: false, max: 0, chipsAlongside: false };
+    new MutationObserver((records) => {
+      const state = w.__chipSkeleton as {
+        seen: boolean;
+        max: number;
+        chipsAlongside: boolean;
+      };
+      const added = records.some((r) =>
+        [...r.addedNodes].some(
+          (n) =>
+            n instanceof Element &&
+            (n.matches(SKELETON) || n.querySelector(SKELETON)),
+        ),
+      );
+      const count = document.querySelectorAll(SKELETON).length;
+      if (added || count > 0) state.seen = true;
+      state.max = Math.max(state.max, count);
+      if (count > 0 && document.querySelector(CHIP))
+        state.chipsAlongside = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await addFromSpotify(page);
+  await expect(chips(page).first()).toBeVisible();
+  await expect(sheet(page).getByTestId("suggestion-chip-skeleton")).toHaveCount(
+    0,
+  );
+  const seen = await page.evaluate(
+    () =>
+      (window as unknown as Record<string, unknown>).__chipSkeleton as {
+        seen: boolean;
+        max: number;
+        chipsAlongside: boolean;
+      },
+  );
+  expect(seen.seen).toBe(true);
+  expect(seen.max).toBeGreaterThan(0);
+  expect(seen.chipsAlongside).toBe(false);
+});
+
+test("no source URL means no skeleton chips", async ({ page, testApi }) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await api.post(base, {
+    data: {
+      title: "Plain Song",
+      references: [{ label: "Chart", value: "https://example.com/chart" }],
+    },
+  });
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "Plain Song" }).click();
+  const s = sheet(page);
+  await s.getByRole("button", { name: "Change references" }).click();
+  await expect(s.getByTestId("references-edit")).toBeVisible();
+  await expect(s.getByTestId("suggestion-chip-skeleton")).toHaveCount(0);
+  await expect(chips(page)).toHaveCount(0);
+});
+
+test("chips past two rows hide behind a dots chip that reveals them inline", async ({
+  page,
+  testApi,
+}) => {
+  await seedAll(testApi);
+  await page.setViewportSize({ width: 300, height: 800 });
+  await addFromSpotify(page);
+  const s = sheet(page);
+  const more = s.getByTestId("suggestion-chips-more");
+  await expect(more).toBeVisible();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  const label = (await more.getAttribute("aria-label"))!;
+  const hidden = Number(/Show (\d+) more suggestion/.exec(label)![1]);
+  // Spotify is already a row, so three suggestions exist in total.
+  expect(await chips(page).count()).toBe(3 - hidden);
+  // Add row, the visible chips and the dots chip share two rows.
+  const tops = async () =>
+    new Set(
+      await s
+        .locator(
+          'button:has-text("Add row"), [data-testid="suggestion-chip"], [data-testid="suggestion-chips-more"]',
+        )
+        .evaluateAll((els) =>
+          els.map((e) => Math.round(e.getBoundingClientRect().top)),
+        ),
+    ).size;
+  expect(await tops()).toBeLessThanOrEqual(2);
+
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(chips(page)).toHaveText([
+    "YouTube Music",
+    "YouTube",
+    "Apple Music",
+  ]);
+  expect(await tops()).toBeGreaterThan(2);
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  expect(await chips(page).count()).toBe(3 - hidden);
 });

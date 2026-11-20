@@ -26,6 +26,7 @@ import { OpenReferencesDialog } from "./open-references-dialog";
 import { PickTarget, TargetRow } from "./pick-dnd";
 import {
   SongChordsLink,
+  SongDuration,
   SongLine,
   setlistSummary,
   toSetlistSong,
@@ -277,12 +278,16 @@ export function SetlistSection({
                         dragging && "opacity-30",
                       )}
                     >
-                      <SongLine song={song} />
+                      <SongLine song={song} hideDuration />
                     </div>
                     <SongChordsLink
                       bandId={builder.bandId}
                       songId={item.songId}
                       title={item.title}
+                    />
+                    <SongDuration
+                      seconds={song.durationSeconds}
+                      onClick={() => builder.viewSong(item.songId)}
                     />
                     <Button
                       type="button"

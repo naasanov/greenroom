@@ -8,7 +8,11 @@ import { BandSection } from "@/components/settings/band-section";
 import { ConnectionsSection } from "@/components/settings/connections-section";
 import { DeleteAccountSection } from "@/components/settings/delete-account-section";
 import { LeaveBandSection } from "@/components/settings/leave-band-section";
-import { PersonalSection } from "@/components/settings/personal-section";
+import {
+  PersonalSection,
+  ProfileFormProvider,
+  SaveProfileBar,
+} from "@/components/settings/personal-section";
 import {
   SettingsPanel,
   SettingsTabBar,
@@ -56,8 +60,11 @@ export function SettingsView() {
           )}
         >
           <SettingsPanel tab="profile" active={tab === "profile"}>
-            <PersonalSection user={me} bandId={currentBand?.id} />
-            <DeleteAccountSection />
+            <ProfileFormProvider user={me}>
+              <PersonalSection user={me} />
+              <DeleteAccountSection />
+              <SaveProfileBar />
+            </ProfileFormProvider>
           </SettingsPanel>
           {currentBand ? (
             <>
@@ -68,7 +75,11 @@ export function SettingsView() {
                 <LeaveBandSection key={currentBand.id} band={currentBand} />
               </SettingsPanel>
               <SettingsPanel tab="connections" active={tab === "connections"}>
-                <ConnectionsSection bandId={currentBand.id} isAdmin={isAdmin} />
+                <ConnectionsSection
+                  user={me}
+                  bandId={currentBand.id}
+                  isAdmin={isAdmin}
+                />
               </SettingsPanel>
             </>
           ) : null}

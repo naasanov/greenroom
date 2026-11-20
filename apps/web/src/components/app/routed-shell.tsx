@@ -142,7 +142,8 @@ export function RoutedShell({ children }: { children: ReactNode }) {
           if (tab === "files") warmFiles();
         }}
         profile={{ name: me.displayName, imageUrl: me.avatarUrl }}
-        onProfileClick={() => router.push("/settings")}
+        onProfileSettings={() => router.push("/settings")}
+        onSignOut={() => signOut.mutate()}
       >
         {eventsVisited ? (
           <div hidden={!showEvents}>

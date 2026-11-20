@@ -20,6 +20,13 @@ test("settings tabs switch and sync the URL", async ({ page }) => {
     page.getByRole("button", { name: "Delete account" }),
   ).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
+  await expect(page.getByTestId("calendar-invites-row")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  const save = page.getByRole("button", { name: "Save profile" });
+  const del = page.getByRole("button", { name: "Delete account" });
+  expect((await save.boundingBox())!.y).toBeGreaterThan(
+    (await del.boundingBox())!.y,
+  );
 
   await tab("Band").click();
   await expect(page).toHaveURL(/\/settings\?tab=band$/);
@@ -32,6 +39,9 @@ test("settings tabs switch and sync the URL", async ({ page }) => {
   await tab("Connections").click();
   await expect(page).toHaveURL(/\/settings\?tab=connections$/);
   await expect(page.getByTestId("settings-spotify")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add to your calendar" }),
+  ).toBeVisible();
   await expect(page.getByTestId("settings-google-drive")).toBeVisible();
   await expect(page.getByTestId("settings-leave")).toHaveCount(0);
 

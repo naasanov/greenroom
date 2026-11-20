@@ -309,8 +309,15 @@ async function openOccurrence(page: Page, date: string) {
   return drawer;
 }
 
+const rowOf = (drawer: Locator, name: string) =>
+  drawer.locator("li", { hasText: name });
+
+/** The caller's own "Going" option in their attendee row. */
 const going = (drawer: Locator) =>
-  drawer.getByRole("radio", { name: "Going", exact: true });
+  rowOf(drawer, USERS.ava.displayName).getByRole("radio", {
+    name: `Going for ${USERS.ava.displayName}`,
+    exact: true,
+  });
 
 async function rsvpGoing(page: Page, drawer: Locator, scope: string) {
   await going(drawer).click();
@@ -390,11 +397,8 @@ test("a member sets another member's RSVP from their row", async ({ page }) => {
     .getByRole("button", { name: "Save RSVP" })
     .click();
   await expect(benRow).toHaveAttribute("data-status", "maybe");
-  // The caller's own control is untouched and has no row control.
+  // The caller's own picker is untouched.
   await expect(going(drawer)).not.toBeChecked();
-  await expect(
-    drawer.locator("li", { hasText: USERS.ava.displayName }).getByRole("radio"),
-  ).toHaveCount(0);
   await page.reload();
   await expect(
     dialog(page, seed.practice.title).locator("li", {
@@ -541,19 +545,92 @@ test("practice drawer has per-section buttons and no footer", async ({
   await expect(drawer.getByTestId("practice-when")).toContainText("7:00 PM");
 });
 
-test("practice drawer orders setlist, RSVP, then who's coming", async ({
+test("own row shows the picker and there is no separate Your RSVP section", async ({
   page,
 }) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  await expect(drawer.getByRole("region", { name: "Your RSVP" })).toHaveCount(
+    0,
+  );
+  await expect(
+    rowOf(drawer, USERS.ava.displayName).getByRole("radio"),
+  ).toHaveCount(3);
+});
+
+test("clicking the selected RSVP option clears it to no response", async ({
+  page,
+}) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  const benRow = rowOf(drawer, USERS.ben.displayName);
+  const maybe = benRow.getByRole("radio", {
+    name: `Maybe for ${USERS.ben.displayName}`,
+    exact: true,
+  });
+  const save = async () => {
+    await rsvpScopeDialog(page)
+      .getByRole("radio", { name: "This event", exact: true })
+      .click();
+    await rsvpScopeDialog(page)
+      .getByRole("button", { name: "Save RSVP" })
+      .click();
+  };
+  await maybe.click();
+  await save();
+  await expect(benRow).toHaveAttribute("data-status", "maybe");
+  await maybe.click();
+  await save();
+  await expect(benRow).toHaveAttribute("data-status", "none");
+  await expect(maybe).not.toBeChecked();
+  // The caller's own row clears the same way.
+  await going(drawer).click();
+  await save();
+  await expect(going(drawer)).toBeChecked();
+  await going(drawer).click();
+  await save();
+  await expect(going(drawer)).not.toBeChecked();
+  await page.reload();
+  const reloaded = dialog(page, seed.practice.title);
+  await expect(rowOf(reloaded, USERS.ben.displayName)).toHaveAttribute(
+    "data-status",
+    "none",
+  );
+});
+
+test("attendee order stays alphabetical when a response changes", async ({
+  page,
+}) => {
+  const drawer = await openOccurrence(page, occDate(7));
+  const names = () =>
+    drawer.getByTestId("attendee-list").locator("li p.font-medium");
+  const before = await names().allInnerTexts();
+  expect(before).toEqual(
+    [...before].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    ),
+  );
+  const last = before[before.length - 1]!;
+  await rowOf(drawer, last)
+    .getByRole("radio", { name: `Going for ${last}`, exact: true })
+    .click();
+  await rsvpScopeDialog(page)
+    .getByRole("radio", { name: "This event", exact: true })
+    .click();
+  await rsvpScopeDialog(page)
+    .getByRole("button", { name: "Save RSVP" })
+    .click();
+  await expect(rowOf(drawer, last)).toHaveAttribute("data-status", "going");
+  expect(await names().allInnerTexts()).toEqual(before);
+});
+
+test("practice drawer orders setlist then who's coming", async ({ page }) => {
   const date = seed.practice.moved.startsAt.slice(0, 10);
   await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
   const drawer = dialog(page, seed.practice.title);
   await expect(drawer.getByTestId("attendee-list")).toBeVisible();
   const top = async (loc: Locator) => (await loc.boundingBox())!.y;
   const setlist = await top(drawer.getByTestId("setlist-section"));
-  const rsvp = await top(drawer.getByRole("region", { name: "Your RSVP" }));
   const coming = await top(drawer.getByRole("region", { name: "Attendees" }));
-  expect(setlist).toBeLessThan(rsvp);
-  expect(rsvp).toBeLessThan(coming);
+  expect(setlist).toBeLessThan(coming);
 });
 
 test("editing practice details swaps only the details block inline", async ({

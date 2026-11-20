@@ -81,7 +81,7 @@ test("the subscribe path shows the feed and instructions, and Back returns to th
       .getByTestId("calendar-invites-dialog")
       .getByTestId("calendar-feed-url"),
   ).toBeVisible({ timeout: 40_000 });
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await expect(page.getByTestId("calendar-invites-status")).toHaveText(
     "Subscribe link",
   );
@@ -94,7 +94,7 @@ test("Settings opens the chooser first, even with the subscribe link in use", as
   await dialog.getByTestId("calendar-choice-feed").click();
   await expect(dialog.getByTestId("calendar-feed-url")).toBeVisible({ timeout: 40_000 });
   await page.keyboard.press("Escape");
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await page.getByTestId("calendar-invites-open").click();
   const settings = page.getByTestId("calendar-invites-dialog");
   await expect(settings.getByTestId("calendar-choice-email")).toBeVisible({ timeout: 40_000 });
@@ -145,7 +145,7 @@ test("email invites turn on with an optional address and can be turned off", asy
   await again.getByTestId("calendar-choice-email").click();
 
   await page.keyboard.press("Escape");
-  await page.goto("/settings");
+  await page.goto("/settings?tab=connections");
   await expect(page.getByTestId("calendar-invites-status")).toHaveText(
     "Email invites",
   );

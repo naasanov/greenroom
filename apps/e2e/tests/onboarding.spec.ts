@@ -104,9 +104,7 @@ test("sign out returns to sign-in and protects the app again", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/");
   await page.getByRole("button", { name: "Profile and settings" }).click();
-  await expect(page).toHaveURL(/\/settings$/);
-  await expect(page.getByText(USERS.ava.email)).toBeVisible();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
   await page.goto("/");
   await expect(page).toHaveURL(/\/sign-in\?redirectTo=%2F$/);

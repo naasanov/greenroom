@@ -1,4 +1,10 @@
-import type { CalendarEvent } from "@greenroom/shared";
+import {
+  loadInDate,
+  loadInIsDayBefore,
+  type CalendarEvent,
+} from "@greenroom/shared";
+
+export { loadInDate, loadInIsDayBefore };
 
 /** The browser's IANA zone, used for new events. */
 export function localTimeZone(): string {
@@ -129,4 +135,20 @@ export function shiftDate(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/** "Day before, Nov 19" (or "Day before" without a date) when load-in precedes the gig date, else null. */
+export function loadInDayLabel(
+  date: string,
+  startTime: string | null | undefined,
+  loadInTime: string | null | undefined,
+): string | null {
+  if (!loadInIsDayBefore(startTime, loadInTime)) return null;
+  if (!date) return "Day before";
+  const day = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${loadInDate(date, startTime, loadInTime)}T12:00:00Z`));
+  return `Day before, ${day}`;
 }

@@ -143,7 +143,7 @@ export function PeopleSection() {
     <Section
       id="people"
       title="RSVP list and instrument picker"
-      description="The attendee list sorts going, maybe, no response, then not going."
+      description="The attendee list sorts alphabetically by name."
     >
       <Demo
         title="Attendees"

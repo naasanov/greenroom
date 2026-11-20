@@ -16,7 +16,12 @@ import { Switch } from "@/components/ui/switch";
 import { Fact } from "@/components/events/facts";
 import { eventDrawerClass } from "@/components/events/beside-sheet";
 import { GigForm } from "@/components/events/gig-form";
-import { dayLabel, time12, timeRange } from "@/components/events/time";
+import {
+  dayLabel,
+  loadInDayLabel,
+  time12,
+  timeRange,
+} from "@/components/events/time";
 import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { MediaSection } from "@/components/media/media-section";
 import { UploadLinkButton } from "@/components/media/upload-link-dialog";
@@ -100,6 +105,7 @@ function GigDetails({
 }) {
   const hasContact = gig.contactName || gig.contactPhone || gig.contactEmail;
   const time = timeRange(gig);
+  const loadInNote = loadInDayLabel(gig.date, gig.startTime, gig.loadInTime);
   return (
     <div className="flex flex-col gap-6">
       <CollapsibleSection
@@ -145,7 +151,17 @@ function GigDetails({
                 </span>
               </Fact>
               {gig.loadInTime ? (
-                <Fact label="Load-in">{time12(gig.loadInTime)}</Fact>
+                <Fact label="Load-in">
+                  {time12(gig.loadInTime)}
+                  {loadInNote ? (
+                    <span
+                      data-testid="gig-load-in-day-before"
+                      className="ml-2 text-muted-foreground"
+                    >
+                      {loadInNote}
+                    </span>
+                  ) : null}
+                </Fact>
               ) : null}
               {gig.venueName || gig.address ? (
                 <Fact label="Venue">
