@@ -139,6 +139,7 @@ function scrollParent(node: EventTarget | null): Element | null {
 export function PickDndProvider({ children }: { children: ReactNode }) {
   const registry = useRef(new Map<string, TargetRegistration>());
   const scroller = useRef<Element | null>(null);
+  const scrollStart = useRef(0);
   const dwell = useRef<number | null>(null);
   const clearDwell = () => {
     if (dwell.current !== null) window.clearTimeout(dwell.current);
@@ -168,6 +169,7 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
 
   const onDragStart = (e: DragStartEvent) => {
     scroller.current = scrollParent(e.activatorEvent.target);
+    scrollStart.current = scroller.current?.scrollTop ?? 0;
     // Pointer drags wait for the edge band; keyboard drags always scroll.
     setScrollEdge(!("clientX" in e.activatorEvent));
     const data = e.active.data.current as DragData | undefined;
@@ -188,7 +190,10 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     const src = a.touches?.[0] ?? a;
     const box = scroller.current?.getBoundingClientRect();
     if (!box || src.clientX === undefined || src.clientY === undefined) return;
-    const y = src.clientY + e.delta.y;
+    // dnd-kit folds the scroller's scroll offset into delta; remove it to get
+    // the pointer's viewport position.
+    const scrolled = (scroller.current?.scrollTop ?? 0) - scrollStart.current;
+    const y = src.clientY + e.delta.y - scrolled;
     const band = box.height * EDGE_BAND;
     const inBand =
       (y >= box.top && y <= box.top + band) ||
@@ -235,12 +240,16 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(() => ({ active, register }), [active, register]);
-  // Picks use a thin edge zone, gated by the dwell, so a row near the list's
-  // edge is not scrolled away. Reorders always scroll with dnd-kit's defaults.
+  // Reorders gate scrolling through canScroll so dnd-kit keeps tracking the
+  // pointer's direction while the dwell runs and a still pointer scrolls once it
+  // elapses. Picks use a thin edge zone and toggle `enabled` instead.
+  const canScroll = useCallback(() => scrollEdge, [scrollEdge]);
   const autoScroll =
     active?.type === "pick"
       ? { threshold: { x: 0.2, y: 0.05 }, enabled: scrollEdge }
-      : { enabled: active?.type === "item" || scrollEdge };
+      : active?.type === "item"
+        ? { canScroll }
+        : { enabled: scrollEdge };
 
   return (
     <PickDndContext.Provider value={value}>
