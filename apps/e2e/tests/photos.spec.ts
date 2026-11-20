@@ -1,6 +1,7 @@
 import { BANDS, USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { BAND, PNG, clientFor, setupDrive } from "./api-media-helpers.js";
+import { NIGHT_OWLS_SETTINGS } from "./band-helpers.js";
 
 type Page = import("@playwright/test").Page;
 
@@ -26,7 +27,7 @@ test("settings shows one profile photo; the band photo is disabled until Drive i
   await expect(mine).toContainText("Your photo");
   await expect(page.getByTestId("member-photo-row")).toHaveCount(0);
   await expect(mine.getByRole("button", { name: "Add photo" })).toBeEnabled();
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   const band = page.getByTestId("band-photo-row");
   await expect(band.getByTestId("band-photo-row-note")).toBeVisible();
   await expect(band.getByRole("button", { name: "Add photo" })).toBeDisabled();
@@ -40,7 +41,7 @@ test("admin uploads, replaces, and removes the band photo", async ({
   await testApi.seed("band");
   await setupDrive(await clientFor(testApi, USERS.ava.email));
   await loginAs(USERS.ava.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   const row = page.getByTestId("band-photo-row");
   await expect(row.getByRole("button", { name: "Add photo" })).toBeEnabled();
   await expect(switcherImg(page)).toHaveCount(0);
@@ -156,7 +157,7 @@ test("non-admins cannot change the band photo", async ({
   await loginAs(USERS.cleo.email);
   await page.goto("/settings");
   await expect(page.getByTestId("profile-photo-row")).toBeVisible();
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("band-photo-row")).toHaveCount(0);
 });

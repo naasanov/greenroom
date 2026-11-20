@@ -130,7 +130,9 @@ test("band switcher moves between bands and remembers the choice", async ({
   await loginAs(USERS.ben.email);
   await page.goto("/");
   await page.getByRole("button", { name: /Switch band/ }).click();
-  await page.getByRole("menuitem", { name: /Side Project/ }).click();
+  await page
+    .getByRole("menuitem", { name: /^(?!Settings for).*Side Project/ })
+    .click();
   await expect(switcher(page, "Side Project")).toBeVisible();
   await page.reload();
   await expect(switcher(page, "Side Project")).toBeVisible();

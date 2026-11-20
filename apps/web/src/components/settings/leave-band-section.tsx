@@ -37,7 +37,7 @@ export function LeaveBandSection({ band }: { band: BandSummary }) {
     !!members.data &&
     members.data.filter((m) => m.role === "admin").length <= 1;
 
-  /** Awaited rather than per-call callbacks: this section remounts when the band list refreshes. */
+  /** Awaited rather than per-call callbacks: this section unmounts once the band leaves the list. */
   async function run(deleteBand: boolean) {
     setError(null);
     try {

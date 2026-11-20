@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { request as pwRequest } from "@playwright/test";
 import { API_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
+import { NIGHT_OWLS_SETTINGS, bandSettingsUrl } from "./band-helpers.js";
 
 const switcher = (page: import("@playwright/test").Page, name: string) =>
   page.getByRole("button", { name: `Switch band, current: ${name}` });
@@ -21,7 +22,7 @@ test("a regular member leaves and the app switches to their other band", async (
   await api.put("/me/current-band", { data: { bandId: BANDS.nightOwls.id } });
   await api.dispose();
 
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(switcher(page, "The Night Owls")).toBeVisible();
   await page.getByRole("button", { name: "Leave The Night Owls" }).click();
   await page
@@ -39,18 +40,18 @@ test("the last admin sees the warning up front and cannot leave", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(
     page.getByRole("alert").filter({ hasText: "last admin" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Leave The Night Owls" }),
   ).toBeDisabled();
-  await expect(page).toHaveURL(/\/settings\?tab=band$/);
+  await expect(page).toHaveURL(new RegExp(`${NIGHT_OWLS_SETTINGS}$`));
   await expect(switcher(page, "The Night Owls")).toBeVisible();
 });
 
-test("a regular member does not get Band settings in the band picker", async ({
+test("a regular member gets a settings icon for their band with Leave only", async ({
   page,
   testApi,
   loginAs,
@@ -59,10 +60,12 @@ test("a regular member does not get Band settings in the band picker", async ({
   await loginAs(USERS.cleo.email);
   await page.goto("/events");
   await page.getByRole("button", { name: /Switch band/ }).click();
-  await expect(page.getByRole("menuitem").first()).toBeVisible();
-  await expect(
-    page.getByRole("menuitem", { name: "Band settings" }),
-  ).toHaveCount(0);
+  await page
+    .getByRole("menuitem", { name: "Settings for The Night Owls" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${NIGHT_OWLS_SETTINGS}$`));
+  await expect(page.getByTestId("settings-leave")).toBeVisible();
+  await expect(page.getByTestId("settings-band")).toHaveCount(0);
 });
 
 test("the only member must delete the band, typing its name to confirm", async ({
@@ -73,14 +76,11 @@ test("the only member must delete the band, typing its name to confirm", async (
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.ben.email);
-  // Ben's first band in the list is irrelevant: make Side Project current via the switcher.
-  await page.goto("/settings?tab=band");
-  if (!(await switcher(page, "Side Project").isVisible())) {
-    await page.getByRole("button", { name: /Switch band/ }).click();
-    await page.getByRole("menuitem", { name: /Side Project/ }).click();
-  }
-  await expect(switcher(page, "Side Project")).toBeVisible();
-
+  // Ben's active band is not guaranteed; the delete acts on the band whose page is open.
+  await page.goto(bandSettingsUrl(BANDS.sideProject.id));
+  await expect(page.getByTestId("band-settings-name")).toHaveText(
+    "Side Project",
+  );
   await page.getByRole("button", { name: "Delete band" }).click();
   const dialog = page.getByRole("dialog", { name: "Delete Side Project?" });
   const confirm = dialog.getByRole("button", { name: "Delete band" });
@@ -102,7 +102,7 @@ test("leaving the only band returns to the start screen", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.cleo.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await page.getByRole("button", { name: "Leave The Night Owls" }).click();
   await page
     .getByRole("alertdialog")

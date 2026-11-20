@@ -1,5 +1,6 @@
 import { USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
+import { NIGHT_OWLS_SETTINGS } from "./band-helpers.js";
 import { fakeGoogleConsent } from "./google-helpers.js";
 
 test.beforeEach(async ({ testApi, loginAs }) => {
@@ -28,13 +29,7 @@ test("settings tabs switch and sync the URL", async ({ page }) => {
     (await del.boundingBox())!.y,
   );
 
-  await tab("Band").click();
-  await expect(page).toHaveURL(/\/settings\?tab=band$/);
-  await expect(tab("Band")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("settings-band")).toBeVisible();
-  await expect(page.getByTestId("public-calendar-row")).toBeVisible();
-  await expect(page.getByTestId("settings-leave")).toBeVisible();
-  await expect(page.getByTestId("settings-personal")).toHaveCount(0);
+  await expect(tab("Band")).toHaveCount(0);
 
   await tab("Connections").click();
   await expect(page).toHaveURL(/\/settings\?tab=connections$/);
@@ -83,16 +78,17 @@ test("a denied Google sign-in shows the error on Connections", async ({
   await expect(page).toHaveURL(/\/settings\?tab=connections$/);
 });
 
-test("members see only Leave band on Band and no Drive card", async ({
+test("members see only Leave band on band settings and no Drive card", async ({
   page,
   loginAs,
   context,
 }) => {
   await context.clearCookies();
   await loginAs(USERS.ben.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
+  await page.goto("/settings");
   await page.getByRole("tab", { name: "Connections" }).click();
   await expect(page.getByTestId("settings-spotify")).toBeVisible();
   await expect(page.getByTestId("settings-google-drive")).toHaveCount(0);
@@ -111,11 +107,11 @@ test("tabs sit left of the panel on desktop and above it on mobile", async ({
 
   await page.getByRole("tab", { name: "Profile" }).focus();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("tab", { name: "Band" })).toHaveAttribute(
+  await expect(page.getByRole("tab", { name: "Connections" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await expect(page.getByRole("tab", { name: "Band" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Connections" })).toBeFocused();
   await page.keyboard.press("ArrowUp");
   await expect(page.getByRole("tab", { name: "Profile" })).toHaveAttribute(
     "aria-selected",
@@ -129,7 +125,7 @@ test("tabs sit left of the panel on desktop and above it on mobile", async ({
 
   await page.getByRole("tab", { name: "Profile" }).focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Band" })).toHaveAttribute(
+  await expect(page.getByRole("tab", { name: "Connections" })).toHaveAttribute(
     "aria-selected",
     "true",
   );

@@ -2,6 +2,7 @@ import type { BandSeedResult } from "@greenroom/db";
 import { USERS } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
 import { fakeGoogleConsent } from "./google-helpers.js";
+import { NIGHT_OWLS_SETTINGS } from "./band-helpers.js";
 
 let seed: BandSeedResult;
 
@@ -17,11 +18,13 @@ test("non-admins do not see band settings", async ({
 }) => {
   await context.clearCookies();
   await loginAs(USERS.ben.email);
-  await page.goto("/settings?tab=band");
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.goto(NIGHT_OWLS_SETTINGS);
+  await expect(
+    page.getByRole("heading", { name: "Band settings" }),
+  ).toBeVisible();
   await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
-  await page.getByRole("tab", { name: "Connections" }).click();
+  await page.goto("/settings?tab=connections");
   await expect(page.getByTestId("settings-spotify")).toBeVisible();
   await expect(page.getByTestId("settings-google")).toHaveCount(0);
 });

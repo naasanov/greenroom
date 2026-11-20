@@ -1,6 +1,7 @@
 import { USERS, bands, users } from "@greenroom/db";
 import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
+import { NIGHT_OWLS_SETTINGS } from "./band-helpers.js";
 
 // Route stubs do not apply reliably to pages controlled by a service worker.
 test.use({ serviceWorkers: "block" });
@@ -117,7 +118,7 @@ test("band section is hidden for regular members", async ({
   await loginAs(USERS.cleo.email);
   await page.goto("/settings");
   await expect(page.getByTestId("settings-personal")).toBeVisible();
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
   await expect(page.getByTestId("settings-leave")).toBeVisible();
 });
@@ -130,7 +131,7 @@ test("admin edits the band name and public profile", async ({
 }) => {
   const seeded = await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   const band = page.getByTestId("settings-band");
   await expect(band.getByLabel("Bio")).toHaveValue(/rehearsal room/);
   const save = band.getByRole("button", { name: "Save band" });
