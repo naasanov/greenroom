@@ -126,8 +126,6 @@ export function sourceUrlOf(rows: { value: string }[]): string | null {
   );
 }
 
-export const MAX_SUGGESTION_CHIPS = 4;
-
 const hostOfUrl = (value: string): string | null => {
   try {
     return new URL(value).hostname.toLowerCase();
@@ -138,7 +136,7 @@ const hostOfUrl = (value: string): string | null => {
 
 /**
  * Drops suggestions the song already has, puts references the band has used
- * as keys first, breaks ties by whitelist order, and keeps the first four.
+ * as keys first, and breaks ties by whitelist order.
  */
 export function rankSuggestions(
   suggestions: ReferenceSuggestion[],
@@ -161,6 +159,5 @@ export function rankSuggestions(
     used.has(s.label.toLowerCase()) ? 0 : 1;
   return suggestions
     .filter((s) => order(s.key) >= 0 && !hasIt(s))
-    .sort((a, b) => rank(a) - rank(b) || order(a.key) - order(b.key))
-    .slice(0, MAX_SUGGESTION_CHIPS);
+    .sort((a, b) => rank(a) - rank(b) || order(a.key) - order(b.key));
 }
