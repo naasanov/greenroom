@@ -13,3 +13,4 @@ export * from "./feedback.js";
 export * from "./public-calendar.js";
 export * from "./gig-path.js";
 export * from "./chords.js";
+export * from "./load-in.js";

@@ -227,6 +227,40 @@ test("gig: soft delete hides it and leaves drive fields alone", async ({
   expect(row?.driveFolderId).toBe("drive-folder-1");
 });
 
+test("load-in later than the start falls on the previous day", async ({
+  testApi,
+}) => {
+  const { api, bandId } = await newBand(testApi);
+  const base = { title: "Late show", date: "2026-12-05", timeZone: NY };
+  const post = async (data: Json) =>
+    (
+      await api.post(`/bands/${bandId}/gigs`, { data: { ...base, ...data } })
+    ).json();
+
+  const late = await post({ startTime: "00:00", loadInTime: "23:00" });
+  expect(late).toMatchObject({
+    date: "2026-12-05",
+    loadInTime: "23:00",
+    startTime: "00:00",
+    loadInAt: "2026-12-05T04:00:00.000Z",
+    startsAt: "2026-12-05T05:00:00.000Z",
+  });
+
+  const evening = await post({ startTime: "20:00", loadInTime: "18:00" });
+  expect(evening.loadInAt).toBe("2026-12-05T23:00:00.000Z");
+
+  // Moving the start earlier through PATCH re-resolves the stored load-in.
+  const patched = await (
+    await api.patch(`/bands/${bandId}/gigs/${evening.id}`, {
+      data: { startTime: "17:00" },
+    })
+  ).json();
+  expect(patched).toMatchObject({
+    loadInTime: "18:00",
+    loadInAt: "2026-12-04T23:00:00.000Z",
+  });
+});
+
 test("band scoping: non-members get 404, other bands' gigs are unreachable", async ({
   testApi,
 }) => {

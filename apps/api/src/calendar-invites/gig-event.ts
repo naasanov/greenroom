@@ -1,6 +1,6 @@
 import type { gigs } from "@greenroom/db";
 import { gigSlugId } from "@greenroom/shared";
-import { addDays, localTime } from "../events/time.js";
+import { addDays, localDate, localTime } from "../events/time.js";
 
 type GigRow = typeof gigs.$inferSelect;
 
@@ -45,7 +45,11 @@ function gigTimes(g: GigRow): { allDay: boolean; start: string; end: string } {
 export function gigInput(g: GigRow, webUrl: string): GigEventContent {
   const t = gigTimes(g);
   const lines = [g.notes?.trim() || null];
-  if (g.loadInAt) lines.push(`Load-in: ${localTime(g.loadInAt, g.timeZone)}`);
+  if (g.loadInAt) {
+    const dayBefore = localDate(g.loadInAt, g.timeZone) < g.date;
+    const when = localTime(g.loadInAt, g.timeZone);
+    lines.push(`Load-in: ${when}${dayBefore ? " (day before)" : ""}`);
+  }
   lines.push(`${webUrl}/gigs/${gigSlugId(g)}`);
   return {
     summary: g.title,

@@ -27,6 +27,7 @@ import {
   NextDayNote,
   NATIVE_DATE_TIME_INPUT,
 } from "@/components/events/form-parts";
+import { loadInDayLabel } from "@/components/events/time";
 
 const optionalTime = z.union([z.literal(""), localTimeSchema]);
 
@@ -161,6 +162,9 @@ export function GigForm({
   const watchedEnd = useWatch({ control: form.control, name: "endTime" });
   const endsNextDay =
     !!watchedStart && !!watchedEnd && watchedEnd < watchedStart;
+  const watchedDate = useWatch({ control: form.control, name: "date" });
+  const watchedLoadIn = useWatch({ control: form.control, name: "loadInTime" });
+  const loadInNote = loadInDayLabel(watchedDate, watchedStart, watchedLoadIn);
 
   return (
     <form
@@ -237,6 +241,14 @@ export function GigForm({
             className={NATIVE_DATE_TIME_INPUT}
             {...form.register("loadInTime")}
           />
+          {loadInNote ? (
+            <p
+              data-testid="load-in-day-before"
+              className="text-sm text-muted-foreground"
+            >
+              {loadInNote}
+            </p>
+          ) : null}
         </FormField>
       </div>
 
