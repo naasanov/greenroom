@@ -124,8 +124,26 @@ test("each band card has an aligned settings icon with a touch-sized hit area", 
   await page.getByRole("button", { name: /Switch band/ }).click();
   const icons = page.getByRole("menuitem", { name: /^Settings for / });
   await expect(icons).toHaveCount(2);
-  const first = (await icons.nth(0).boundingBox())!;
-  const second = (await icons.nth(1).boundingBox())!;
+  // The menu animates in; boundingBox includes transforms, so wait for stable boxes.
+  const measure = async () => [
+    (await icons.nth(0).boundingBox())!,
+    (await icons.nth(1).boundingBox())!,
+  ];
+  let previous = "";
+  let boxes = await measure();
+  await expect
+    .poll(
+      async () => {
+        boxes = await measure();
+        const current = JSON.stringify(boxes);
+        const settled = current === previous;
+        previous = current;
+        return settled;
+      },
+      { intervals: [100] },
+    )
+    .toBe(true);
+  const [first, second] = boxes;
   // Only the active band shows a check mark, yet the icons share one column.
   expect(second.x).toBeCloseTo(first.x, 1);
   expect(first.width).toBeGreaterThanOrEqual(44);

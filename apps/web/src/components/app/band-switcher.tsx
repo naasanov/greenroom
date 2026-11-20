@@ -97,7 +97,7 @@ export function BandSwitcher({
       >
         <DropdownMenuLabel>Your bands</DropdownMenuLabel>
         {bands.map((b) => (
-          <div key={b.id} className="flex items-center gap-1">
+          <div key={b.id} role="none" className="flex items-center gap-1">
             <DropdownMenuItem
               onSelect={() => onSelect?.(b.id)}
               className="min-w-0 flex-1 gap-3"
