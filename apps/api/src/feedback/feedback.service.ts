@@ -26,6 +26,16 @@ const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 5;
 const TITLE_MAX = 80;
 
+/** Comma-separated emails in FEEDBACK_RATE_LIMIT_EXEMPT_EMAILS skip the cap. */
+function isRateExempt(email: string): boolean {
+  const raw = process.env.FEEDBACK_RATE_LIMIT_EXEMPT_EMAILS ?? "";
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
+
 /** Single-line title from the message when none was given. */
 export function deriveTitle(message: string): string {
   const line = message.replace(/\s+/g, " ").trim();
@@ -82,7 +92,7 @@ export class FeedbackService {
   }
 
   async submit(user: User, input: FeedbackInput): Promise<FeedbackResult> {
-    this.checkRate(user.id);
+    if (!isRateExempt(user.email)) this.checkRate(user.id);
     const band = await this.bandName(user.id, input.bandId);
     const category = FEEDBACK_CATEGORIES.find(
       (c) => c.value === input.category,
