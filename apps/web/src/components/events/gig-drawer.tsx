@@ -22,6 +22,7 @@ import {
   time12,
   timeRange,
 } from "@/components/events/time";
+import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { MediaSection } from "@/components/media/media-section";
 import { UploadLinkButton } from "@/components/media/upload-link-dialog";
 import { LineupAside } from "@/components/lineups/lineup-aside";
@@ -107,28 +108,25 @@ function GigDetails({
   const loadInNote = loadInDayLabel(gig.date, gig.startTime, gig.loadInTime);
   return (
     <div className="flex flex-col gap-6">
-      <section
-        data-testid="details-section"
-        aria-labelledby="details-heading"
-        className="flex flex-col gap-3"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="details-heading" className="text-base font-semibold">
-            Details
-          </h3>
-          {editing ? null : (
+      <CollapsibleSection
+        testId="details-section"
+        headingId="details-heading"
+        title="Details"
+        actions={
+          editing ? null : (
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               aria-label="Edit details"
-              className="-mr-1.5 text-muted-foreground"
+              className="text-muted-foreground"
               onClick={onEdit}
             >
               <Pencil />
             </Button>
-          )}
-        </div>
+          )
+        }
+      >
         {editing ? (
           <GigForm
             idPrefix="gig-edit"
@@ -227,7 +225,7 @@ function GigDetails({
             </div>
           </>
         )}
-      </section>
+      </CollapsibleSection>
       <div data-testid="gig-sections" className="flex flex-col gap-6">
         <SetlistSection builder={setlist} />
         {setlist.setlist?.items.length ? (

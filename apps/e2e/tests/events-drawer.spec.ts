@@ -150,6 +150,62 @@ test("each section has its own edit button and there is no footer", async ({
   ).toHaveCount(0);
 });
 
+test("gig drawer sections collapse and expand from their headers", async ({
+  page,
+}) => {
+  const gig = seed.gigs.upcomingClub;
+  await page.goto(`/gigs/${gig.id}`);
+  const drawer = dialog(page, gig.title);
+  for (const name of ["Details", "Setlist", "Lineup", "Media"]) {
+    await expect(
+      drawer.getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-expanded", "true");
+  }
+  const setlist = drawer.getByTestId("setlist-section");
+  const toggle = setlist.getByRole("button", { name: "Setlist", exact: true });
+  const rows = setlist.getByTestId("setlist-row");
+  await expect(rows.first()).toBeVisible();
+  await drawer.getByRole("button", { name: "Edit details" }).click();
+  await expect(
+    drawer.getByRole("button", { name: "Details", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await drawer.getByRole("button", { name: "Cancel", exact: true }).click();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(rows.first()).toBeHidden();
+  await expect(
+    setlist.getByRole("button", { name: "Edit setlist" }),
+  ).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(rows.first()).toBeVisible();
+});
+
+test("practice drawer sections collapse and expand from their headers", async ({
+  page,
+}) => {
+  const date = seed.practice.moved.startsAt.slice(0, 10);
+  await page.goto(`/practices/${seed.practice.seriesId}?date=${date}`);
+  const drawer = dialog(page, seed.practice.title);
+  const details = drawer.getByTestId("details-section");
+  const toggle = details.getByRole("button", { name: "Details", exact: true });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(details.getByTestId("practice-when")).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(details.getByTestId("practice-when")).toBeHidden();
+  await expect(
+    details.getByRole("button", { name: "Edit details" }),
+  ).toBeVisible();
+  await toggle.click();
+  await expect(details.getByTestId("practice-when")).toBeVisible();
+  const coming = drawer.getByRole("region", { name: "Attendees" });
+  await coming.getByRole("button", { expanded: true }).click();
+  await expect(coming.getByTestId("attendee-list")).toBeHidden();
+  await coming.getByRole("button", { expanded: false }).click();
+  await expect(coming.getByTestId("attendee-list")).toBeVisible();
+});
+
 test("editing details swaps the block inline and saves", async ({ page }) => {
   const gig = seed.gigs.upcomingClub;
   await page.goto(`/gigs/${gig.id}`);
