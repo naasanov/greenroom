@@ -57,6 +57,29 @@ test("a gig ending before it starts rolls to the next day with an indicator", as
   );
 });
 
+test("a load-in later than the start is flagged as the day before", async ({
+  page,
+}) => {
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Add event" }).click();
+  const pane = await pickSide(page, "gig");
+  const note = pane.getByTestId("load-in-day-before");
+  await pane.getByLabel("Title").fill("Midnight gig");
+  await pane.getByLabel("Start time").fill("00:00");
+  await pane.getByLabel("Load-in time").fill("23:00");
+  await expect(note).toHaveText("Day before");
+  await pane.getByLabel("Date", { exact: true }).fill(isoDay(2));
+  await expect(note).toHaveText(/^Day before, [A-Z][a-z]{2} \d{1,2}$/);
+  await pane.getByLabel("Load-in time").fill("00:00");
+  await expect(note).toHaveCount(0);
+  await pane.getByLabel("Load-in time").fill("23:00");
+  await pane.getByRole("button", { name: "Create gig" }).click();
+  const drawer = page.getByRole("dialog", { name: "Midnight gig" });
+  await expect(drawer.getByTestId("gig-load-in-day-before")).toContainText(
+    "Day before",
+  );
+});
+
 test("clicking a day pre-fills the date", async ({ page }) => {
   await page.goto("/events");
   await expect(calendar(page).locator(".fc-event").first()).toBeVisible();
