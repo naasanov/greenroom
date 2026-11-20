@@ -2,7 +2,8 @@
 
 import { MessageSquarePlus } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import {
   FEEDBACK_CATEGORIES,
   FEEDBACK_ERROR_CODES,
@@ -11,16 +12,9 @@ import {
   type FeedbackRequest,
 } from "@greenroom/shared";
 import { NAV_TABS } from "@/components/app/app-shell";
+import { RightSheet } from "@/components/app/right-sheet";
 import { NativeSelect } from "@/components/events/form-parts";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, isApiError } from "@/lib/api";
@@ -49,27 +43,33 @@ function errorText(e: unknown): string {
   return "We could not send your feedback. Please try again.";
 }
 
-/** Height of the visual viewport, which shrinks when the on-screen keyboard opens. */
-function useVisualViewportHeight(active: boolean): number | null {
-  const [height, setHeight] = useState<number | null>(null);
+/** Pixels of the layout viewport covered by the on-screen keyboard. */
+function useKeyboardGap(active: boolean): number {
+  const [gap, setGap] = useState(0);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!active || !vv) return;
-    const update = () => setHeight(vv.height);
+    const update = () =>
+      setGap(Math.max(0, Math.round(window.innerHeight - vv.height)));
     update();
     vv.addEventListener("resize", update);
     return () => {
       vv.removeEventListener("resize", update);
-      setHeight(null);
+      setGap(0);
     };
   }, [active]);
-  return height;
+  return gap;
 }
+
+const noopSubscribe = () => () => {};
 
 /** Unsent text, kept at module scope so it survives closing and remounting. */
 let draft = "";
 
-/** Header icon button that opens a dialog for sending feedback as a GitHub issue. */
+/**
+ * Header icon button that opens a right-hand sheet for sending feedback as a
+ * GitHub issue. The sheet is non-modal and only closes via its own controls.
+ */
 export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState(draft);
@@ -77,16 +77,42 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<FeedbackCategory | "">("");
-  const [area, setArea] = useState("Other");
+  // A manual Area pick wins; otherwise the area follows the current page.
+  const [areaPick, setAreaPick] = useState<string | null>(null);
   const pathname = usePathname();
-  const viewportHeight = useVisualViewportHeight(open);
+  const area = areaPick ?? areaForPath(pathname);
+  const keyboardGap = useKeyboardGap(open);
+  // The sheet is portaled to body: the header's blur and z-index would trap it.
+  const canPortal = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+  const openerRef = useRef<HTMLButtonElement>(null);
 
   // Form state resets on open, so the success view stays put while closing.
-  function openDialog() {
+  function openSheet() {
+    if (open) return;
     setSent(false);
     setError(null);
-    setArea(areaForPath(pathname));
+    setAreaPick(null);
     setOpen(true);
+  }
+
+  // Non-modal, so focus is moved in on open and handed back on close by hand.
+  useEffect(() => {
+    if (!open) return;
+    document
+      .getElementById("feedback-category")
+      ?.focus({ preventScroll: true });
+  }, [open, canPortal]);
+
+  function changeOpen(next: boolean) {
+    if (!next) {
+      const sheet = document.querySelector('[data-testid="feedback-sheet"]');
+      if (sheet?.contains(document.activeElement)) openerRef.current?.focus();
+    }
+    setOpen(next);
   }
 
   const canSend = !sending && !!message.trim() && category !== "";
@@ -122,115 +148,127 @@ export function FeedbackWidget({ bandId }: { bandId?: string }) {
       <button
         type="button"
         aria-label="Send feedback"
-        onClick={openDialog}
+        ref={openerRef}
+        onClick={openSheet}
         className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <MessageSquarePlus className="size-5" />
       </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          data-testid="feedback-dialog"
-          style={
-            viewportHeight
-              ? { maxHeight: `${viewportHeight - 16}px` }
-              : undefined
-          }
-          className="top-2 max-h-[calc(100dvh-1rem)] translate-y-0 overflow-y-auto overscroll-contain sm:top-1/2 sm:-translate-y-1/2"
-        >
-          <DialogHeader>
-            <DialogTitle>Send feedback</DialogTitle>
-            <DialogDescription>
-              Tell us about a bug, a rough edge, or something missing.
-            </DialogDescription>
-          </DialogHeader>
-          {sent ? (
-            <p role="status" data-testid="feedback-sent" className="text-sm">
-              Thanks! Your feedback was sent.
-            </p>
-          ) : (
-            <form
-              className="grid gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send();
-              }}
+      {canPortal
+        ? createPortal(
+            <RightSheet
+              open={open}
+              onOpenChange={changeOpen}
+              title="Send feedback"
+              testId="feedback-sheet"
+              className="z-[44]"
             >
-              <Label htmlFor="feedback-category">Category</Label>
-              <NativeSelect
-                id="feedback-category"
-                value={category}
-                required
-                disabled={sending}
-                onChange={(e) =>
-                  setCategory(e.target.value as FeedbackCategory | "")
-                }
-              >
-                <option value="" disabled>
-                  Select a category
-                </option>
-                {FEEDBACK_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Label htmlFor="feedback-area">Area</Label>
-              <NativeSelect
-                id="feedback-area"
-                value={area}
-                disabled={sending}
-                onChange={(e) => setArea(e.target.value)}
-              >
-                {[...NAV_TABS.map((t) => t.label), "Other", "N/A"].map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Label htmlFor="feedback-message">Message</Label>
-              <Textarea
-                id="feedback-message"
-                value={message}
-                maxLength={FEEDBACK_MESSAGE_MAX}
-                disabled={sending}
-                onChange={(e) => {
-                  draft = e.target.value;
-                  setMessage(draft);
-                }}
-                onKeyDown={(e) => {
-                  if (e.nativeEvent.isComposing || e.repeat) return;
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              <p className="mb-3 text-sm text-muted-foreground">
+                Tell us about a bug, a rough edge, or something missing.
+              </p>
+              {sent ? (
+                <>
+                  <p
+                    role="status"
+                    data-testid="feedback-sent"
+                    className="text-sm"
+                  >
+                    Thanks! Your feedback was sent.
+                  </p>
+                  <Button
+                    size="lg"
+                    autoFocus
+                    className="mt-4 w-full"
+                    onClick={() => changeOpen(false)}
+                  >
+                    Done
+                  </Button>
+                </>
+              ) : (
+                <form
+                  className="grid gap-3"
+                  onSubmit={(e) => {
                     e.preventDefault();
                     void send();
-                  }
-                }}
-                onFocus={(e) => {
-                  const el = e.currentTarget;
-                  setTimeout(() => el.scrollIntoView({ block: "center" }), 300);
-                }}
-                placeholder="What happened, or what would help?"
-              />
-              {error ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
+                  }}
+                >
+                  <Label htmlFor="feedback-category">Category</Label>
+                  <NativeSelect
+                    id="feedback-category"
+                    value={category}
+                    required
+                    disabled={sending}
+                    onChange={(e) =>
+                      setCategory(e.target.value as FeedbackCategory | "")
+                    }
+                  >
+                    <option value="" disabled>
+                      Select a category
+                    </option>
+                    {FEEDBACK_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <Label htmlFor="feedback-area">Area</Label>
+                  <NativeSelect
+                    id="feedback-area"
+                    value={area}
+                    disabled={sending}
+                    onChange={(e) => setAreaPick(e.target.value)}
+                  >
+                    {[...NAV_TABS.map((t) => t.label), "Other", "N/A"].map(
+                      (a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ),
+                    )}
+                  </NativeSelect>
+                  <Label htmlFor="feedback-message">Message</Label>
+                  <Textarea
+                    id="feedback-message"
+                    value={message}
+                    maxLength={FEEDBACK_MESSAGE_MAX}
+                    disabled={sending}
+                    onChange={(e) => {
+                      draft = e.target.value;
+                      setMessage(draft);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.repeat) return;
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        void send();
+                      }
+                    }}
+                    onFocus={(e) => {
+                      const el = e.currentTarget;
+                      setTimeout(
+                        () => el.scrollIntoView({ block: "center" }),
+                        300,
+                      );
+                    }}
+                    placeholder="What happened, or what would help?"
+                  />
+                  {error ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {error}
+                    </p>
+                  ) : null}
+                  <Button type="submit" size="lg" disabled={!canSend}>
+                    {sending ? "Sending..." : "Send"}
+                  </Button>
+                </form>
+              )}
+              {keyboardGap > 0 ? (
+                <div aria-hidden style={{ height: keyboardGap }} />
               ) : null}
-              <DialogFooter>
-                <Button type="submit" size="lg" disabled={!canSend}>
-                  {sending ? "Sending..." : "Send"}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-          {sent ? (
-            <DialogFooter>
-              <Button size="lg" autoFocus onClick={() => setOpen(false)}>
-                Done
-              </Button>
-            </DialogFooter>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+            </RightSheet>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

@@ -24,6 +24,7 @@ export function RightSheet({
   headerSlot,
   headerActions,
   placement = "fixed",
+  testId = "right-sheet",
   bodyRef,
   bodyClassName,
   children,
@@ -48,6 +49,8 @@ export function RightSheet({
   /** Extra icon buttons shown before the Edit button / header slot. */
   headerActions?: ReactNode;
   placement?: "fixed" | "contained";
+  /** Test id of the panel, for pages that can show two sheets at once. */
+  testId?: string;
   /** The scrolling body element, for callers that control scroll position. */
   bodyRef?: Ref<HTMLDivElement>;
   bodyClassName?: string;
@@ -73,7 +76,8 @@ export function RightSheet({
       aria-hidden={!open}
       inert={!open}
       data-state={open ? "open" : "closed"}
-      data-testid="right-sheet"
+      data-right-sheet=""
+      data-testid={testId}
       className={cn(
         placement === "fixed"
           ? "fixed md:top-[calc(env(safe-area-inset-top)+3.5rem+1px)]"
