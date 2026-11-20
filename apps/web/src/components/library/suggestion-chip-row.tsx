@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 
 export interface SuggestionChipItem {
   key: string;
-  /** A single keyed element, so each item maps to one child of the row. */
+  /** A single element, keyed by the wrapping Fragment, so each item is one child of the row. */
   node: ReactElement;
 }
 
@@ -36,10 +36,9 @@ function rowsOf(els: Element[]): number[] {
 }
 
 /**
- * Chips that flow inside the parent's flex-wrap row. Past `MAX_ROWS` rows the
- * rest hide behind a round dots chip that reveals them inline. Fit is measured
- * from layout: all chips render once, then the count is trimmed until the dots
- * chip also lands on the last allowed row. `loading` shows skeleton chips.
+ * Chips in the parent's flex-wrap row; past `MAX_ROWS` rows the rest hide behind
+ * a dots chip. Fit is measured from layout once chips are real (not skeletons),
+ * trimming until the dots chip also lands on the last allowed row.
  */
 export function SuggestionChipRow({
   items,
@@ -57,10 +56,15 @@ export function SuggestionChipRow({
   const hidden = items.length - shown.length;
   const showDots = expanded || hidden > 0;
 
-  /* eslint-disable react-hooks/set-state-in-effect -- layout measurement drives state before paint */
   useLayoutEffect(() => {
     const root = rootRef.current;
     const parent = root?.parentElement;
+    if (loading) {
+      // Skeletons are not chips; measure afresh once the real chips render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFit(STALE);
+      return;
+    }
     if (!root || !parent || items.length === 0) return;
     const own = [...root.children];
     const all = [...parent.children].filter((c) => c !== root).concat(own);
@@ -69,20 +73,23 @@ export function SuggestionChipRow({
     if (expanded) {
       // Everything fits without hiding, so there is nothing to collapse.
       if (rowOf(own[own.length - 1]!) < MAX_ROWS) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setExpanded(false);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFit(STALE);
       }
     } else if (limit === null) {
       let n = 0;
       while (n < own.length && rowOf(own[n]!) < MAX_ROWS) n++;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFit({ sig, limit: n });
     } else if (hidden > 0 && limit > 0) {
       if (rowOf(own[own.length - 1]!) >= MAX_ROWS) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFit({ sig, limit: limit - 1 });
       }
     }
-  }, [items.length, expanded, limit, hidden, sig]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [items.length, expanded, limit, hidden, sig, loading]);
 
   useEffect(() => {
     const parent = rootRef.current?.parentElement;
