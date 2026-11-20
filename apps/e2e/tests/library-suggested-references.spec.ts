@@ -412,23 +412,48 @@ test("skeleton chips hold the row while suggestions load, then give way to chips
   testApi,
 }) => {
   await seedAll(testApi);
-  let release!: () => void;
-  const gate = new Promise<void>((r) => (release = r));
-  // Either held request keeps the skeletons up; WebKit does not hold the suggest POST, so the tags GET is held too.
-  await page.route(
-    /\/songs\/(suggest-references|reference-tags)$/,
-    async (route) => {
-      await gate;
-      await route.continue().catch(() => {});
-    },
-  );
+  // A DOM observer records skeletons independent of request timing, which WebKit routing does not control.
+  await page.addInitScript(() => {
+    const SKELETON = '[data-testid="suggestion-chip-skeleton"]';
+    const CHIP = '[data-testid="suggestion-chip"]';
+    const w = window as unknown as Record<string, unknown>;
+    w.__chipSkeleton = { seen: false, max: 0, chipsAlongside: false };
+    new MutationObserver((records) => {
+      const state = w.__chipSkeleton as {
+        seen: boolean;
+        max: number;
+        chipsAlongside: boolean;
+      };
+      const added = records.some((r) =>
+        [...r.addedNodes].some(
+          (n) =>
+            n instanceof Element &&
+            (n.matches(SKELETON) || n.querySelector(SKELETON)),
+        ),
+      );
+      const count = document.querySelectorAll(SKELETON).length;
+      if (added || count > 0) state.seen = true;
+      state.max = Math.max(state.max, count);
+      if (count > 0 && document.querySelector(CHIP))
+        state.chipsAlongside = true;
+    }).observe(document, { childList: true, subtree: true });
+  });
   await addFromSpotify(page);
-  const skeletons = sheet(page).getByTestId("suggestion-chip-skeleton");
-  await expect(skeletons.first()).toBeVisible();
-  await expect(chips(page)).toHaveCount(0);
-  release();
   await expect(chips(page).first()).toBeVisible();
-  await expect(skeletons).toHaveCount(0);
+  await expect(sheet(page).getByTestId("suggestion-chip-skeleton")).toHaveCount(
+    0,
+  );
+  const seen = await page.evaluate(
+    () =>
+      (window as unknown as Record<string, unknown>).__chipSkeleton as {
+        seen: boolean;
+        max: number;
+        chipsAlongside: boolean;
+      },
+  );
+  expect(seen.seen).toBe(true);
+  expect(seen.max).toBeGreaterThan(0);
+  expect(seen.chipsAlongside).toBe(false);
 });
 
 test("no source URL means no skeleton chips", async ({ page, testApi }) => {
