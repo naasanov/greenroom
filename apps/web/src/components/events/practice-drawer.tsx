@@ -79,13 +79,15 @@ const UI_STATUS: Record<ApiRsvp, RsvpStatus> = {
 
 type RsvpChoice = "going" | "maybe" | "not_going";
 
-const RSVP_OPTIONS = [
-  { value: "going", label: "Going" },
-  { value: "maybe", label: "Maybe" },
-  { value: "not_going", label: "Not going" },
-] as const;
+/** The picker value for a row; empty means no option is selected. */
+const CHOICE_FOR: Record<RsvpStatus, RsvpChoice | ""> = {
+  going: "going",
+  maybe: "maybe",
+  declined: "not_going",
+  none: "",
+};
 
-const OTHER_RSVP_OPTIONS = [
+const RSVP_OPTIONS = [
   { value: "going", label: "Going", icon: <Check />, iconOnly: true },
   { value: "maybe", label: "Maybe", icon: <HelpCircle />, iconOnly: true },
   { value: "not_going", label: "Not going", icon: <X />, iconOnly: true },
@@ -117,8 +119,8 @@ function PracticeDetails({
   const me = useMe().data;
   const rsvp = useSetRsvp(bandId, occ.seriesId, occ.occurrenceKey, me?.id);
   const [pendingRsvp, setPendingRsvp] = useState<{
-    status: RsvpChoice;
-    userId?: string;
+    status: ApiRsvp;
+    userId: string;
   } | null>(null);
   const series = usePracticeSeries(bandId, occ.seriesId, occ.recurring);
   const attendees: Attendee[] = occ.attendees.map((a) => ({
@@ -127,6 +129,10 @@ function PracticeDetails({
     imageUrl: a.avatarUrl,
     status: UI_STATUS[a.status],
   }));
+  const chooseRsvp = (status: ApiRsvp, userId: string) =>
+    occ.recurring
+      ? setPendingRsvp({ status, userId })
+      : rsvp.mutate({ status, scope: "this", userId });
   return (
     <div className="flex flex-col gap-5">
       <section
@@ -233,20 +239,22 @@ function PracticeDetails({
             </p>
           ) : null}
 
-          <section aria-label="Your RSVP" className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Your RSVP</h3>
-            <SegmentedToggle<RsvpChoice>
-              label="Your RSVP"
-              fullWidth
-              value={
-                (occ.myRsvp === "no_response" ? "" : occ.myRsvp) as RsvpChoice
-              }
-              onValueChange={(status) =>
-                occ.recurring
-                  ? setPendingRsvp({ status })
-                  : rsvp.mutate({ status, scope: "this" })
-              }
-              options={RSVP_OPTIONS}
+          <section aria-label="Attendees" className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
+            <AttendeeList
+              attendees={attendees}
+              renderAction={(a) => (
+                <SegmentedToggle<RsvpChoice>
+                  label={`RSVP for ${a.name}`}
+                  value={CHOICE_FOR[a.status]}
+                  onValueChange={(status) => chooseRsvp(status, a.id)}
+                  onClear={() => chooseRsvp("no_response", a.id)}
+                  options={RSVP_OPTIONS.map((o) => ({
+                    ...o,
+                    label: `${o.label} for ${a.name}`,
+                  }))}
+                />
+              )}
             />
             <EditScopeDialog
               open={pendingRsvp !== null}
@@ -259,36 +267,6 @@ function PracticeDetails({
                     scope: SCOPE_TO_API[scope],
                   });
               }}
-            />
-          </section>
-
-          <section aria-label="Attendees" className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
-            <AttendeeList
-              attendees={attendees}
-              renderAction={(a) =>
-                a.id === me?.id ? null : (
-                  <SegmentedToggle<RsvpChoice>
-                    label={`RSVP for ${a.name}`}
-                    value={
-                      (a.status === "none"
-                        ? ""
-                        : a.status === "declined"
-                          ? "not_going"
-                          : a.status) as RsvpChoice
-                    }
-                    onValueChange={(status) =>
-                      occ.recurring
-                        ? setPendingRsvp({ status, userId: a.id })
-                        : rsvp.mutate({ status, scope: "this", userId: a.id })
-                    }
-                    options={OTHER_RSVP_OPTIONS.map((o) => ({
-                      ...o,
-                      label: `${o.label} for ${a.name}`,
-                    }))}
-                  />
-                )
-              }
             />
           </section>
         </>

@@ -18,17 +18,20 @@ export interface SegmentedOption<T extends string> {
   iconOnly?: boolean;
 }
 
-/** Single-select pill toggle (Month/Week, density). Never deselects. */
+/** Single-select pill toggle (Month/Week, density). Deselects only when `onClear` is given. */
 export function SegmentedToggle<T extends string>({
   value,
   onValueChange,
+  onClear,
   options,
   label,
   fullWidth,
   className,
 }: {
-  value: T;
+  value: T | "";
   onValueChange: (value: T) => void;
+  /** Called when the selected option is clicked again. */
+  onClear?: () => void;
   options: readonly SegmentedOption<T>[];
   label: string;
   fullWidth?: boolean;
@@ -70,7 +73,7 @@ export function SegmentedToggle<T extends string>({
       ref={rootRef}
       type="single"
       value={value}
-      onValueChange={(v) => v && onValueChange(v as T)}
+      onValueChange={(v) => (v ? onValueChange(v as T) : onClear?.())}
       aria-label={label}
       spacing={0}
       className={cn(
