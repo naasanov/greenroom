@@ -2,6 +2,7 @@
 
 import { FileQuestion, FileVideo, ImageIcon, Images, Plus } from "lucide-react";
 import type { GigMedia, MediaItem } from "@greenroom/shared";
+import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { Button } from "@/components/ui/button";
 import { DriveLinkPrompt } from "@/components/google/drive-link-prompt";
 import { useGoogleIntegrations } from "@/lib/queries/google";
@@ -128,14 +129,11 @@ export function MediaSection({
   }
 
   return (
-    <section
-      data-testid="media-section"
-      aria-labelledby="gig-media-heading"
-      className="flex flex-col gap-3"
+    <CollapsibleSection
+      testId="media-section"
+      headingId="gig-media-heading"
+      title="Media"
     >
-      <h3 id="gig-media-heading" className="text-base font-semibold">
-        Media
-      </h3>
       {body}
       {ready ? (
         empty ? (
@@ -159,6 +157,6 @@ export function MediaSection({
           </Button>
         )
       ) : null}
-    </section>
+    </CollapsibleSection>
   );
 }

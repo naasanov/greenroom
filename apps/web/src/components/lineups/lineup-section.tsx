@@ -2,6 +2,7 @@
 
 import { Pencil, Plus, X } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo } from "react";
+import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { Button } from "@/components/ui/button";
 import { AsideDismissContext } from "@/components/app/bottom-drawer";
 import { MemberSheet } from "@/components/roster/member-sheet";
@@ -33,31 +34,27 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
       : null;
 
   return (
-    <section
-      data-testid="lineup-section"
-      aria-labelledby="lineup-heading"
-      className="flex flex-col gap-3"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <h3 id="lineup-heading" className="text-base font-semibold">
-            Lineup
-          </h3>
-          {count ? (
-            <p
-              data-testid="lineup-count"
-              className="text-sm text-muted-foreground tabular-nums"
-            >
-              {count}
-            </p>
-          ) : null}
-        </div>
+    <CollapsibleSection
+      testId="lineup-section"
+      headingId="lineup-heading"
+      title="Lineup"
+      meta={
+        count ? (
+          <p
+            data-testid="lineup-count"
+            className="text-sm text-muted-foreground tabular-nums"
+          >
+            {count}
+          </p>
+        ) : null
+      }
+      actions={
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           aria-label="Edit lineup"
-          className="-mr-1.5 shrink-0 text-muted-foreground"
+          className="text-muted-foreground"
           aria-expanded={builder.rosterOpen}
           onClick={() => {
             editor.clearError();
@@ -66,8 +63,8 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
         >
           <Pencil />
         </Button>
-      </div>
-
+      }
+    >
       {!rows ? (
         builder.loadError ? (
           <p role="alert" className="text-sm text-destructive">
@@ -145,7 +142,7 @@ export function LineupSection({ builder }: { builder: LineupBuilder }) {
           Could not save that change. The lineup was reloaded.
         </p>
       ) : null}
-    </section>
+    </CollapsibleSection>
   );
 }
 

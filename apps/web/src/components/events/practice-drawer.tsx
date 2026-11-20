@@ -38,6 +38,7 @@ import {
 import { SegmentedToggle } from "@/components/app/segmented-toggle";
 import { ShareButton } from "@/components/app/share-button";
 import { Button } from "@/components/ui/button";
+import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { Fact } from "@/components/events/facts";
 import { PickDndProvider } from "@/components/setlists/pick-dnd";
 import { SetlistAside } from "@/components/setlists/setlist-aside";
@@ -129,28 +130,25 @@ function PracticeDetails({
   }));
   return (
     <div className="flex flex-col gap-5">
-      <section
-        data-testid="details-section"
-        aria-labelledby="details-heading"
-        className="flex flex-col gap-3"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="details-heading" className="text-base font-semibold">
-            Details
-          </h3>
-          {editing || occ.cancelled ? null : (
+      <CollapsibleSection
+        testId="details-section"
+        headingId="details-heading"
+        title="Details"
+        actions={
+          editing || occ.cancelled ? null : (
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               aria-label="Edit details"
-              className="-mr-1.5 text-muted-foreground"
+              className="text-muted-foreground"
               onClick={onEdit}
             >
               <Pencil />
             </Button>
-          )}
-        </div>
+          )
+        }
+      >
         {occ.cancelled ? (
           <p
             role="status"
@@ -203,7 +201,7 @@ function PracticeDetails({
             ) : null}
           </dl>
         )}
-      </section>
+      </CollapsibleSection>
 
       {occ.cancelled ? null : (
         <>
@@ -233,8 +231,11 @@ function PracticeDetails({
             </p>
           ) : null}
 
-          <section aria-label="Your RSVP" className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Your RSVP</h3>
+          <CollapsibleSection
+            label="Your RSVP"
+            title="Your RSVP"
+            headingClassName="text-sm font-semibold"
+          >
             <SegmentedToggle<RsvpChoice>
               label="Your RSVP"
               fullWidth
@@ -260,10 +261,13 @@ function PracticeDetails({
                   });
               }}
             />
-          </section>
+          </CollapsibleSection>
 
-          <section aria-label="Attendees" className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Who&apos;s coming</h3>
+          <CollapsibleSection
+            label="Attendees"
+            title="Who's coming"
+            headingClassName="text-sm font-semibold"
+          >
             <AttendeeList
               attendees={attendees}
               renderAction={(a) =>
@@ -290,7 +294,7 @@ function PracticeDetails({
                 )
               }
             />
-          </section>
+          </CollapsibleSection>
         </>
       )}
     </div>

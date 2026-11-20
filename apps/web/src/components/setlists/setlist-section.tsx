@@ -16,6 +16,7 @@ import {
   useExportReturn,
 } from "@/components/library/export-dialog";
 import { songArt } from "@/components/library/song-utils";
+import { CollapsibleSection } from "@/components/events/collapsible-section";
 import { Button } from "@/components/ui/button";
 import { useCurrentBand } from "@/lib/current-band";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -111,31 +112,27 @@ export function SetlistSection({
   );
 
   return (
-    <section
-      data-testid="setlist-section"
-      aria-labelledby="setlist-heading"
-      className="flex flex-col gap-3"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
-          <h3 id="setlist-heading" className="text-base font-semibold">
-            Setlist
-          </h3>
-          {setlist && setlist.songCount > 0 ? (
-            <p
-              data-testid="setlist-total"
-              className="truncate text-sm text-muted-foreground tabular-nums"
-            >
-              {setlistSummary(
-                setlist.songCount,
-                setlist.totalDurationSeconds,
-                setlist.unknownDurationCount,
-                !wideSummary,
-              )}
-            </p>
-          ) : null}
-        </div>
-        <div className="-mr-1.5 flex shrink-0 items-center">
+    <CollapsibleSection
+      testId="setlist-section"
+      headingId="setlist-heading"
+      title="Setlist"
+      meta={
+        setlist && setlist.songCount > 0 ? (
+          <p
+            data-testid="setlist-total"
+            className="truncate text-sm text-muted-foreground tabular-nums"
+          >
+            {setlistSummary(
+              setlist.songCount,
+              setlist.totalDurationSeconds,
+              setlist.unknownDurationCount,
+              !wideSummary,
+            )}
+          </p>
+        ) : null
+      }
+      actions={
+        <>
           {setlist && setlist.songCount > 0 ? (
             <Button
               type="button"
@@ -175,8 +172,9 @@ export function SetlistSection({
           >
             <Pencil />
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
       {caption ? (
         <p className="-mt-2 text-sm text-muted-foreground">{caption}</p>
       ) : null}
@@ -339,6 +337,6 @@ export function SetlistSection({
           connectError={exportBack.resume?.state === "error"}
         />
       ) : null}
-    </section>
+    </CollapsibleSection>
   );
 }
