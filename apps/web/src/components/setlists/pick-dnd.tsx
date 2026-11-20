@@ -235,11 +235,12 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(() => ({ active, register }), [active, register]);
-  // Picks use a thin edge zone so a row near the list's edge is not scrolled away.
+  // Picks use a thin edge zone, gated by the dwell, so a row near the list's
+  // edge is not scrolled away. Reorders always scroll with dnd-kit's defaults.
   const autoScroll =
     active?.type === "pick"
       ? { threshold: { x: 0.2, y: 0.05 }, enabled: scrollEdge }
-      : { enabled: scrollEdge };
+      : { enabled: active?.type === "item" || scrollEdge };
 
   return (
     <PickDndContext.Provider value={value}>
@@ -322,16 +323,18 @@ export function PickTarget({
   useEffect(() => {
     register(targetId, { ids, onChange: handleChange });
   }, [register, targetId, ids, handleChange]);
+  // Rows are always keyed through toArray so switching between the settled and
+  // the locally reordered list keeps every key, and no row remounts.
   const rows = useMemo(() => {
-    if (shown === ids) return children;
     const list = Children.toArray(children);
+    if (shown === ids) return list;
     const rank = new Map(shown.map((id, i) => [id, i]));
     const keyed = list.map((c) =>
       isValidElement<{ itemId?: string }>(c) && c.props.itemId !== undefined
         ? rank.get(c.props.itemId)
         : undefined,
     );
-    if (keyed.some((r) => r === undefined)) return children;
+    if (keyed.some((r) => r === undefined)) return list;
     return list
       .map((c, i) => ({ c, r: keyed[i]! }))
       .sort((a, b) => a.r - b.r)
