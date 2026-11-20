@@ -24,9 +24,37 @@ export const toSetlistSong = (s: SongSummary): SetlistSong => ({
   youtubeUrl: s.youtubeUrl,
 });
 
-/** Art, title, artist and duration; fills the space between a row's controls. */
-export function SongLine({ song }: { song: SongLineData }) {
-  const duration = formatDuration(song.durationSeconds);
+/** A song's length; renders nothing when the length is unknown. */
+export function SongDuration({
+  seconds,
+  onClick,
+}: {
+  seconds: number | null;
+  onClick?: () => void;
+}) {
+  const duration = formatDuration(seconds);
+  if (!duration) return null;
+  return (
+    <span
+      onClick={onClick}
+      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+    >
+      {duration}
+    </span>
+  );
+}
+
+/**
+ * Art, title, artist and duration; fills the space between a row's controls.
+ * `hideDuration` lets a row place the duration itself, after its own controls.
+ */
+export function SongLine({
+  song,
+  hideDuration = false,
+}: {
+  song: SongLineData;
+  hideDuration?: boolean;
+}) {
   return (
     <>
       <Thumbnail
@@ -43,11 +71,7 @@ export function SongLine({ song }: { song: SongLineData }) {
           {song.artist ?? "No artist"}
         </span>
       </span>
-      {duration ? (
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {duration}
-        </span>
-      ) : null}
+      {hideDuration ? null : <SongDuration seconds={song.durationSeconds} />}
     </>
   );
 }
