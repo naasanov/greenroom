@@ -28,9 +28,10 @@ async function arrange(testApi: TestApi) {
   const song = async (
     title: string,
     references: { label: string; value: string }[] = [],
+    durationSeconds?: number,
   ) => {
     const res = await api.post(`/bands/${bandId}/songs`, {
-      data: { title, references },
+      data: { title, references, durationSeconds },
     });
     expect(res.status(), await res.text()).toBe(201);
     return (await res.json()).id as string;
@@ -172,8 +173,8 @@ test("setlist rows show a chords icon only for songs with a sheet", async ({
   testApi,
 }) => {
   const { api, bandId, song, importChords } = await arrange(testApi);
-  const withSheet = await song("Wonderwall");
-  const without = await song("Plain Song");
+  const withSheet = await song("Wonderwall", [], 258);
+  const without = await song("Plain Song", [], 185);
   await importChords(withSheet, `${FAKE}/wonderwall-chords-3`);
   const sl = await (
     await api.get(`/bands/${bandId}/gigs/${seed.gigs.tentative.id}/setlist`)
@@ -193,6 +194,19 @@ test("setlist rows show a chords icon only for songs with a sheet", async ({
   await expect(icon).toHaveAttribute(
     "aria-label",
     "Open chords for Wonderwall",
+  );
+  // Durations share a right edge whether or not the row has a chords link.
+  const right = async (title: string, time: string) => {
+    const box = await page
+      .getByTestId("setlist-row")
+      .filter({ hasText: title })
+      .getByText(time, { exact: true })
+      .boundingBox();
+    return box!.x + box!.width;
+  };
+  expect(await right("Wonderwall", "4:18")).toBeCloseTo(
+    await right("Plain Song", "3:05"),
+    0,
   );
   await icon.click();
   await expect(page).toHaveURL(new RegExp(`/songs/${withSheet}/chords`));
