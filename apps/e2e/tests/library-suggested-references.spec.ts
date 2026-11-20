@@ -492,7 +492,9 @@ test("view mode shows chips without editing, and a tap saves the reference right
 test("a failed view mode save shows the error and keeps the chip, then a retry saves", async ({
   page,
   testApi,
+  isMobile,
 }) => {
+  test.skip(isMobile, "WebKit does not reliably apply page.route fulfills");
   const source = "https://youtu.be/viewmode2";
   await testApi.seedMusicLink(source, {
     spotify: "https://open.spotify.com/track/viewfail",
