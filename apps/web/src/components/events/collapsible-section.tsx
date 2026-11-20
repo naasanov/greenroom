@@ -1,13 +1,13 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A drawer section whose heading is a chevron toggle. The body animates its
- * height and is hidden and inert while collapsed; it stays mounted so local
- * state survives. Header `actions` sit beside the toggle and never trigger it.
+ * A drawer section with a chevron-toggle heading and an animated, inert-when-
+ * collapsed body that stays mounted. The body clips only while collapsed or
+ * animating, so sticky descendants anchor to the outer scroll container.
  */
 export function CollapsibleSection({
   title,
@@ -34,9 +34,26 @@ export function CollapsibleSection({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
+  const [animating, setAnimating] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const autoId = useId();
   const hId = headingId ?? `${autoId}-heading`;
   const bodyId = `${autoId}-body`;
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
+
+  function toggle() {
+    clearTimeout(settleTimer.current);
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (!reduced) {
+      setAnimating(true);
+      // Fallback for when no transitionend fires (e.g. interrupted or skipped).
+      settleTimer.current = setTimeout(() => setAnimating(false), 250);
+    }
+    setOpen((o) => !o);
+  }
+
   return (
     <section
       data-testid={testId}
@@ -51,7 +68,7 @@ export function CollapsibleSection({
               type="button"
               aria-expanded={open}
               aria-controls={bodyId}
-              onClick={() => setOpen((o) => !o)}
+              onClick={toggle}
               className="-ml-1 flex min-h-11 items-center gap-1 rounded-lg pr-2 pl-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-h-8"
             >
               <ChevronDown
@@ -73,12 +90,26 @@ export function CollapsibleSection({
       <div
         id={bodyId}
         inert={!open}
+        onTransitionEnd={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            e.propertyName === "grid-template-rows"
+          ) {
+            clearTimeout(settleTimer.current);
+            setAnimating(false);
+          }
+        }}
         className={cn(
           "grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none",
           open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
         )}
       >
-        <div className="-mx-1 -mb-1 min-h-0 overflow-hidden px-1 pb-1">
+        <div
+          className={cn(
+            "-mx-1 -mb-1 min-h-0 px-1 pb-1",
+            open && !animating ? "overflow-visible" : "overflow-hidden",
+          )}
+        >
           <div className="flex flex-col gap-3 pt-3">{children}</div>
         </div>
       </div>
