@@ -3,6 +3,7 @@
 import {
   keepPreviousData,
   queryOptions,
+  useIsMutating,
   useMutation,
   useQueries,
   useQuery,
@@ -251,9 +252,18 @@ export function useCreateSong(bandId: string) {
   });
 }
 
+const updateSongKey = (bandId: string, songId: string) =>
+  ["update-song", bandId, songId] as const;
+
+/** True while any save of this song is in flight, from any component. */
+export function useIsSongSaving(bandId: string, songId: string) {
+  return useIsMutating({ mutationKey: updateSongKey(bandId, songId) }) > 0;
+}
+
 export function useUpdateSong(bandId: string, songId: string) {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: updateSongKey(bandId, songId),
     mutationFn: (body: UpdateSong) =>
       api(`/bands/${bandId}/songs/${songId}`, {
         method: "PATCH",
