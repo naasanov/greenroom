@@ -1,13 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { userSchema, type UpdateProfile, type User } from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
-import { CalendarInvitesRow } from "@/components/settings/calendar-invites-row";
 import { InstrumentsAutosave } from "@/components/settings/instruments-autosave";
 import { SavedNote, SectionCard } from "@/components/settings/section-card";
 import { PhotoUpload } from "@/components/app/photo-upload";
@@ -15,7 +14,7 @@ import { MemberAvatar } from "@/components/roster/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { keys, useMyInstruments, useSignOut } from "@/lib/queries";
+import { keys, useMyInstruments } from "@/lib/queries";
 import { useMyPhoto } from "@/lib/queries/photos";
 
 /** Saves name and calendar email only; instruments autosave separately. */
@@ -43,7 +42,7 @@ const personalSchema = z.object({
     .refine((v) => v === "" || z.string().email().safeParse(v).success),
 });
 
-function PersonalForm({ user }: { user: User }) {
+function useProfileForm(user: User) {
   const save = useSaveProfileFields();
   const [saved, setSaved] = useState(false);
   const form = useForm({
@@ -53,7 +52,6 @@ function PersonalForm({ user }: { user: User }) {
       calendarEmail: user.calendarEmail ?? "",
     },
   });
-  const dirty = form.formState.isDirty;
 
   const submit = form.handleSubmit((v) => {
     setSaved(false);
@@ -74,8 +72,72 @@ function PersonalForm({ user }: { user: User }) {
     );
   });
 
+  return { form, save, saved, setSaved, submit };
+}
+
+const ProfileFormContext = createContext<ReturnType<
+  typeof useProfileForm
+> | null>(null);
+
+function useProfileFormContext() {
+  const ctx = useContext(ProfileFormContext);
+  if (!ctx) throw new Error("Profile form context is missing");
+  return ctx;
+}
+
+const PROFILE_FORM_ID = "settings-profile-form";
+
+/** Owns the name and calendar email form shared by the fields and the page-bottom Save button. */
+export function ProfileFormProvider({
+  user,
+  children,
+}: {
+  user: User;
+  children: ReactNode;
+}) {
   return (
-    <form noValidate className="flex flex-col gap-5" onSubmit={submit}>
+    <ProfileFormContext.Provider value={useProfileForm(user)}>
+      {children}
+    </ProfileFormContext.Provider>
+  );
+}
+
+/** Save button for the profile fields, rendered at the bottom of the Profile tab. */
+export function SaveProfileBar() {
+  const { form, save, saved } = useProfileFormContext();
+  const dirty = form.formState.isDirty;
+  return (
+    <div data-testid="settings-profile-save" className="flex flex-col gap-3">
+      {save.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          We could not save your profile. Please try again.
+        </p>
+      ) : null}
+      <div className="flex items-center gap-3">
+        <Button
+          type="submit"
+          form={PROFILE_FORM_ID}
+          size="lg"
+          disabled={save.isPending || !dirty}
+        >
+          {save.isPending ? "Saving..." : "Save profile"}
+        </Button>
+        <SavedNote show={saved && !dirty} />
+      </div>
+    </div>
+  );
+}
+
+function PersonalForm({ user }: { user: User }) {
+  const { form, setSaved, submit } = useProfileFormContext();
+
+  return (
+    <form
+      id={PROFILE_FORM_ID}
+      noValidate
+      className="flex flex-col gap-5"
+      onSubmit={submit}
+    >
       <FormField label="Your name" htmlFor="settings-display-name">
         <Input
           id="settings-display-name"
@@ -114,18 +176,6 @@ function PersonalForm({ user }: { user: User }) {
           </p>
         ) : null}
       </FormField>
-
-      {save.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          We could not save your profile. Please try again.
-        </p>
-      ) : null}
-      <div className="flex items-center gap-3">
-        <Button type="submit" size="lg" disabled={save.isPending || !dirty}>
-          {save.isPending ? "Saving..." : "Save profile"}
-        </Button>
-        <SavedNote show={saved && !dirty} />
-      </div>
     </form>
   );
 }
@@ -150,16 +200,9 @@ function ProfilePhotoRow({ user }: { user: User }) {
   );
 }
 
-/** Name, photo, instruments, and sign out. */
-export function PersonalSection({
-  user,
-  bandId,
-}: {
-  user: User;
-  bandId?: string;
-}) {
+/** Name, photo, and instruments. */
+export function PersonalSection({ user }: { user: User }) {
   const mine = useMyInstruments();
-  const signOut = useSignOut();
 
   return (
     <SectionCard
@@ -189,13 +232,6 @@ export function PersonalSection({
       {mine.data ? (
         <>
           <PersonalForm user={user} />
-          {bandId ? (
-            <CalendarInvitesRow
-              userId={user.id}
-              bandId={bandId}
-              invitesEnabled={user.calendarInvitesEnabled}
-            />
-          ) : null}
           <InstrumentsAutosave
             initial={[...mine.data.presets, ...mine.data.custom]}
           />
@@ -209,15 +245,6 @@ export function PersonalSection({
           Loading...
         </p>
       )}
-
-      <Button
-        variant="destructive"
-        size="lg"
-        disabled={signOut.isPending}
-        onClick={() => signOut.mutate()}
-      >
-        Sign out
-      </Button>
     </SectionCard>
   );
 }

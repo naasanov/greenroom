@@ -4,6 +4,8 @@ import {
   Calendar,
   FolderOpen,
   ListMusic,
+  LogOut,
+  Settings,
   UserRound,
   Users,
   type LucideIcon,
@@ -13,6 +15,12 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import { BandSwitcher, type BandSummary } from "@/components/app/band-switcher";
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Placement, ShellLayout } from "@/components/app/event-types";
 import { cn } from "@/lib/utils";
 
@@ -214,33 +222,49 @@ export function TopTabs({
   );
 }
 
+/** Profile photo that opens a menu with Settings and Sign out. */
 export function ProfileButton({
   name,
   imageUrl,
-  onClick,
+  onSettings,
+  onSignOut,
 }: {
   name?: string;
   imageUrl?: string | null;
-  onClick?: () => void;
+  onSettings?: () => void;
+  onSignOut?: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-label="Profile and settings"
-      onClick={onClick}
-      className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-    >
-      <Avatar className="size-9">
-        {imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
-        <AvatarFallback className="bg-secondary text-secondary-foreground">
-          {name ? (
-            name.slice(0, 1).toUpperCase()
-          ) : (
-            <UserRound className="size-5" />
-          )}
-        </AvatarFallback>
-      </Avatar>
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Profile and settings"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=open]:bg-muted"
+        >
+          <Avatar className="size-9">
+            {imageUrl ? <AvatarImage src={imageUrl} alt="" /> : null}
+            <AvatarFallback className="bg-secondary text-secondary-foreground">
+              {name ? (
+                name.slice(0, 1).toUpperCase()
+              ) : (
+                <UserRound className="size-5" />
+              )}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onSelect={onSettings} className="gap-3">
+          <Settings />
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onSignOut} className="gap-3">
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -259,7 +283,8 @@ export function AppShell({
   onTabIntent,
   tabHref,
   profile,
-  onProfileClick,
+  onProfileSettings,
+  onSignOut,
   layout = "responsive",
   placement = "fixed",
   children,
@@ -276,7 +301,8 @@ export function AppShell({
   onTabIntent?: (tab: TabKey) => void;
   tabHref?: TabHref;
   profile?: { name?: string; imageUrl?: string | null };
-  onProfileClick?: () => void;
+  onProfileSettings?: () => void;
+  onSignOut?: () => void;
   layout?: ShellLayout;
   placement?: Placement;
   children?: ReactNode;
@@ -317,7 +343,11 @@ export function AppShell({
           />
           <div className="flex-1" />
           <FeedbackWidget bandId={activeBandId} />
-          <ProfileButton {...profile} onClick={onProfileClick} />
+          <ProfileButton
+            {...profile}
+            onSettings={onProfileSettings}
+            onSignOut={onSignOut}
+          />
         </div>
       </header>
       <OfflineBar />

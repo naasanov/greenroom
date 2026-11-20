@@ -109,7 +109,7 @@ test("the band picker links straight to band settings", async ({
   await expect(page.getByTestId("settings-band")).toBeVisible();
 });
 
-test("profile icon opens settings with personal info and sign out", async ({
+test("profile icon opens a menu with Settings and Sign out", async ({
   page,
   testApi,
   loginAs,
@@ -119,6 +119,10 @@ test("profile icon opens settings with personal info and sign out", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/roster");
   await page.getByRole("button", { name: "Profile and settings" }).click();
+  await expect(page.getByRole("menuitem", { name: "Settings" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/roster$/);
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/settings$/);
 
   // Header stays, and no tab is marked active.
@@ -136,7 +140,7 @@ test("profile icon opens settings with personal info and sign out", async ({
   await expect(page).toHaveURL(/\/roster$/);
 
   await page.getByRole("button", { name: "Profile and settings" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
@@ -163,8 +167,8 @@ test("Band section shows for admins and is hidden for members", async ({
   await expect(page.getByTestId("settings-band")).toBeVisible();
   await expect(page.getByLabel("Band name")).toHaveValue("The Night Owls");
 
-  await page.getByRole("tab", { name: "Profile" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Profile and settings" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
   // Leaves sign-in first so it can't redirect home once the new session exists.
   await page.goto("about:blank");

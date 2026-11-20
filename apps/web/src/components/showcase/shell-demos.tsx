@@ -54,7 +54,8 @@ function ShellDemo({
         activeTab={tab}
         onTabChange={setTab}
         profile={{ name: "Ava" }}
-        onProfileClick={() => setToast("Profile and settings")}
+        onProfileSettings={() => setToast("Settings")}
+        onSignOut={() => setToast("Sign out")}
       >
         <div
           className="mx-auto flex max-w-2xl flex-col gap-2.5 p-3 pb-24"
