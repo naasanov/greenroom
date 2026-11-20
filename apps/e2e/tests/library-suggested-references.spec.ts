@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { BANDS, USERS } from "@greenroom/db";
+import { WEB_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
 import {
   apiAs,
@@ -444,20 +445,19 @@ test("view mode shows chips without editing, and a tap saves the reference right
   const first = await chips(page).first().boundingBox();
   expect(first!.y).toBeGreaterThan(list!.y + list!.height - 1);
 
-  // Record that every chip is disabled while the save is in flight.
+  // Record which chips are disabled while the save is in flight.
   await page.evaluate(() => {
-    const w = window as unknown as Record<string, unknown>;
-    w.__chipDisabled = false;
+    const w = window as unknown as { __disabledChips: Set<Element> };
+    w.__disabledChips = new Set();
     new MutationObserver((records) => {
-      if (
-        records.some(
-          (r) =>
-            r.attributeName === "disabled" &&
-            r.oldValue === null &&
-            (r.target as Element).matches('[data-testid="suggestion-chip"]'),
+      for (const r of records) {
+        if (
+          r.attributeName === "disabled" &&
+          r.oldValue === null &&
+          (r.target as Element).matches('[data-testid="suggestion-chip"]')
         )
-      )
-        w.__chipDisabled = true;
+          w.__disabledChips.add(r.target as Element);
+      }
     }).observe(document, {
       attributes: true,
       attributeFilter: ["disabled"],
@@ -469,11 +469,14 @@ test("view mode shows chips without editing, and a tap saves the reference right
   await expect(s.getByText("open.spotify.com")).toBeVisible();
   await expect(chips(page)).toHaveText(["Apple Music"]);
   await expect(s.getByTestId("references-edit")).toHaveCount(0);
+  // Both chips (the tapped one and its sibling) were disabled during the save.
   expect(
     await page.evaluate(
-      () => (window as unknown as Record<string, unknown>).__chipDisabled,
+      () =>
+        (window as unknown as { __disabledChips: Set<Element> }).__disabledChips
+          .size,
     ),
-  ).toBe(true);
+  ).toBe(2);
   const stored = await (await api.get(`${base}/${id}`)).json();
   expect(
     stored.references.map((r: { label: string; value: string }) => [
@@ -499,12 +502,25 @@ test("a failed view mode save shows the error and keeps the chip, then a retry s
   await cards(page).filter({ hasText: "View Fail Song" }).click();
   const s = sheet(page);
   await expect(chip(page, "Spotify")).toBeVisible();
+  // A real 500 with CORS headers, so every engine surfaces it as an API error.
   const failPatch = (route: import("@playwright/test").Route) =>
     route.request().method() === "PATCH"
-      ? route.fulfill({ status: 500, body: "{}" })
+      ? route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          headers: {
+            "access-control-allow-origin": WEB_URL,
+            "access-control-allow-credentials": "true",
+          },
+          body: "{}",
+        })
       : route.fallback();
   await page.route("**/bands/*/songs/*", failPatch);
+  const failed = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && r.status() === 500,
+  );
   await chip(page, "Spotify").click();
+  await failed;
   await expect(s.getByRole("alert")).toContainText(
     "Could not save your changes",
   );
@@ -516,6 +532,45 @@ test("a failed view mode save shows the error and keeps the chip, then a retry s
   await expect(s.getByText("open.spotify.com")).toBeVisible();
   await expect(chips(page)).toHaveCount(0);
   await expect(s.getByRole("alert")).toHaveCount(0);
+});
+
+test("the pencils are disabled while a view mode chip save is in flight", async ({
+  page,
+  testApi,
+  isMobile,
+}) => {
+  test.skip(isMobile, "WebKit page.route cannot reliably hold a request");
+  const source = "https://youtu.be/viewmode3";
+  await testApi.seedMusicLink(source, {
+    spotify: "https://open.spotify.com/track/viewhold",
+  });
+  await viewModeSong(testApi, "View Hold Song", source);
+  await openLibrary(page);
+  await cards(page).filter({ hasText: "View Hold Song" }).click();
+  const s = sheet(page);
+  const sectionPencil = s.getByRole("button", { name: "Change references" });
+  const headerPencil = s.getByRole("button", { name: "Edit", exact: true });
+  await expect(chip(page, "Spotify")).toBeVisible();
+  await expect(sectionPencil).toBeEnabled();
+  await expect(headerPencil).toBeEnabled();
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const holdPatch = async (route: import("@playwright/test").Route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    await held;
+    return route.continue();
+  };
+  await page.route("**/bands/*/songs/*", holdPatch);
+  await chip(page, "Spotify").click();
+  await expect(sectionPencil).toBeDisabled();
+  await expect(headerPencil).toBeDisabled();
+
+  release();
+  await expect(s.getByText("open.spotify.com")).toBeVisible();
+  await expect(sectionPencil).toBeEnabled();
+  await expect(headerPencil).toBeEnabled();
+  await page.unroute("**/bands/*/songs/*", holdPatch);
 });
 
 test("skeleton chips hold the row while suggestions load, then give way to chips", async ({

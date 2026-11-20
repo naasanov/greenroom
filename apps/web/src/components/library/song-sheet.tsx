@@ -30,6 +30,7 @@ import {
   DuplicateSongError,
   useCreateSong,
   useDeleteSong,
+  useIsSongSaving,
   usePrefetchSong,
   useSongDetail,
   useSongSummary,
@@ -298,8 +299,9 @@ function ReferencesSection({
             size="icon"
             aria-label="Change references"
             className="-my-1.5"
+            disabled={update.isPending}
             onClick={() => {
-              update.reset();
+              if (!update.isPending) update.reset();
               setRows(valuesFromSong(song).references);
             }}
           >
@@ -633,6 +635,7 @@ export function SongSheet({
   const formId = adding ? "add-song-form" : "edit-song-form";
   const showForm = adding ? draft !== null : editing && !!song;
   const saving = create.isPending || update.isPending;
+  const songSaving = useIsSongSaving(bandId, songId ?? "");
 
   const title = adding ? "Add song" : (shown?.title ?? "Song");
   const subtitle = adding ? undefined : (shown?.artist ?? undefined);
@@ -821,6 +824,7 @@ export function SongSheet({
                     variant="ghost"
                     size="icon"
                     aria-label="Edit"
+                    disabled={songSaving}
                     onClick={() => changeEditing(true)}
                   >
                     <Pencil />
