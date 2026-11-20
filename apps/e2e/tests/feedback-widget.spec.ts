@@ -12,25 +12,25 @@ test("opens, sends, and confirms; the issue reaches the fake", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/events");
   await page.getByRole("button", { name: "Send feedback" }).click();
-  const dialog = page.getByTestId("feedback-dialog");
-  await expect(dialog).toBeVisible();
-  const send = dialog.getByRole("button", { name: "Send", exact: true });
+  const sheet = page.getByTestId("feedback-sheet");
+  await expect(sheet).toBeVisible();
+  const send = sheet.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeDisabled();
-  await dialog.getByLabel("Message").fill("The widget works");
+  await sheet.getByLabel("Message").fill("The widget works");
   await expect(send).toBeDisabled();
-  await dialog.getByLabel("Category").selectOption({ label: "UI" });
-  await expect(dialog.getByLabel("Area")).toHaveValue("Events");
+  await sheet.getByLabel("Category").selectOption({ label: "UI" });
+  await expect(sheet.getByLabel("Area")).toHaveValue("Events");
   await send.click();
   await expect(page.getByTestId("feedback-sent")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Done" })).toBeFocused();
+  await expect(sheet.getByRole("button", { name: "Done" })).toBeFocused();
   const [issue] = await testApi.githubIssues();
   expect(issue!.body).toContain("The widget works");
   expect(issue!.body).toContain("/events");
   expect(issue!.body).toContain("Category: UI");
   expect(issue!.body).toContain("Area: Events");
   expect(issue!.labels).toEqual(["feedback"]);
-  await dialog.getByRole("button", { name: "Done" }).click();
-  await expect(dialog).toBeHidden();
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(sheet).toBeHidden();
 });
 
 test("Done closes without flashing the form back", async ({
@@ -42,11 +42,11 @@ test("Done closes without flashing the form back", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/roster");
   await page.getByRole("button", { name: "Send feedback" }).click();
-  const dialog = page.getByTestId("feedback-dialog");
-  await expect(dialog.getByLabel("Area")).toHaveValue("Roster");
-  await dialog.getByLabel("Category").selectOption({ label: "Bug" });
-  await dialog.getByLabel("Message").fill("closing check");
-  await dialog.getByRole("button", { name: "Send", exact: true }).click();
+  const sheet = page.getByTestId("feedback-sheet");
+  await expect(sheet.getByLabel("Area")).toHaveValue("Roster");
+  await sheet.getByLabel("Category").selectOption({ label: "Bug" });
+  await sheet.getByLabel("Message").fill("closing check");
+  await sheet.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("feedback-sent")).toBeVisible();
   // Record whether the textbox ever reappears while the dialog is closing.
   await page.evaluate(() => {
@@ -56,15 +56,15 @@ test("Done closes without flashing the form back", async ({
       if (document.getElementById("feedback-message")) w.formSeen = true;
     }).observe(document.body, { childList: true, subtree: true });
   });
-  await dialog.getByRole("button", { name: "Done" }).click();
-  await expect(dialog).toBeHidden();
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(sheet).toBeHidden();
   expect(
     await page.evaluate(
       () => (window as unknown as { formSeen: boolean }).formSeen,
     ),
   ).toBe(false);
   await page.getByRole("button", { name: "Send feedback" }).click();
-  await expect(dialog.getByLabel("Message")).toHaveValue("");
+  await expect(sheet.getByLabel("Message")).toHaveValue("");
 });
 
 test("Ctrl+Enter sends only when Send is enabled", async ({
@@ -76,9 +76,9 @@ test("Ctrl+Enter sends only when Send is enabled", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/events");
   await page.getByRole("button", { name: "Send feedback" }).click();
-  const dialog = page.getByTestId("feedback-dialog");
-  const box = dialog.getByLabel("Message");
-  await dialog.getByLabel("Category").selectOption({ label: "Bug" });
+  const sheet = page.getByTestId("feedback-sheet");
+  const box = sheet.getByLabel("Message");
+  await sheet.getByLabel("Category").selectOption({ label: "Bug" });
   await box.press("Control+Enter");
   await expect(page.getByTestId("feedback-sent")).toBeHidden();
   await box.fill("sent by keyboard");
@@ -97,19 +97,70 @@ test("keeps a partial draft when closed and reopened", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/events");
   const open = page.getByRole("button", { name: "Send feedback" });
-  const dialog = page.getByTestId("feedback-dialog");
+  const sheet = page.getByTestId("feedback-sheet");
   await open.click();
-  await dialog.getByLabel("Message").fill("half a thought");
-  await dialog.getByLabel("Category").selectOption({ label: "Bug" });
+  await sheet.getByLabel("Message").fill("half a thought");
+  await sheet.getByLabel("Category").selectOption({ label: "Bug" });
   await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
+  await expect(sheet).toBeHidden();
   await open.click();
-  await expect(dialog.getByLabel("Message")).toHaveValue("half a thought");
-  await dialog.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(sheet.getByLabel("Message")).toHaveValue("half a thought");
+  await sheet.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("feedback-sent")).toBeVisible();
-  await dialog.getByRole("button", { name: "Done" }).click();
+  await sheet.getByRole("button", { name: "Done" }).click();
   await open.click();
-  await expect(dialog.getByLabel("Message")).toHaveValue("");
+  await expect(sheet.getByLabel("Message")).toHaveValue("");
+});
+
+test("stays open with its text while the page behind is used", async ({
+  page,
+  loginAs,
+  testApi,
+  isMobile,
+}) => {
+  test.skip(isMobile, "the sheet covers the whole screen on mobile");
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Send feedback" }).click();
+  const sheet = page.getByTestId("feedback-sheet");
+  await expect(sheet).toBeVisible();
+  await sheet.getByLabel("Message").fill("still here");
+  await sheet.getByLabel("Category").selectOption({ label: "Bug" });
+  await expect(sheet.getByLabel("Area")).toHaveValue("Events");
+  // A nav link and a plain click behind the sheet work and do not dismiss it.
+  await page
+    .getByTestId("top-tabs")
+    .getByRole("link", { name: "Roster" })
+    .click();
+  await expect(page).toHaveURL(/\/roster/);
+  await page.getByTestId("top-bar").click({ position: { x: 5, y: 5 } });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel("Message")).toHaveValue("still here");
+  await expect(sheet.getByLabel("Category")).toHaveValue("bug");
+  // The auto-captured area follows the page the owner navigated to.
+  await expect(sheet.getByLabel("Area")).toHaveValue("Roster");
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(sheet).toBeHidden();
+});
+
+test("covers the whole screen on mobile", async ({
+  page,
+  loginAs,
+  testApi,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "desktop uses a side panel");
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/events");
+  await page.getByRole("button", { name: "Send feedback" }).click();
+  const sheet = page.getByTestId("feedback-sheet");
+  await expect(sheet).toBeVisible();
+  const box = (await sheet.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.width).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(box.height).toBeGreaterThanOrEqual(viewport.height - 1);
 });
 
 test("shows an error when sending fails", async ({
@@ -133,11 +184,11 @@ test("shows an error when sending fails", async ({
   expect(limited).toBe(true);
   await page.goto("/events");
   await page.getByRole("button", { name: "Send feedback" }).click();
-  const dialog = page.getByTestId("feedback-dialog");
-  await dialog.getByLabel("Message").fill("one too many");
-  await dialog.getByLabel("Category").selectOption({ label: "Bug" });
-  await dialog.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("try again later");
+  const sheet = page.getByTestId("feedback-sheet");
+  await sheet.getByLabel("Message").fill("one too many");
+  await sheet.getByLabel("Category").selectOption({ label: "Bug" });
+  await sheet.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(sheet.getByRole("alert")).toContainText("try again later");
   await expect(page.getByTestId("feedback-sent")).toBeHidden();
 });
 

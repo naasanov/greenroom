@@ -128,7 +128,7 @@ export function MediaViewer({
       // Dialogs and drawers above the viewer own the keyboard; right sheets sit below it.
       if (
         document.querySelector(
-          '[role="dialog"][data-state="open"]:not([data-testid="right-sheet"]), [role="alertdialog"]',
+          '[role="dialog"][data-state="open"]:not([data-right-sheet]), [role="alertdialog"]',
         )
       )
         return;
