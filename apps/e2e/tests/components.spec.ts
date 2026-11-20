@@ -410,13 +410,19 @@ test("segmented toggle and instrument picker", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("attendee list sorts going, maybe, none, declined", async ({ page }) => {
-  const statuses = await page
+test("attendee list sorts alphabetically by name", async ({ page }) => {
+  const names = await page
     .getByTestId("attendee-list")
     .first()
-    .locator("li")
-    .evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
-  expect(statuses).toEqual(["going", "going", "maybe", "none", "declined"]);
+    .locator("li p.font-medium")
+    .allInnerTexts();
+  expect(names).toEqual([
+    "Ava Chen",
+    "Jonas Eriksson",
+    "Marcus Reed",
+    "Priya Natarajan",
+    "Sam O'Brien-Fitzgerald-Montgomery",
+  ]);
 });
 
 test("clicking the check circle toggles a selectable list card", async ({
