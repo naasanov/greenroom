@@ -2,11 +2,12 @@ import { BANDS, USERS, bands, gigs } from "@greenroom/db";
 import { eq } from "drizzle-orm";
 import { expect, test } from "../src/fixtures.js";
 import { AVA, isoDay } from "./events-helpers.js";
+import { NIGHT_OWLS_SETTINGS } from "./band-helpers.js";
 
 const tokenOf = (url: string) => url.split("/c/")[1]!;
 
 async function adminLink(page: import("@playwright/test").Page) {
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   const row = page.getByTestId("public-calendar-row");
   const input = row.getByLabel("Public calendar link");
   await expect(input).toHaveValue(/\/c\//);
@@ -68,7 +69,7 @@ test("members do not see the public link settings", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.dev.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("public-calendar-row")).toHaveCount(0);
 });
@@ -93,7 +94,9 @@ test("gig form toggle is on by default and hides the gig from the public page", 
   await toggle.click();
   await expect(toggle).not.toBeChecked();
   await pane.getByRole("button", { name: "Create gig" }).click();
-  await expect(page).toHaveURL(/\/gigs\/([a-z0-9-]+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  await expect(page).toHaveURL(
+    /\/gigs\/([a-z0-9-]+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  );
 
   const rows = await db
     .select()

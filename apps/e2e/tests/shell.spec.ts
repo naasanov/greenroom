@@ -1,6 +1,7 @@
-import { USERS } from "@greenroom/db";
+import { BANDS, USERS } from "@greenroom/db";
 import { WEB_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
+import { NIGHT_OWLS_SETTINGS, bandSettingsUrl } from "./band-helpers.js";
 
 /** The primary nav that is visible for this project: bottom bar on mobile, top tabs on desktop. */
 const nav = (page: import("@playwright/test").Page, isMobile: boolean) =>
@@ -95,7 +96,7 @@ test("creating another band lands on Events", async ({
   ).toBeVisible();
 });
 
-test("the band picker links straight to band settings", async ({
+test("the band picker has no separate Band settings entry", async ({
   page,
   testApi,
   loginAs,
@@ -104,8 +105,90 @@ test("the band picker links straight to band settings", async ({
   await loginAs(USERS.ava.email);
   await page.goto("/events");
   await page.getByRole("button", { name: /Switch band/ }).click();
-  await page.getByRole("menuitem", { name: "Band settings" }).click();
-  await expect(page).toHaveURL(/\/settings\?tab=band$/);
+  await expect(
+    page.getByRole("menuitem", { name: "Settings for The Night Owls" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Band settings" }),
+  ).toHaveCount(0);
+});
+
+test("each band card has an aligned settings icon with a touch-sized hit area", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ben.email);
+  await page.goto("/events");
+  await page.getByRole("button", { name: /Switch band/ }).click();
+  const icons = page.getByRole("menuitem", { name: /^Settings for / });
+  await expect(icons).toHaveCount(2);
+  const first = (await icons.nth(0).boundingBox())!;
+  const second = (await icons.nth(1).boundingBox())!;
+  // Only the active band shows a check mark, yet the icons share one column.
+  expect(second.x).toBeCloseTo(first.x, 1);
+  expect(first.width).toBeGreaterThanOrEqual(44);
+  expect(first.height).toBeGreaterThanOrEqual(44);
+});
+
+test("the settings icon opens a non-active band's own settings", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ben.email);
+  await page.goto("/events");
+  await expect(
+    page.getByRole("button", { name: "Switch band, current: The Night Owls" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Switch band/ }).click();
+  await page
+    .getByRole("menuitem", { name: "Settings for Side Project" })
+    .click();
+  await expect(page).toHaveURL(
+    new RegExp(`${bandSettingsUrl(BANDS.sideProject.id)}$`),
+  );
+  // The page shows Side Project even though The Night Owls stays the active band.
+  await expect(page.getByTestId("band-settings-name")).toHaveText(
+    "Side Project",
+  );
+  await expect(page.getByLabel("Band name", { exact: true })).toHaveValue(
+    "Side Project",
+  );
+  await expect(page.getByRole("button", { name: "Delete band" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Switch band, current: The Night Owls" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/events$/);
+});
+
+test("a band the user does not belong to shows no settings", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.cleo.email);
+  await page.goto(bandSettingsUrl(BANDS.sideProject.id));
+  await expect(
+    page.getByText("You are not a member of this band."),
+  ).toBeVisible();
+  await expect(page.getByTestId("settings-band")).toHaveCount(0);
+  await expect(page.getByTestId("settings-leave")).toHaveCount(0);
+});
+
+test("the old ?tab=band URL forwards to the active band's settings", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  await page.goto("/settings?tab=band");
+  await expect(page).toHaveURL(new RegExp(`${NIGHT_OWLS_SETTINGS}$`));
   await expect(page.getByTestId("settings-band")).toBeVisible();
 });
 
@@ -163,7 +246,7 @@ test("Band section shows for admins and is hidden for members", async ({
 }) => {
   await testApi.seed("band");
   await loginAs(USERS.ava.email);
-  await page.goto("/settings?tab=band");
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-band")).toBeVisible();
   await expect(page.getByLabel("Band name")).toHaveValue("The Night Owls");
 
@@ -177,7 +260,8 @@ test("Band section shows for admins and is hidden for members", async ({
   await expect(page.getByTestId("settings-name")).toHaveText(
     USERS.cleo.displayName,
   );
-  await page.getByRole("tab", { name: "Band" }).click();
+  await expect(page.getByRole("tab", { name: "Band" })).toHaveCount(0);
+  await page.goto(NIGHT_OWLS_SETTINGS);
   await expect(page.getByTestId("settings-leave")).toBeVisible();
   await expect(page.getByTestId("settings-band")).toHaveCount(0);
 });
@@ -223,7 +307,9 @@ test("switching bands persists across a reload and a fresh browser context", asy
     p.getByRole("button", { name: `Switch band, current: ${name}` });
   await expect(switcher(page, "The Night Owls")).toBeVisible();
   await page.getByRole("button", { name: /Switch band/ }).click();
-  await page.getByRole("menuitem", { name: /Side Project/ }).click();
+  await page
+    .getByRole("menuitem", { name: /^(?!Settings for).*Side Project/ })
+    .click();
   await expect(switcher(page, "Side Project")).toBeVisible();
   await page.reload();
   await expect(switcher(page, "Side Project")).toBeVisible();

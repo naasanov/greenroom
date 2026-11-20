@@ -131,7 +131,7 @@ Expected: band switcher (band name and photo) sits next to the profile icon on b
 Section: Multiple bands & leaving; Persistence.
 1. Open the switcher, pick the other band.
 2. Reload and open the app on another device/context signed in as the same user.
-Expected: data switches to the chosen band; last-used band is stored server-side so the other device opens on it. Switcher also contains a Band settings entry. Current app behavior: the entry is shown to every member of the band, not only admins; admin-only controls inside settings remain admin-only.
+Expected: data switches to the chosen band; last-used band is stored server-side so the other device opens on it. Each band row in the switcher has a settings icon (labeled "Settings for <band>") that opens that band's settings page at /bands/<id>/settings, for any band the user belongs to, active or not. Every member sees the icon; admin-only controls on the page remain admin-only.
 
 ### BAND-03 Deep link switches band automatically
 Tags: [needs-two-users]. Section: Multiple bands; Shareable deep links.
@@ -270,7 +270,7 @@ Expected: each renders its view when signed in.
 ### NAV-05 Profile icon opens Settings
 Section: Settings.
 1. Tap the profile icon.
-Expected: reaches Settings (personal section; admins also see Band section).
+Expected: reaches Settings (Profile and Connections tabs). Band settings live on each band's own page, reached from the switcher.
 
 ### NAV-06 Gig deep link
 Section: Shareable deep links.
@@ -1127,7 +1127,7 @@ Expected: change instruments, no Save button needed; reload shows them.
 
 ### SETT-04 Band settings admin-only
 Tags: [needs-two-users].
-Expected: regular members do not see the Band section.
+Expected: regular members do not see the Band section on a band's settings page (they still see Leave band). The old /settings?tab=band URL forwards to the active band's settings page.
 
 ### SETT-05 Band name and photo
 Expected: updates in the switcher.

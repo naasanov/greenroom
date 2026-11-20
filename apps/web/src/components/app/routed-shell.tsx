@@ -48,6 +48,10 @@ export function tabPath(tab: TabKey): string {
   return `/${tab}`;
 }
 
+export function bandSettingsPath(bandId: string): string {
+  return `/bands/${bandId}/settings`;
+}
+
 function tabFromPath(pathname: string): TabKey | null {
   const seg = pathname.split("/")[1];
   if (
@@ -131,11 +135,7 @@ export function RoutedShell({ children }: { children: ReactNode }) {
         activeBandId={currentBand.id}
         onBandChange={setCurrentBandId}
         onCreateBand={() => setCreateOpen(true)}
-        onBandSettings={
-          currentBand.role === "admin"
-            ? () => router.push("/settings?tab=band")
-            : undefined
-        }
+        onBandSettings={(id) => router.push(bandSettingsPath(id))}
         activeTab={activeTab}
         tabHref={tabPath}
         onTabIntent={(tab) => {

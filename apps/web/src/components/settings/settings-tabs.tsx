@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 
 export const SETTINGS_TABS = [
   { key: "profile", label: "Profile" },
-  { key: "band", label: "Band" },
   { key: "connections", label: "Connections" },
 ] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["key"];
@@ -56,7 +55,7 @@ export function SettingsTabBar({
         role="tablist"
         aria-label="Settings sections"
         onKeyDown={onKeyDown}
-        className="grid grid-cols-3 gap-1 rounded-full bg-muted p-1 md:flex md:flex-col md:rounded-xl"
+        className="grid grid-cols-2 gap-1 rounded-full bg-muted p-1 md:flex md:flex-col md:rounded-xl"
       >
         {SETTINGS_TABS.map((t) => (
           <button

@@ -2,12 +2,16 @@
 
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { tabPath, useLastTab } from "@/components/app/routed-shell";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import {
+  bandSettingsPath,
+  tabPath,
+  useLastTab,
+} from "@/components/app/routed-shell";
 import { GoogleLinkReturn } from "@/components/google/google-link-return";
-import { BandSection } from "@/components/settings/band-section";
 import { ConnectionsSection } from "@/components/settings/connections-section";
 import { DeleteAccountSection } from "@/components/settings/delete-account-section";
-import { LeaveBandSection } from "@/components/settings/leave-band-section";
 import {
   PersonalSection,
   ProfileFormProvider,
@@ -23,13 +27,22 @@ import { useCurrentBand } from "@/lib/current-band";
 import { useMe } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-/** Settings page split into Profile, Band, and Connections tabs. */
+/**
+ * Settings page split into Profile and Connections tabs. The retired
+ * `?tab=band` URL forwards to the active band's settings page.
+ */
 export function SettingsView() {
   const me = useMe().data;
   const { currentBand } = useCurrentBand();
   const lastTab = useLastTab();
   const [requested, setTab] = useSettingsTab();
-  if (!me) return null;
+  const router = useRouter();
+  const legacyBandTab = useSearchParams().get("tab") === "band";
+  const bandId = currentBand?.id;
+  useEffect(() => {
+    if (legacyBandTab && bandId) router.replace(bandSettingsPath(bandId));
+  }, [legacyBandTab, bandId, router]);
+  if (!me || (legacyBandTab && bandId)) return null;
   const isAdmin = currentBand?.role === "admin";
   const tab = currentBand ? requested : "profile";
 
@@ -68,12 +81,6 @@ export function SettingsView() {
           </SettingsPanel>
           {currentBand ? (
             <>
-              <SettingsPanel tab="band" active={tab === "band"}>
-                {isAdmin ? (
-                  <BandSection key={currentBand.id} band={currentBand} />
-                ) : null}
-                <LeaveBandSection key={currentBand.id} band={currentBand} />
-              </SettingsPanel>
               <SettingsPanel tab="connections" active={tab === "connections"}>
                 <ConnectionsSection
                   user={me}

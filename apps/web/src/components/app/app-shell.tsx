@@ -294,7 +294,7 @@ export function AppShell({
   activeBandId: string;
   onBandChange?: (id: string) => void;
   onCreateBand?: () => void;
-  onBandSettings?: () => void;
+  onBandSettings?: (bandId: string) => void;
   /** Null on pages outside the tabs (e.g. settings). */
   activeTab: TabKey | null;
   onTabChange?: (tab: TabKey) => void;

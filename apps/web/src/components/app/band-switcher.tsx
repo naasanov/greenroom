@@ -67,8 +67,8 @@ export function BandSwitcher({
   activeId: string;
   onSelect?: (id: string) => void;
   onCreate?: () => void;
-  /** Adds a "Band settings" entry for the active band. */
-  onSettings?: () => void;
+  /** Adds a settings icon to each band row. */
+  onSettings?: (id: string) => void;
   className?: string;
 }) {
   const active = bands.find((b) => b.id === activeId) ?? bands[0];
@@ -97,31 +97,32 @@ export function BandSwitcher({
       >
         <DropdownMenuLabel>Your bands</DropdownMenuLabel>
         {bands.map((b) => (
-          <DropdownMenuItem
-            key={b.id}
-            onSelect={() => onSelect?.(b.id)}
-            className="gap-3"
-          >
-            <BandAvatar band={b} className="size-8" />
-            <span className="min-w-0 flex-1 truncate font-medium">
-              {b.name}
-            </span>
-            {b.id === active.id ? (
-              <Check className="size-4 text-primary" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-        {onSettings ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onSettings} className="gap-3">
-              <span className="flex size-8 items-center justify-center rounded-xl bg-muted">
-                <Settings className="size-4" />
+          <div key={b.id} className="flex items-center gap-1">
+            <DropdownMenuItem
+              onSelect={() => onSelect?.(b.id)}
+              className="min-w-0 flex-1 gap-3"
+            >
+              <BandAvatar band={b} className="size-8" />
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {b.name}
               </span>
-              Band settings
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                {b.id === active.id ? (
+                  <Check className="size-4 text-primary" />
+                ) : null}
+              </span>
             </DropdownMenuItem>
-          </>
-        ) : null}
+            {onSettings ? (
+              <DropdownMenuItem
+                aria-label={`Settings for ${b.name}`}
+                onSelect={() => onSettings(b.id)}
+                className="size-11 shrink-0 justify-center px-0"
+              >
+                <Settings className="size-4" />
+              </DropdownMenuItem>
+            ) : null}
+          </div>
+        ))}
         {onCreate ? (
           <>
             <DropdownMenuSeparator />
