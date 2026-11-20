@@ -414,10 +414,14 @@ test("skeleton chips hold the row while suggestions load, then give way to chips
   await seedAll(testApi);
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
-  await page.route("**/songs/suggest-references", async (route) => {
-    await gate;
-    return route.continue();
-  });
+  // Either held request keeps the skeletons up; WebKit does not hold the suggest POST, so the tags GET is held too.
+  await page.route(
+    /\/songs\/(suggest-references|reference-tags)$/,
+    async (route) => {
+      await gate;
+      await route.continue().catch(() => {});
+    },
+  );
   await addFromSpotify(page);
   const skeletons = sheet(page).getByTestId("suggestion-chip-skeleton");
   await expect(skeletons.first()).toBeVisible();
