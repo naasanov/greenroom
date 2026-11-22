@@ -20,6 +20,7 @@ export interface SetlistItem {
   durationSeconds: number | null;
   imageUrl: string | null;
   youtubeUrl: string | null;
+  youtubeMusicUrl: string | null;
 }
 
 export interface SetlistDetail {

@@ -42,12 +42,14 @@ import {
   type SongSummary,
   type UpdateSong,
   type UsedIn,
+  youtubeMusicReferenceUrl,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { resolveAssignment } from "../events/assignment.js";
 import { expandSeries } from "../events/occurrences.js";
 import { YOUTUBE, type YoutubeAdapter } from "../integrations/index.js";
 import { SongIndex } from "./song-match.js";
+import { youtubeMusicUrls } from "./youtube-music.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type SongRow = typeof songs.$inferSelect;
@@ -138,8 +140,13 @@ export class SongsService {
       .from(songs)
       .where(where)
       .orderBy(...order);
+    const musicUrls = await youtubeMusicUrls(
+      this.db,
+      rows.map((r) => r.song.id),
+    );
     return rows.map((r) => ({
       ...this.summary(r.song),
+      youtubeMusicUrl: musicUrls.get(r.song.id) ?? null,
       setlistCount: r.setlistCount,
       lastPlayedDate: r.lastPlayedDate,
     }));
@@ -303,7 +310,7 @@ export class SongsService {
 
   private summary(
     s: SongRow,
-  ): Omit<SongSummary, "setlistCount" | "lastPlayedDate"> {
+  ): Omit<SongSummary, "setlistCount" | "lastPlayedDate" | "youtubeMusicUrl"> {
     return {
       id: s.id,
       title: s.title,
@@ -381,6 +388,7 @@ export class SongsService {
     }));
     return {
       ...this.summary(song),
+      youtubeMusicUrl: youtubeMusicReferenceUrl(references),
       setlistCount,
       lastPlayedDate,
       bandId: song.bandId,

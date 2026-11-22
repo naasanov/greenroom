@@ -194,11 +194,15 @@ function useExportRows(bandId: string, target: ExportTarget) {
     : (setlist.data?.items ?? []);
 }
 
-/** Opens the songs with a YouTube link as a temporary queue, no login needed. */
+/** Opens the songs with a YouTube or YouTube Music link as a temporary queue, no login needed. */
 function YoutubeQueueSection({
   rows,
 }: {
-  rows: { title: string; youtubeUrl: string | null }[];
+  rows: {
+    title: string;
+    youtubeUrl: string | null;
+    youtubeMusicUrl: string | null;
+  }[];
 }) {
   const queue = buildYoutubeQueue(rows);
   const [opened, setOpened] = useState(false);
@@ -225,7 +229,7 @@ function YoutubeQueueSection({
         className="text-sm text-muted-foreground"
       >
         {queue.included === 0
-          ? "None of these songs have a YouTube link."
+          ? "None of these songs have a YouTube or YouTube Music link."
           : `${opened ? "Opened" : "Includes"} ${queue.included} ${
               queue.included === 1 ? "song" : "songs"
             } in a temporary queue. Sign in on YouTube to save it as a playlist.`}
@@ -237,7 +241,7 @@ function YoutubeQueueSection({
         >
           {`Skipped ${queue.noLink.length} ${
             queue.noLink.length === 1 ? "song" : "songs"
-          } without a YouTube link.`}
+          } without a YouTube or YouTube Music link.`}
         </p>
       ) : null}
       {queue.overflow.length > 0 ? (
