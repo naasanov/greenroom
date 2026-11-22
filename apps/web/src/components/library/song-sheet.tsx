@@ -24,7 +24,6 @@ import { MediaThumb, isVideo } from "@/components/media/media-tile";
 import { MediaViewer } from "@/components/media/media-viewer";
 import { Button } from "@/components/ui/button";
 import { useSongMedia } from "@/lib/queries/uploads";
-import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import {
   DuplicateSongError,
@@ -783,10 +782,7 @@ export function SongSheet({
   return (
     <>
       <RightSheet
-        className={cn(
-          nonModal && "max-md:top-[40dvh] max-md:rounded-t-3xl",
-          className,
-        )}
+        className={className}
         open={open}
         onOpenChange={(o) => !o && onRequestClose()}
         title={title}

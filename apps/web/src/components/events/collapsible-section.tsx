@@ -100,13 +100,13 @@ export function CollapsibleSection({
           }
         }}
         className={cn(
-          "grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none",
+          "grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none",
           open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
         )}
       >
         <div
           className={cn(
-            "-mx-1 -mb-1 min-h-0 px-1 pb-1",
+            "-mx-1 -mb-1 min-h-0 min-w-0 px-1 pb-1",
             open && !animating ? "overflow-visible" : "overflow-hidden",
           )}
         >
