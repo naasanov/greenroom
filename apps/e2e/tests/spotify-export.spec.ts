@@ -277,6 +277,45 @@ test("copy shows a failure state when no clipboard path works", async ({
   await expect(copy).toHaveText("Copy failed");
 });
 
+test("YouTube queue falls back to a YouTube Music reference", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  const seed = await testApi.seed("band");
+  await loginAs(USERS.ava.email);
+  const bandId = seed.bands.nightOwls.id;
+  const api = await apiAs(testApi, USERS.ava.email);
+  for (const [title, value] of [
+    ["Music Only", "https://music.youtube.com/watch?v=musicOnly01&si=abc"],
+    ["Music Playlist", "https://music.youtube.com/playlist?list=PLmusic01"],
+  ] as const) {
+    await api.post(`/bands/${bandId}/songs`, {
+      data: { title, references: [{ label: "YouTube Music", value }] },
+    });
+  }
+  await api.dispose();
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const youtube = dialog(page).getByTestId("export-youtube");
+  await expect(youtube.getByTestId("export-youtube-summary")).toContainText(
+    "4 songs",
+  );
+  await expect(youtube.getByTestId("export-youtube-skipped")).toHaveText(
+    "Skipped 6 songs without a YouTube or YouTube Music link.",
+  );
+  let queueUrl = "";
+  await page.context().route("**://www.youtube.com/**", (route) => {
+    queueUrl = route.request().url();
+    return route.fulfill({ status: 200, body: "ok" });
+  });
+  const popup = page.waitForEvent("popup");
+  await youtube.getByTestId("export-youtube-open").click();
+  await popup;
+  await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
+  expect(queueUrl).toContain("musicOnly01");
+});
+
 test("library export can open a YouTube Music queue without logging in", async ({
   page,
   testApi,
@@ -291,7 +330,7 @@ test("library export can open a YouTube Music queue without logging in", async (
     "3 songs",
   );
   await expect(youtube.getByTestId("export-youtube-skipped")).toHaveText(
-    "Skipped 5 songs without a YouTube link.",
+    "Skipped 5 songs without a YouTube or YouTube Music link.",
   );
   let queueUrl = "";
   await page.context().route("**://www.youtube.com/**", (route) => {

@@ -92,6 +92,8 @@ export interface SongSummary {
   imageUrl: string | null;
   spotifyTrackId: string | null;
   youtubeUrl: string | null;
+  /** Value of the song's first "YouTube Music" reference, if any. */
+  youtubeMusicUrl: string | null;
   createdAt: string;
   /** Distinct setlists containing the song. */
   setlistCount: number;
@@ -208,6 +210,16 @@ export type MagicReference = (typeof MAGIC_REFERENCES)[number];
 export function findMagicReference(label: string): MagicReference | undefined {
   const l = label.trim().toLowerCase();
   return MAGIC_REFERENCES.find((r) => r.label.toLowerCase() === l);
+}
+
+/** The value of the first "YouTube Music" reference row, or null. */
+export function youtubeMusicReferenceUrl(
+  refs: readonly { label: string; value: string }[],
+): string | null {
+  const ref = refs.find(
+    (r) => findMagicReference(r.label)?.key === "youtubeMusic",
+  );
+  return ref?.value ?? null;
 }
 
 /** True for an https link on one of the magic key's hosts (Ultimate Guitar also bans ports and credentials). */

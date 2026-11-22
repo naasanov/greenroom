@@ -22,6 +22,7 @@ export const toSetlistSong = (s: SongSummary): SetlistSong => ({
   durationSeconds: s.durationSeconds,
   imageUrl: songArt(s),
   youtubeUrl: s.youtubeUrl,
+  youtubeMusicUrl: s.youtubeMusicUrl,
 });
 
 /** A song's length; renders nothing when the length is unknown. */

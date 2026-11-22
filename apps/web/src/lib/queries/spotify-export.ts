@@ -104,16 +104,21 @@ export interface YoutubeQueue {
   overflow: string[];
 }
 
-/** Builds a no-login YouTube queue link from songs' YouTube links. */
+/** Builds a no-login YouTube queue link from songs' YouTube or YouTube Music links. */
 export function buildYoutubeQueue(
-  songs: { title: string; youtubeUrl: string | null }[],
+  songs: {
+    title: string;
+    youtubeUrl: string | null;
+    youtubeMusicUrl: string | null;
+  }[],
 ): YoutubeQueue {
   const ids: string[] = [];
   const seen = new Set<string>();
   const noLink: string[] = [];
   const overflow: string[] = [];
   for (const song of songs) {
-    const id = youtubeVideoId(song.youtubeUrl);
+    const id =
+      youtubeVideoId(song.youtubeUrl) ?? youtubeVideoId(song.youtubeMusicUrl);
     if (!id) noLink.push(song.title);
     else if (seen.has(id)) continue;
     else if (ids.length >= YOUTUBE_QUEUE_MAX) overflow.push(song.title);
