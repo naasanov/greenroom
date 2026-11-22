@@ -22,9 +22,8 @@ import {
 import { useDebounced } from "./use-debounced";
 
 /**
- * One chip per suggested reference, rendered beside the "Add row" button
- * and capped at two rows behind a dots chip.
- * Tapping a chip hands its label and link to `onAdd`; nothing is added automatically.
+ * One chip per suggested reference, capped at two rows behind a dots chip.
+ * Tapping a chip hands its label and link to `onAdd`; `disabled` greys every chip out.
  */
 export function SuggestedReferenceChips({
   bandId,
@@ -33,6 +32,7 @@ export function SuggestedReferenceChips({
   artist,
   rows,
   onAdd,
+  disabled = false,
 }: {
   bandId: string;
   sourceUrl: string | null;
@@ -41,6 +41,7 @@ export function SuggestedReferenceChips({
   artist?: string | null;
   rows: { label: string; value: string }[];
   onAdd: (label: string, value: string) => void;
+  disabled?: boolean;
 }) {
   const found = useSuggestedReferences(bandId, sourceUrl);
   const tags = useReferenceTags(bandId);
@@ -63,6 +64,7 @@ export function SuggestedReferenceChips({
         variant="outline"
         data-testid="suggestion-chip"
         data-key={chip.key}
+        disabled={disabled}
         onClick={() => onAdd(chip.label, chip.value)}
         className={cn("border-dashed", CHIP_FADE_IN)}
       >
@@ -75,7 +77,7 @@ export function SuggestedReferenceChips({
   if (chords) {
     items.push({
       key: "ultimate-guitar",
-      node: <ChordsChip offer={chords} onAdd={onAdd} />,
+      node: <ChordsChip offer={chords} onAdd={onAdd} disabled={disabled} />,
     });
   }
   return <SuggestionChipRow items={items} loading={loading} />;
@@ -116,9 +118,11 @@ function useChordsOffer(
 function ChordsChip({
   offer,
   onAdd,
+  disabled,
 }: {
   offer: ChordsOffer;
   onAdd: (label: string, value: string) => void;
+  disabled: boolean;
 }) {
   return (
     <div className={cn("flex gap-2", CHIP_FADE_IN)}>
@@ -126,6 +130,7 @@ function ChordsChip({
         type="button"
         variant="outline"
         data-testid="reference-chip-ultimate-guitar"
+        disabled={disabled}
         onClick={() => onAdd("Ultimate Guitar", offer.match.url)}
         className="border-dashed"
       >
@@ -140,6 +145,7 @@ function ChordsChip({
               type="button"
               variant="ghost"
               data-testid="reference-chip-ultimate-guitar-others"
+              disabled={disabled}
             >
               Other versions <ChevronDown />
             </Button>
@@ -149,6 +155,7 @@ function ChordsChip({
               <DropdownMenuItem
                 key={v.url}
                 data-testid="reference-chip-ultimate-guitar-version"
+                disabled={disabled}
                 onSelect={() => onAdd("Ultimate Guitar", v.url)}
               >
                 {versionText(v)}

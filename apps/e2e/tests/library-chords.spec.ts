@@ -99,6 +99,21 @@ test("Ultimate Guitar chip adds a reference, saving auto-imports the sheet, read
     .not.toBe(before);
 });
 
+test("Ultimate Guitar chip in view mode saves the reference right away", async ({
+  page,
+  testApi,
+}) => {
+  const { song } = await arrange(testApi);
+  await song("Wonderwall");
+  await openSong(page, "Wonderwall");
+  const chip = sheet(page).getByTestId("reference-chip-ultimate-guitar");
+  await chip.click();
+  await expect(chip).toHaveCount(0);
+  await expect(sheet(page).getByTestId("references-edit")).toHaveCount(0);
+  await expect(sheet(page).getByTestId("reference-link")).toHaveCount(1);
+  await expect(sheet(page).getByTestId("song-chords-button")).toBeVisible();
+});
+
 test("Add chords offers the suggestion and other versions", async ({
   page,
   testApi,

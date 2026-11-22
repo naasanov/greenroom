@@ -30,6 +30,7 @@ import {
   DuplicateSongError,
   useCreateSong,
   useDeleteSong,
+  useIsSongSaving,
   usePrefetchSong,
   useSongDetail,
   useSongSummary,
@@ -298,7 +299,11 @@ function ReferencesSection({
             size="icon"
             aria-label="Change references"
             className="-my-1.5"
-            onClick={() => setRows(valuesFromSong(song).references)}
+            disabled={update.isPending}
+            onClick={() => {
+              if (!update.isPending) update.reset();
+              setRows(valuesFromSong(song).references);
+            }}
           >
             <Pencil />
           </Button>
@@ -333,13 +338,41 @@ function ReferencesSection({
           ) : null}
         </div>
       ) : (
-        <LinkList
-          rows={song.references.map((r) => ({
-            id: r.id,
-            label: r.label,
-            value: r.value,
-          }))}
-        />
+        <div className="flex flex-col">
+          <LinkList
+            rows={song.references.map((r) => ({
+              id: r.id,
+              label: r.label,
+              value: r.value,
+            }))}
+          />
+          <div
+            data-testid="references-suggestions"
+            className="flex flex-wrap items-center gap-2 has-[button,[data-testid=suggestion-chip-skeleton]]:mt-3"
+          >
+            <SuggestedReferenceChips
+              bandId={bandId}
+              sourceUrl={sourceUrlOf(song.references)}
+              title={song.title}
+              artist={song.artist}
+              rows={song.references}
+              disabled={update.isPending}
+              onAdd={(label, value) =>
+                update.mutate({
+                  references: [
+                    ...toSongBody(valuesFromSong(song)).references,
+                    { label, value },
+                  ],
+                })
+              }
+            />
+          </div>
+          {update.isError ? (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              Could not save your changes. Please try again.
+            </p>
+          ) : null}
+        </div>
       )}
     </Section>
   );
@@ -602,6 +635,7 @@ export function SongSheet({
   const formId = adding ? "add-song-form" : "edit-song-form";
   const showForm = adding ? draft !== null : editing && !!song;
   const saving = create.isPending || update.isPending;
+  const songSaving = useIsSongSaving(bandId, songId ?? "");
 
   const title = adding ? "Add song" : (shown?.title ?? "Song");
   const subtitle = adding ? undefined : (shown?.artist ?? undefined);
@@ -790,6 +824,7 @@ export function SongSheet({
                     variant="ghost"
                     size="icon"
                     aria-label="Edit"
+                    disabled={songSaving}
                     onClick={() => changeEditing(true)}
                   >
                     <Pencil />
