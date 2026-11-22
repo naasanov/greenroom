@@ -13,6 +13,7 @@ Pitfalls for later tasks:
 - After a modal dialog closes inside a drawer, the page can keep `aria-hidden` until the drawer closes (screen readers, role-based test queries).
 - `NestedDrawer` is a plain Root, not Vaul's NestedRoot (NestedRoot made the parent jump).
 - dnd-kit auto-scroll inside a scrollable drawer body can scroll the drop target out from under the pointer mid-drag (2026-10-27: library drag-in failed 1 in 3). `PickDndProvider` narrows the auto-scroll edge zone for picks; keep that when adding new drag targets in drawers.
+- dnd-kit reorder in a drawer (2026-11-20, #107 and #120): its auto-scroll activator is the pointer, and `delta` includes the scroller's scroll offset, so subtract it before testing an edge band. Gate reorder scrolling with `autoScroll.canScroll` instead of toggling `enabled`: toggling resets dnd-kit's scroll intent, so a still pointer never scrolls. Always pass children through `Children.toArray` in both the settled and the locally reordered render; mixing raw and rewritten keys remounts every row on each drop and snaps the drawer scroll.
 - Keyboard fit (`lib/use-visual-viewport.ts`) is only simulated in tests; real iOS behavior needs a device check.
 
 **How to apply:** put these bullets in briefs for any agent building event, library, or roster drawers, and re-check them if Vaul is upgraded or replaced. Related: [[scaffold-gotchas]].
