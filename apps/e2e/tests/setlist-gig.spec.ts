@@ -2,6 +2,7 @@ import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
+import { agendaCard } from "./agenda-helpers.js";
 import { closeSideDrawer, sideDrawerOf } from "./events-helpers.js";
 import { apiAs, chooseSort } from "./library-helpers.js";
 
@@ -328,6 +329,128 @@ test("a row can be reordered by dragging its handle", async ({
   await expect
     .poll(async () => (await rowTitles(page)).slice(0, 3))
     .toEqual(["Midnight Train", "Paper Planes", "Skyline Drive"]);
+});
+
+/** Songs created through the API so a gig setlist is long enough to scroll. */
+async function longSetlist(
+  testApi: Parameters<typeof apiAs>[0],
+  gigId: string,
+  count: number,
+) {
+  const api = await apiAs(testApi, AVA);
+  const bandId = seed.bands.nightOwls.id;
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const res = await api.post(`/bands/${bandId}/songs`, {
+      data: { title: `Long Song ${String(i).padStart(2, "0")}`, force: true },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    ids.push((await res.json()).id);
+  }
+  await api.dispose();
+  await fillSetlist(testApi, gigId, ids);
+}
+
+/** The event drawer body: the nearest vertically scrollable ancestor of the setlist. */
+const drawerBody = (page: Page) =>
+  page.getByTestId("setlist-section").evaluateHandle((el) => {
+    let n: HTMLElement | null = el.parentElement;
+    while (n && !/(auto|scroll)/.test(getComputedStyle(n).overflowY)) {
+      n = n.parentElement;
+    }
+    return n!;
+  });
+
+/** Opens the club gig from the agenda and waits for its 30 setlist rows. */
+async function openLongGig(page: Page) {
+  await page.goto("/events");
+  const card = agendaCard(page, seed.gigs.upcomingClub.title);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await card.click();
+  await expect(rows(page)).toHaveCount(30, { timeout: 20_000 });
+  // Measure only after the drawer's slide-up has settled.
+  const drawer = page.locator("[data-vaul-drawer]:not([data-exiting])");
+  let last = -1;
+  await expect(async () => {
+    const y = (await drawer.boundingBox())!.y;
+    const settled = y === last;
+    last = y;
+    expect(settled).toBe(true);
+  }).toPass();
+}
+
+test("dropping a row near the top edge leaves the drawer scroll where it was", async ({
+  page,
+  testApi,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Pointer drag is covered on desktop");
+  await longSetlist(testApi, seed.gigs.upcomingClub.id, 30);
+  await openLongGig(page);
+  const body = await drawerBody(page);
+  const bodyBox = (await body.asElement()!.boundingBox())!;
+  // Park mid-list so a jump to either end is visible.
+  await body.evaluate((el) => {
+    const b = el as HTMLElement;
+    b.scrollTop = (b.scrollHeight - b.clientHeight) / 2;
+  });
+  const handle = page.getByRole("button", { name: "Reorder Long Song 15" });
+  await handle.scrollIntoViewIfNeeded();
+  const from = (await handle.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, bodyBox.y + 20, { steps: 20 });
+  await page.waitForTimeout(300);
+  // Read the offset in the same task as the release, before any drop handling.
+  await body.evaluate((el) => {
+    const w = window as unknown as { __atDrop?: number };
+    document.addEventListener(
+      "mouseup",
+      () => (w.__atDrop = (el as HTMLElement).scrollTop),
+      { capture: true, once: true },
+    );
+  });
+  await page.mouse.up();
+  const atDrop = await page.evaluate(
+    () => (window as unknown as { __atDrop: number }).__atDrop,
+  );
+  for (let i = 0; i < 10; i++) {
+    expect(await body.evaluate((el) => (el as HTMLElement).scrollTop)).toBe(
+      atDrop,
+    );
+    await page.waitForTimeout(100);
+  }
+  await expect
+    .poll(async () => (await rowTitles(page)).indexOf("Long Song 15"))
+    .toBeLessThan(15);
+});
+
+test("holding a dragged row near the drawer's bottom edge scrolls it", async ({
+  page,
+  testApi,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Pointer drag is covered on desktop");
+  await longSetlist(testApi, seed.gigs.upcomingClub.id, 30);
+  await openLongGig(page);
+  const body = await drawerBody(page);
+  const scrollTop = () => body.evaluate((el) => (el as HTMLElement).scrollTop);
+  await body.evaluate((el) => {
+    (el as HTMLElement).scrollTop = 0;
+  });
+  const handle = page.getByRole("button", { name: "Reorder Long Song 00" });
+  const from = (await handle.boundingBox())!;
+  const bodyBox = (await body.asElement()!.boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, bodyBox.y + bodyBox.height - 24, {
+    steps: 20,
+  });
+  // A still pointer in the edge zone keeps scrolling until it leaves.
+  await expect.poll(scrollTop).toBeGreaterThan(100);
+  const first = await scrollTop();
+  await expect.poll(scrollTop).toBeGreaterThan(first);
+  await page.mouse.up();
 });
 
 test("rows settle without bouncing after a drop", async ({
