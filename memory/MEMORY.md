@@ -40,9 +40,14 @@ Before adding an entry, check for an existing one that covers it and update that
 - [E2E test scope](e2e-test-scope.md) — locally only targeted specs + smoke, never the full suite; CI runs the full suite on push
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting; factory runs desktop only (WebKit crashes)
 - [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together
-- [Known flaky e2e specs](flaky-e2e-specs.md) — files-import (desktop), agenda-drawer hand-off (mobile) and media-upload wake lock (mobile, tray-tile race fixed 2026-11-15) fail intermittently in CI; rerun once, never weaken assertions
+- [Known flaky e2e specs](flaky-e2e-specs.md) — files-import (desktop), agenda-drawer hand-off (mobile) and media-upload wake lock (mobile, tray-tile race fixed 2026-11-15) and the setlist drag-reorder spec (desktop) fail intermittently in CI; rerun once, never weaken assertions
 - [Stage snapshot source](stage-snapshot-source.md) — stage renders from the offline snapshot; write mutations through, return undefined (not empty) on fetch failure
 - [Swipe gestures](swipe-gestures.md) — track pointerId, cancel on multi-touch, skip controls/portals, guard window keys, reset scroll
 - [WebKit route interception](webkit-route-interception.md) — page.route does not hold or fulfill reliably on mobile; MutationObserver, desktop-only specs
 - [Grep specs for changed behavior](grep-specs-for-changed-behavior.md) — run every spec that touches changed behavior, not only the feature's own
 - [Pending save vs edit mode](pending-save-vs-edit-mode.md) — disable edit entry points while a mutation is pending; shared mutationKey, no reset mid-flight
+- [Text locators vs list changes](e2e-text-locators-vs-list-changes.md) — adding items to a picker breaks `.first()` and hasText drawer specs; grep before pushing
+- [Drawer and aside gotchas](drawer-aside-focus-gotchas.md) — retry-focus in the setlist aside, no always-mounted sheets, one aside, Escape in viewers
+- [Calendar grid date dependence](calendar-grid-date-dependence.md) — seed dates are relative to today; page the grid with `pageToDay` / `pageAwayFromDay`
+- [Untrusted file parsing caps](untrusted-file-parsing-caps.md) — cap bytes, pixels and element counts before decoding user files
+- [Upload type allowlist](upload-type-allowlist.md) — type exceptions must still pass the per-link allow callback
