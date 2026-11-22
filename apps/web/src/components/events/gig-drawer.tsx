@@ -52,7 +52,10 @@ function mapsUrl(gig: Gig): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}${place}`;
 }
 
-/** Inline map icon that flows at the end of the text it follows. */
+/**
+ * Inline map icon at the end of the text it follows. The block svg makes the
+ * anchor's baseline its bottom edge; the shift cancels the glyph's 1.33px inset.
+ */
 function MapsLink({ href }: { href: string }) {
   return (
     <a
@@ -60,9 +63,9 @@ function MapsLink({ href }: { href: string }) {
       target="_blank"
       rel="noreferrer"
       aria-label="Open in Maps"
-      className="inline-block align-text-bottom text-primary"
+      className="inline-block align-baseline text-primary"
     >
-      <ExternalLink className="size-4" />
+      <ExternalLink className="block size-4 translate-y-[1.33px]" />
     </a>
   );
 }

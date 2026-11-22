@@ -393,6 +393,7 @@ export function PracticeDrawer({
           dismissible={!dirty}
           onDismissAttempt={requestClose}
           title={title}
+          bodyClassName="overflow-x-hidden"
           description={EVENT_TYPES.practice.label}
           headerAction={<ShareButton path={path} title={title} />}
           headerLeading={
