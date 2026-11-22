@@ -335,6 +335,7 @@ A web app for a small local band that plays a handful of gigs. The goal is to re
 - Instruments save automatically as you change them (decided 2026-10-24).
 
 ## Band settings (admins only)
+Each band has its own settings page at `/bands/<id>/settings`, opened from the settings icon on that band's row in the band switcher (global Settings keeps Profile and Connections). Members see only Leave band there; Delete band appears for the only member.
 - Band name and photo.
 - Google Drive connection.
 - Public gig calendar link, with copy and reset buttons.
