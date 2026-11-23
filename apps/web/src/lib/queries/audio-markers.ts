@@ -147,17 +147,25 @@ export function useUpdateAudioMarker(bandId: string, fileId: string) {
   const key = audioMarkerKeys.list(bandId, fileId);
   return useMutation({
     mutationKey: audioMarkerKeys.update(bandId, fileId),
-    mutationFn: (v: { markerId: string; patch: UpdateAudioMarker }) =>
-      api(`/bands/${bandId}/audio-markers/${encodeURIComponent(v.markerId)}`, {
-        method: "PATCH",
-        body: v.patch,
-        schema: typed<AudioMarker>(),
-      }),
+    // Updates for one file run serially so PATCHes reach the server in order.
+    scope: { id: `audio-markers-${fileId}` },
+    // A marker missing from the cache was deleted, so its PATCH would only 404.
+    mutationFn: async (v: { markerId: string; patch: UpdateAudioMarker }) => {
+      if (
+        !qc.getQueryData<AudioMarker[]>(key)?.some((m) => m.id === v.markerId)
+      )
+        return null;
+      return api(
+        `/bands/${bandId}/audio-markers/${encodeURIComponent(v.markerId)}`,
+        { method: "PATCH", body: v.patch, schema: typed<AudioMarker>() },
+      );
+    },
     onMutate: (v) =>
       applyOptimistic(qc, key, (list) =>
         list.map((m) => (m.id === v.markerId ? { ...m, ...v.patch } : m)),
       ),
     onSuccess: (saved) => {
+      if (!saved) return;
       // Only the server's timestamp is merged so a newer queued patch is not clobbered.
       qc.setQueryData<AudioMarker[]>(key, (old) =>
         old?.map((m) =>

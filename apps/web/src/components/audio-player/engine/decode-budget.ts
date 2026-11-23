@@ -1,5 +1,7 @@
 export const MAX_FILE_BYTES = 100 * 1024 * 1024;
-export const MAX_DECODED_BYTES = 450 * 1024 * 1024;
+// The decoded AudioBuffer and the copies posted to the worklet coexist until
+// feeding ends, so peak memory is about twice this figure.
+export const MAX_DECODED_BYTES = 300 * 1024 * 1024;
 
 /** Rough decoded PCM size multiplier for a mime type (lossy and unknown are the worst case). */
 function expansionFactor(mimeType: string | null): number {

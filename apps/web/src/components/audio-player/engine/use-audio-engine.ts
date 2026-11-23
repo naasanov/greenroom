@@ -48,15 +48,19 @@ export function useAudioEngine(src: string, opts: Opts): AudioEngine {
   const engineRef = useRef<Engine | null>(null);
   const tuningRef = useRef({ rate: opts.rate, semitones: opts.semitones });
 
-  const { sizeBytes, mimeType } = opts;
+  const sourceRef = useRef({
+    sizeBytes: opts.sizeBytes,
+    mimeType: opts.mimeType,
+  });
   useEffect(() => {
     tuningRef.current = { rate: opts.rate, semitones: opts.semitones };
-  }, [opts.rate, opts.semitones]);
+    sourceRef.current = { sizeBytes: opts.sizeBytes, mimeType: opts.mimeType };
+  }, [opts.rate, opts.semitones, opts.sizeBytes, opts.mimeType]);
   useEffect(() => {
     const engine = new Engine({
       src,
-      sizeBytes,
-      mimeType,
+      sizeBytes: sourceRef.current.sizeBytes,
+      mimeType: sourceRef.current.mimeType,
       rate: tuningRef.current.rate,
       semitones: tuningRef.current.semitones,
       onState: setSnapshot,
@@ -67,7 +71,7 @@ export function useAudioEngine(src: string, opts: Opts): AudioEngine {
       engine.dispose();
       if (engineRef.current === engine) engineRef.current = null;
     };
-  }, [src, sizeBytes, mimeType]);
+  }, [src]);
 
   useEffect(() => {
     engineRef.current?.setRate(opts.rate);
