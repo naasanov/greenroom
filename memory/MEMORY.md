@@ -51,3 +51,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Calendar grid date dependence](calendar-grid-date-dependence.md) — seed dates are relative to today; page the grid with `pageToDay` / `pageAwayFromDay`
 - [Untrusted file parsing caps](untrusted-file-parsing-caps.md) — cap bytes, pixels and element counts before decoding user files
 - [Upload type allowlist](upload-type-allowlist.md) — type exceptions must still pass the per-link allow callback
+- [Audio worklet bundling](audio-worklet-bundling.md) — worklet libraries built from Function#toString break when bundled; serve from public/, verify in a browser
+- [WebKit audio e2e](webkit-audio-e2e.md) — assert play state not the audio clock; WebKit decodes durations short, round for display; small test WAVs
+- [Public assets and the proxy](public-assets-proxy-matcher.md) — new public/ file extensions need the proxy matcher exclusion or they redirect to sign-in
+- [Escalate unknown test failures](escalate-unknown-test-failures.md) — owner rule: a Sonnet agent that cannot explain a failing test hands it to Opus
