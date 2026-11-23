@@ -4,6 +4,7 @@ import {
   Download,
   ExternalLink,
   FolderInput,
+  HardDrive,
   Music2,
   MoreVertical,
   Pencil,
@@ -18,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { isGoogleDoc, isProtected } from "./file-utils";
+import { driveOpenUrl, isGoogleDoc, isProtected } from "./file-utils";
 
 export interface EntryActions {
   onOpen: (entry: FileEntry) => void;
@@ -59,6 +60,15 @@ export function ItemMenu({
       <DropdownMenuContent align="end" className="min-w-52">
         <DropdownMenuItem onSelect={() => actions.onOpen(entry)}>
           <ExternalLink /> Open
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a
+            href={driveOpenUrl(entry)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <HardDrive /> Open in Drive
+          </a>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => actions.onRename(entry)}>
           <Pencil /> Rename
