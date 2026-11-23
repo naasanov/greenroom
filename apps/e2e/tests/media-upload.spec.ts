@@ -500,14 +500,20 @@ test("EXIF-rotated photos preview upright and the uploaded file is untouched", a
     ]),
   ).toEqual([20, 40]);
   release();
-  await expect(utile(page, "exif-6.jpg")).toHaveAttribute(
-    "data-status",
-    "done",
-  );
-  const stored = (await m.fake.files()).find((f) => f.name === "exif-6.jpg")!;
-  expect(
-    Buffer.from(await m.fake.content(stored.id)).equals(readFileSync(path)),
-  ).toBe(true);
+  // The tile leaves the tray once the file reaches the gallery, so wait on the stored bytes.
+  const original = readFileSync(path);
+  await expect
+    .poll(async () => {
+      const stored = (await m.fake.files()).find(
+        (f) => f.name === "exif-6.jpg",
+      );
+      return (
+        !!stored &&
+        Buffer.from(await m.fake.content(stored.id)).equals(original)
+      );
+    })
+    .toBe(true);
+  await expect(utile(page, "exif-6.jpg")).toHaveCount(0);
 });
 
 test("dropping files on the gallery uploads them", async ({ page }) => {
