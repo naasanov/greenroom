@@ -297,12 +297,8 @@ test("YouTube queue falls back to a YouTube Music reference", async ({
   await api.dispose();
   await openLibrary(page);
   await page.getByRole("button", { name: "Export to Spotify" }).click();
-  const youtube = dialog(page).getByTestId("export-youtube");
-  await expect(youtube.getByTestId("export-youtube-summary")).toContainText(
-    "4 songs",
-  );
-  await expect(youtube.getByTestId("export-youtube-skipped")).toHaveText(
-    "Skipped 6 songs without a YouTube or YouTube Music link.",
+  await expect(dialog(page).getByTestId("export-note")).toHaveText(
+    "Songs without a Spotify or YouTube link are skipped.",
   );
   let queueUrl = "";
   await page.context().route("**://www.youtube.com/**", (route) => {
@@ -310,10 +306,12 @@ test("YouTube queue falls back to a YouTube Music reference", async ({
     return route.fulfill({ status: 200, body: "ok" });
   });
   const popup = page.waitForEvent("popup");
-  await youtube.getByTestId("export-youtube-open").click();
+  await dialog(page).getByTestId("export-youtube-open").click();
   await popup;
   await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
   expect(queueUrl).toContain("musicOnly01");
+  const ids = new URL(queueUrl).searchParams.get("video_ids") ?? "";
+  expect(ids.split(",")).toHaveLength(4);
 });
 
 test("library export can open a YouTube Music queue without logging in", async ({
@@ -325,12 +323,8 @@ test("library export can open a YouTube Music queue without logging in", async (
   await loginAs(USERS.ava.email);
   await openLibrary(page);
   await page.getByRole("button", { name: "Export to Spotify" }).click();
-  const youtube = dialog(page).getByTestId("export-youtube");
-  await expect(youtube.getByTestId("export-youtube-summary")).toContainText(
-    "3 songs",
-  );
-  await expect(youtube.getByTestId("export-youtube-skipped")).toHaveText(
-    "Skipped 5 songs without a YouTube or YouTube Music link.",
+  await expect(dialog(page).getByTestId("export-note")).toHaveText(
+    "Songs without a Spotify or YouTube link are skipped.",
   );
   let queueUrl = "";
   await page.context().route("**://www.youtube.com/**", (route) => {
@@ -338,8 +332,10 @@ test("library export can open a YouTube Music queue without logging in", async (
     return route.fulfill({ status: 200, body: "ok" });
   });
   const popup = page.waitForEvent("popup");
-  await youtube.getByTestId("export-youtube-open").click();
+  await dialog(page).getByTestId("export-youtube-open").click();
   await popup;
   await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
   expect(queueUrl).toContain("harborLights,redLine,midnightTrain");
+  const ids = new URL(queueUrl).searchParams.get("video_ids") ?? "";
+  expect(ids.split(",")).toHaveLength(3);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ClipboardCopy, ExternalLink } from "lucide-react";
+import { Check, ClipboardCopy } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SONG_ERROR_CODES, type ExportResult } from "@greenroom/shared";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -195,64 +194,22 @@ function useExportRows(bandId: string, target: ExportTarget) {
 }
 
 /** Opens the songs with a YouTube or YouTube Music link as a temporary queue, no login needed. */
-function YoutubeQueueSection({
-  rows,
-}: {
-  rows: {
-    title: string;
-    youtubeUrl: string | null;
-    youtubeMusicUrl: string | null;
-  }[];
-}) {
-  const queue = buildYoutubeQueue(rows);
-  const [opened, setOpened] = useState(false);
+function YoutubeQueueButton({ url }: { url: string | null }) {
   const open = () => {
-    if (!queue.url) return;
-    const tab = window.open(queue.url, "_blank");
+    if (!url) return;
+    const tab = window.open(url, "_blank");
     if (tab) tab.opener = null;
-    setOpened(true);
   };
   return (
-    <div className="flex flex-col gap-2" data-testid="export-youtube">
-      <Button
-        type="button"
-        variant="outline"
-        data-testid="export-youtube-open"
-        disabled={!queue.url}
-        onClick={open}
-      >
-        <ExternalLink /> Export to YouTube Music
-      </Button>
-      <p
-        role="status"
-        data-testid="export-youtube-summary"
-        className="text-sm text-muted-foreground"
-      >
-        {queue.included === 0
-          ? "None of these songs have a YouTube or YouTube Music link."
-          : `${opened ? "Opened" : "Includes"} ${queue.included} ${
-              queue.included === 1 ? "song" : "songs"
-            } in a temporary queue. Sign in on YouTube to save it as a playlist.`}
-      </p>
-      {queue.noLink.length > 0 ? (
-        <p
-          data-testid="export-youtube-skipped"
-          className="text-sm text-muted-foreground"
-        >
-          {`Skipped ${queue.noLink.length} ${
-            queue.noLink.length === 1 ? "song" : "songs"
-          } without a YouTube or YouTube Music link.`}
-        </p>
-      ) : null}
-      {queue.overflow.length > 0 ? (
-        <p
-          data-testid="export-youtube-overflow"
-          className="text-sm text-muted-foreground"
-        >
-          {`YouTube queues hold ${YOUTUBE_QUEUE_MAX} songs. Left out ${queue.overflow.length}.`}
-        </p>
-      ) : null}
-    </div>
+    <Button
+      type="button"
+      variant="outline"
+      data-testid="export-youtube-open"
+      disabled={!url}
+      onClick={open}
+    >
+      Export to YouTube
+    </Button>
   );
 }
 
@@ -281,6 +238,7 @@ function ExportBody({
   const copyLines = rows.map((s) =>
     s.artist ? `${s.title} - ${s.artist}` : s.title,
   );
+  const queue = buildYoutubeQueue(rows);
   const exportMutation = useExportToSpotify(bandId);
   const startedRef = useRef(false);
 
@@ -397,17 +355,31 @@ function ExportBody({
               : "Could not export to Spotify. Please try again."}
           </p>
         ) : null}
-        <Button
-          type="submit"
-          variant="outline"
-          disabled={!name.trim() || exportMutation.isPending}
+        <div className="flex flex-col gap-2">
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={!name.trim() || exportMutation.isPending}
+          >
+            {exportMutation.isPending ? "Exporting..." : "Export to Spotify"}
+          </Button>
+          <YoutubeQueueButton url={queue.url} />
+        </div>
+        <p
+          data-testid="export-note"
+          className="text-sm text-muted-foreground"
         >
-          {exportMutation.isPending ? "Exporting..." : "Export to Spotify"}
-        </Button>
+          Songs without a Spotify or YouTube link are skipped.
+        </p>
+        {queue.overflow.length > 0 ? (
+          <p
+            data-testid="export-youtube-overflow"
+            className="text-sm text-muted-foreground"
+          >
+            {`YouTube queues hold ${YOUTUBE_QUEUE_MAX} songs. Left out ${queue.overflow.length}.`}
+          </p>
+        ) : null}
       </form>
-      <div className="border-t pt-5">
-        <YoutubeQueueSection rows={rows} />
-      </div>
       <div className="border-t pt-5">
         <CopyListButton lines={copyLines} />
       </div>
@@ -440,14 +412,11 @@ export function ExportDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Export songs
           </DialogTitle>
-          <DialogDescription>
-            Send this song list to Spotify or YouTube Music, or copy it as text.
-          </DialogDescription>
         </DialogHeader>
         {open ? (
           <ExportBody
