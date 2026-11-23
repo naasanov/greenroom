@@ -12,8 +12,10 @@ Rules for running Sonnet agents in parallel on the same working tree:
 - Never let an agent run `pnpm format` across the whole repo; format only owned files.
 - While any agent is running, the orchestrator commits with explicit paths only (`git add <paths>`), never `git commit -a` or `git add -A`: on 2026-10-22 a docs commit swept an agent's half-finished files onto main.
 - The factory had ~4 GB RAM until 2026-10-27, when three agents building at once made `nest build` OOM and Chromium segfault; it now has 8 GB. Still keep it to two or three agents, since concurrent `next build` runs collide ("Another next build process is already running") and e2e runs serialize on the lock anyway.
+- Agents must not use `pgrep -f` loops whose pattern matches their own command line, and must not `pkill` broadly: both hung or killed sibling agent shells on 2026-11-23. Wait on the e2e lock directory instead.
 - Agents' acceptance checks can leave servers running (a stray `node dist/main.js` happened in Phase 0); check `lsof -i tcp:<port>` after a wave.
 
 **Why:** concurrent installs race on the lockfile, and concurrent e2e runs collide on ports and DB state.
 
 **How to apply:** put the ownership list, install rule, and lock command in every parallel brief. Related: [[orchestrator-role]].
+Seen again: 2026-11-23, #142-#146 batch (three parallel implementers collided on `next build`; escalated in #154).
