@@ -1,10 +1,21 @@
 #!/usr/bin/env node
 // Prints the spec file filters for one shard, space separated, for use as playwright args.
 //   run-shard.mjs --project=desktop --shard=2/3   -> "tests/a.spec.ts tests/b.spec.ts ..."
+//   run-shard.mjs --project=desktop --quarantined=files|grep  -> quarantined spec files, or a title regex
 //   run-shard.mjs --verify                        -> exits 1 unless every project's shards cover all specs once
 import console from "node:console";
 import process from "node:process";
-import { listSpecs, loadPlan, resolveShards } from "./shard-lib.mjs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  E2E_DIR,
+  listSpecs,
+  loadPlan,
+  loadQuarantine,
+  quarantineFiles,
+  quarantineGrep,
+  resolveShards,
+} from "./shard-lib.mjs";
 
 const flag = (name) =>
   process.argv
@@ -40,13 +51,44 @@ if (process.argv.includes("--verify")) {
     if (missing.length) console.error(`  missing: ${missing.join(" ")}`);
     if (dupes.length) console.error(`  duplicated: ${dupes.join(" ")}`);
   }
+  const quarantine = loadQuarantine();
+  for (const [project, entries] of Object.entries(quarantine)) {
+    for (const { file, title } of entries) {
+      const covered = (plan.projects[project] ?? []).flat().includes(file);
+      const present =
+        specs.includes(file) &&
+        readFileSync(join(E2E_DIR, "tests", file), "utf8").includes(title);
+      if (!covered || !present) {
+        bad = true;
+        console.error(`stale quarantine entry: ${project} ${file} "${title}"`);
+      }
+    }
+    console.log(
+      `${project}: ${entries.length} quarantined tests (still run in the blocking job minus their titles, and in the quarantine job)`,
+    );
+  }
   process.exit(bad ? 1 : 0);
 }
 
 const project = flag("project");
+const quarantined = flag("quarantined");
+if (project && quarantined) {
+  const entries = loadQuarantine()[project] ?? [];
+  if (quarantined === "files")
+    console.log(
+      quarantineFiles(entries)
+        .map((f) => `tests/${f}`)
+        .join(" "),
+    );
+  else if (quarantined === "grep") console.log(quarantineGrep(entries));
+  else fail("--quarantined expects files or grep");
+  process.exit(0);
+}
 const m = /^(\d+)\/(\d+)$/.exec(flag("shard") ?? "");
 if (!project || !m)
-  fail("usage: run-shard.mjs --project=<name> --shard=<i>/<n> | --verify");
+  fail(
+    "usage: run-shard.mjs --project=<name> --shard=<i>/<n> | --project=<name> --quarantined=files|grep | --verify",
+  );
 const [i, n] = [Number(m[1]), Number(m[2])];
 const shards = resolveShards(plan, project, specs);
 if (shards.length !== n)

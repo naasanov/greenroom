@@ -6,6 +6,7 @@ export const WORKERS = 2;
 const here = dirname(fileURLToPath(import.meta.url));
 export const E2E_DIR = join(here, "..");
 export const PLAN_PATH = join(E2E_DIR, "shard-plan.json");
+export const QUARANTINE_PATH = join(E2E_DIR, "quarantine.json");
 
 export function listSpecs(dir = join(E2E_DIR, "tests")) {
   return readdirSync(dir)
@@ -67,3 +68,24 @@ export function resolveShards(plan, project, specs) {
   }
   return shards.map((files) => files.sort());
 }
+
+// Quarantined tests ({ file, title }) per project. They stay in the blocking shards' file lists;
+// the blocking job excludes them by title and the quarantine job runs only them.
+export function loadQuarantine(path = QUARANTINE_PATH) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+// Whitespace-free regex over the quarantined titles, safe to pass as one unquoted word.
+export function quarantineGrep(entries) {
+  return entries
+    .map(
+      (e) =>
+        e.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\x20") +
+        "$",
+    )
+    .join("|");
+}
+
+export const quarantineFiles = (entries) => [
+  ...new Set(entries.map((e) => e.file)),
+];
