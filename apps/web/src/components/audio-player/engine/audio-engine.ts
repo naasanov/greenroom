@@ -1,4 +1,4 @@
-import SignalsmithStretch, { type StretchNode } from "signalsmith-stretch";
+import type { StretchNode } from "signalsmith-stretch";
 import { exceedsDecodeBudget } from "./decode-budget";
 import { computePeaks } from "./peaks";
 
@@ -29,6 +29,16 @@ const STALE_WINDOW_S = 0.15;
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
+
+// Loaded from public/ at runtime so the bundler never rewrites the worklet source.
+const STRETCH_URL = "/audio/signalsmith-stretch.mjs";
+
+async function loadStretch() {
+  const mod = (await import(
+    /* webpackIgnore: true */ /* turbopackIgnore: true */ STRETCH_URL
+  )) as typeof import("signalsmith-stretch");
+  return mod.default;
+}
 
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
@@ -143,6 +153,7 @@ export class AudioEngine {
           buffer!.getChannelData(i),
         ),
       );
+      const SignalsmithStretch = await loadStretch();
       const node = await SignalsmithStretch(ctx, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
