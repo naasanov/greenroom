@@ -1,6 +1,12 @@
 "use client";
 
-import { Download, ExternalLink, FileQuestion, X } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  FileQuestion,
+  HardDrive,
+  X,
+} from "lucide-react";
 import { useEffect } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { startDownload } from "@/components/media/media-download";
@@ -47,6 +53,22 @@ export function FileViewer({
         <p className="min-w-0 flex-1 truncate py-3 text-sm font-medium">
           {entry.name}
         </p>
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="text-white hover:bg-white/15 hover:text-white"
+        >
+          <a
+            href={driveOpenUrl(entry)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open in Drive"
+            data-testid="viewer-drive-link"
+          >
+            <HardDrive />
+          </a>
+        </Button>
         {canDownload ? (
           <Button
             variant="ghost"

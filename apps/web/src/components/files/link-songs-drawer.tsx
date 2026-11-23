@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { BottomDrawer } from "@/components/app/bottom-drawer";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useSongPool } from "@/lib/queries/songs";
 
+/** What the drawer edits: "replace" sets one entry's songs, "add" only adds to many. */
+export interface LinkSongsTarget {
+  entries: FileEntry[];
+  mode: "replace" | "add";
+}
+
 function SongPicker({
   bandId,
-  entry,
+  target,
   saving,
   error,
   onSave,
 }: {
   bandId: string;
-  entry: FileEntry;
+  target: LinkSongsTarget;
   saving: boolean;
   error: string | null;
   onSave: (songIds: string[]) => void;
@@ -24,8 +30,39 @@ function SongPicker({
   const songs = useSongPool(bandId, "title");
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState(
-    () => new Set(entry.songLinks.map((l) => l.songId)),
+    () =>
+      new Set(
+        target.mode === "replace"
+          ? target.entries.flatMap((e) => e.songLinks.map((l) => l.songId))
+          : [],
+      ),
   );
+  const searchRef = useRef<HTMLInputElement>(null);
+  // Re-asserts focus per frame (30 max) until the drawer's transition lets it
+  // land, then for 10 more frames so a menu's deferred focus return loses.
+  // Focus the user placed on another drawer element is left alone.
+  useEffect(() => {
+    const input = searchRef.current;
+    if (!input) return;
+    const drawer = input.closest('[role="dialog"]');
+    let frames = 0;
+    let settled = 0;
+    let id = 0;
+    const tick = () => {
+      const active = document.activeElement;
+      const stray =
+        !active ||
+        active === document.body ||
+        (!!drawer && (active === drawer || !drawer.contains(active)));
+      if (active !== input && stray) input.focus({ preventScroll: true });
+      if (document.activeElement === input) settled += 1;
+      else if (settled > 0) return;
+      if (settled > 10 || ++frames >= 30) return;
+      id = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(id);
+  }, []);
   const q = query.trim().toLowerCase();
   const list = (songs.data ?? []).filter(
     (s) =>
@@ -42,6 +79,7 @@ function SongPicker({
   return (
     <div className="flex flex-col gap-3">
       <Input
+        ref={searchRef}
         aria-label="Search songs"
         placeholder="Search songs"
         value={query}
@@ -92,7 +130,7 @@ function SongPicker({
         </p>
       ) : null}
       <Button
-        disabled={saving}
+        disabled={saving || (target.mode === "add" && picked.size === 0)}
         onClick={() => onSave([...picked])}
         className="sticky bottom-0"
       >
@@ -102,37 +140,44 @@ function SongPicker({
   );
 }
 
-/** Multi-select over the band's song pool; saving replaces the entry's song set. */
+/** Multi-select over the band's song pool; "replace" mode sets the entry's songs, "add" mode starts empty and only adds. */
 export function LinkSongsDrawer({
   bandId,
-  entry,
+  target,
   saving,
   error,
   onSave,
   onClose,
 }: {
   bandId: string;
-  entry: FileEntry | null;
+  target: LinkSongsTarget | null;
   saving: boolean;
   error: string | null;
   onSave: (songIds: string[]) => void;
   onClose: () => void;
 }) {
-  const [shown, setShown] = useState(entry);
-  if (entry && entry !== shown) setShown(entry);
+  const [shown, setShown] = useState(target);
+  if (target && target !== shown) setShown(target);
+  const only = shown?.entries.length === 1 ? shown.entries[0]! : null;
   return (
     <BottomDrawer
-      open={!!entry}
+      open={!!target}
       onOpenChange={(o) => !o && onClose()}
       title="Link to songs"
-      description={shown ? (shown.gig?.title ?? shown.name) : undefined}
+      description={
+        shown
+          ? only
+            ? (only.gig?.title ?? only.name)
+            : `${shown.entries.length} items`
+          : undefined
+      }
       tall
     >
       {shown ? (
         <SongPicker
-          key={shown.id}
+          key={`${shown.mode}:${shown.entries.map((e) => e.id).join(",")}`}
           bandId={bandId}
-          entry={shown}
+          target={shown}
           saving={saving}
           error={error}
           onSave={onSave}

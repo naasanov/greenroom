@@ -96,6 +96,7 @@ export function useTrashFiles(bandId: string) {
 export function useSetFileSongs(bandId: string) {
   const invalidate = useInvalidateFiles(bandId);
   return useMutation({
+    mutationKey: [...filesKeys.all(bandId), "set-songs"],
     mutationFn: (v: { fileId: string; songIds: string[] }) =>
       api(`${base(bandId)}/items/${encodeURIComponent(v.fileId)}/songs`, {
         method: "PUT",
@@ -103,5 +104,39 @@ export function useSetFileSongs(bandId: string) {
         schema: setFileSongsResultSchema,
       }),
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * Adds songs to several entries without removing any existing link. Each entry
+ * is sent its current links (read fresh) plus the new songs, one at a time.
+ */
+export function useAddSongsToFiles(bandId: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateFiles(bandId);
+  return useMutation({
+    mutationKey: [...filesKeys.all(bandId), "add-songs"],
+    mutationFn: async (v: {
+      folderId: string;
+      fileIds: string[];
+      songIds: string[];
+    }) => {
+      const listing = await qc.fetchQuery({
+        ...filesFolderQuery(bandId, v.folderId),
+        staleTime: 0,
+      });
+      const byId = new Map(listing.items.map((i) => [i.id, i]));
+      for (const fileId of v.fileIds) {
+        const entry = byId.get(fileId);
+        if (!entry) throw new Error("File is no longer in this folder");
+        const current = entry.songLinks.map((l) => l.songId);
+        await api(`${base(bandId)}/items/${encodeURIComponent(fileId)}/songs`, {
+          method: "PUT",
+          body: { songIds: [...new Set([...current, ...v.songIds])] },
+          schema: setFileSongsResultSchema,
+        });
+      }
+    },
+    onSettled: invalidate,
   });
 }

@@ -8,6 +8,7 @@ import {
   Grid2x2,
   Grid3x3,
   List,
+  Music2,
   Plus,
   Trash2,
   Upload,
@@ -41,6 +42,7 @@ import {
   useCreateFilesFolder,
   useFilesFolder,
   useRenameFile,
+  useAddSongsToFiles,
   useSetFileSongs,
   useTrashFiles,
 } from "@/lib/queries/files";
@@ -59,7 +61,7 @@ import {
 } from "./file-utils";
 import type { EntryActions } from "./item-menu";
 import { LinkGigDialog } from "./link-gig-dialog";
-import { LinkSongsDrawer } from "./link-songs-drawer";
+import { LinkSongsDrawer, type LinkSongsTarget } from "./link-songs-drawer";
 import { NameDialog, type NameDialogState } from "./name-dialog";
 import { useFilesUpload } from "./use-files-upload";
 
@@ -136,13 +138,14 @@ export function FilesView({
   const rename = useRenameFile(bandId);
   const trash = useTrashFiles(bandId);
   const setSongs = useSetFileSongs(bandId);
+  const addSongs = useAddSongsToFiles(bandId);
 
   const [toast, setToast] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [viewer, setViewer] = useState<FileEntry | null>(null);
-  const [linkTarget, setLinkTarget] = useState<FileEntry | null>(null);
+  const [linkTarget, setLinkTarget] = useState<LinkSongsTarget | null>(null);
   const [gigTarget, setGigTarget] = useState<FileEntry | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [trashTargets, setTrashTargets] = useState<FileEntry[]>([]);
@@ -199,7 +202,7 @@ export function FilesView({
       startDownload(filesContentUrl(bandId, e.id, true), e.name),
     onLinkSongs: (e) => {
       setLinkError(null);
-      setLinkTarget(e);
+      setLinkTarget({ entries: [e], mode: "replace" });
     },
     onLinkGig: setGigTarget,
     onTrash: (e) => setTrashTargets([e]),
@@ -234,6 +237,32 @@ export function FilesView({
             : "Could not move to trash.",
         ),
     });
+  }
+
+  function saveSongLinks(songIds: string[]) {
+    if (!linkTarget) return;
+    const failed = () => setLinkError("Could not save the song links.");
+    if (linkTarget.mode === "replace") {
+      setSongs.mutate(
+        { fileId: linkTarget.entries[0]!.id, songIds },
+        { onSuccess: () => setLinkTarget(null), onError: failed },
+      );
+      return;
+    }
+    const count = linkTarget.entries.length;
+    addSongs.mutate(
+      { folderId, fileIds: linkTarget.entries.map((e) => e.id), songIds },
+      {
+        onSuccess: () => {
+          setLinkTarget(null);
+          stopSelecting();
+          setToast(
+            `Linked ${songIds.length === 1 ? "1 song" : `${songIds.length} songs`} to ${count === 1 ? "1 item" : `${count} items`}`,
+          );
+        },
+        onError: failed,
+      },
+    );
   }
 
   function newFolder() {
@@ -513,6 +542,15 @@ export function FilesView({
         onClear={stopSelecting}
         actions={[
           {
+            key: "link-songs",
+            label: "Link to songs",
+            icon: <Music2 />,
+            onSelect: () => {
+              setLinkError(null);
+              setLinkTarget({ entries: selectedEntries, mode: "add" });
+            },
+          },
+          {
             key: "trash",
             label: "Move to trash",
             icon: <Trash2 />,
@@ -553,19 +591,11 @@ export function FilesView({
       />
       <LinkSongsDrawer
         bandId={bandId}
-        entry={linkTarget}
-        saving={setSongs.isPending}
+        target={linkTarget}
+        saving={setSongs.isPending || addSongs.isPending}
         error={linkError}
         onClose={() => setLinkTarget(null)}
-        onSave={(songIds) =>
-          setSongs.mutate(
-            { fileId: linkTarget!.id, songIds },
-            {
-              onSuccess: () => setLinkTarget(null),
-              onError: () => setLinkError("Could not save the song links."),
-            },
-          )
-        }
+        onSave={saveSongLinks}
       />
       {viewer ? (
         <FileViewer
