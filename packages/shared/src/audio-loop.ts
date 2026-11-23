@@ -37,19 +37,20 @@ export function loopPoints(
   ];
 }
 
-/** The stretch the playhead is in; a point at the playhead counts as the start. */
+/** The stretch the playhead is in; only a point with a later point after it can start. */
 export function defaultLoopRange(
   points: LoopPoint[],
   playheadMs: number,
 ): { startId: string; endId: string } {
+  const last = points[points.length - 1]!;
   let startIdx = 0;
   for (let i = 0; i < points.length; i++) {
-    if (points[i]!.positionMs <= playheadMs) startIdx = i;
+    const p = points[i]!;
+    if (p.positionMs <= playheadMs && p.positionMs < last.positionMs)
+      startIdx = i;
   }
   const start = points[startIdx]!;
-  const next =
-    points.find((p) => p.positionMs > start.positionMs) ??
-    points[points.length - 1]!;
+  const next = points.find((p) => p.positionMs > start.positionMs) ?? last;
   return { startId: start.id, endId: next.id };
 }
 
@@ -60,13 +61,13 @@ export function endOptions(points: LoopPoint[], startId: string): LoopPoint[] {
   return points.filter((p) => p.positionMs > start.positionMs);
 }
 
-/** Keeps the chosen range when still valid, else falls back to the playhead's stretch. */
+/** Keeps the chosen range when still valid, else the playhead's stretch; null for a zero-length track. */
 export function resolveLoopRange(
   points: LoopPoint[],
   startId: string,
   endId: string,
   playheadMs: number,
-): LoopRange {
+): LoopRange | null {
   let range = { startId, endId };
   const valid =
     points.some((p) => p.id === startId) &&
@@ -74,5 +75,6 @@ export function resolveLoopRange(
   if (!valid) range = defaultLoopRange(points, playheadMs);
   const start = points.find((p) => p.id === range.startId)!;
   const end = points.find((p) => p.id === range.endId)!;
+  if (end.positionMs <= start.positionMs) return null;
   return { ...range, startMs: start.positionMs, endMs: end.positionMs };
 }

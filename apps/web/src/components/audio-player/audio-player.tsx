@@ -9,6 +9,7 @@ import {
   resolveLoopRange,
   type FileEntry,
 } from "@greenroom/shared";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   audioMarkerKeys,
@@ -99,10 +100,12 @@ export function AudioPlayer({
   const loopStartMs = loopRange?.startMs ?? null;
   const loopEndMs = loopRange?.endMs ?? null;
   const { setLoop } = engine;
+  const engineStatus = engine.status;
+  // Re-applied when the engine becomes ready so an early loop is not lost.
   useEffect(() => {
     if (loopStartMs === null || loopEndMs === null) setLoop(null);
     else setLoop({ startMs: loopStartMs, endMs: loopEndMs });
-  }, [loopStartMs, loopEndMs, setLoop]);
+  }, [loopStartMs, loopEndMs, setLoop, engineStatus]);
 
   function setLoopOpenState(open: boolean) {
     if (open) setLoopSel(defaultLoopRange(points, engine.positionMs));
@@ -165,7 +168,12 @@ export function AudioPlayer({
 
   return (
     <div className="relative size-full min-h-0">
-      <div className="flex size-full flex-col gap-4 overflow-y-auto overscroll-contain p-1 pb-28">
+      <div
+        className={cn(
+          "flex size-full flex-col gap-4 overflow-y-auto overscroll-contain p-1",
+          loopOpen ? "pb-40" : "pb-28",
+        )}
+      >
         <div className="flex items-center gap-4">
           <Button
             type="button"
@@ -185,7 +193,8 @@ export function AudioPlayer({
             data-testid="player-time"
             className="font-mono text-lg tabular-nums"
           >
-            {formatTime(engine.positionMs)} / {formatTime(engine.durationMs)}
+            {formatTime(engine.positionMs)} /{" "}
+            {formatTime(Math.round(engine.durationMs / 1000) * 1000)}
           </p>
         </div>
 

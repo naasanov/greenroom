@@ -56,12 +56,20 @@ export function MarkerSheet({
   const titleFocused = useRef(false);
   const timeFocused = useRef(false);
   const onChangeRef = useRef(onChange);
+  const titleRef = useRef(title);
+  const timeTextRef = useRef(timeText);
+  const savedTitle = useRef(marker.title);
+  const deleted = useRef(false);
+  const finishRef = useRef<() => void>(() => {});
   useEffect(() => {
     onChangeRef.current = onChange;
+    titleRef.current = title;
+    timeTextRef.current = timeText;
   });
 
   // Follow bandmates' edits to this marker unless the user is mid-edit.
   useEffect(() => {
+    savedTitle.current = marker.title;
     if (!titleFocused.current) setTitle(marker.title);
   }, [marker.title]);
   useEffect(() => {
@@ -81,8 +89,8 @@ export function MarkerSheet({
       onChangeRef.current({ positionMs: posRef.current });
     }
   };
-  // Pending debounced position persists when the sheet closes or switches marker.
-  useEffect(() => flush, []);
+  // Closing (even via Escape mid-edit) persists pending position, title and time.
+  useEffect(() => () => finishRef.current(), []);
 
   const schedulePersist = () => {
     dirtyPos.current = true;
@@ -108,18 +116,21 @@ export function MarkerSheet({
 
   const commitTitle = () => {
     titleFocused.current = false;
-    const t = title.trim();
+    const t = titleRef.current.trim();
     if (!t) {
-      setTitle(marker.title);
+      setTitle(savedTitle.current);
       return;
     }
     setTitle(t);
-    if (t !== marker.title) onChange({ title: t });
+    if (t !== savedTitle.current) {
+      savedTitle.current = t;
+      onChangeRef.current({ title: t });
+    }
   };
 
   const commitTime = () => {
     timeFocused.current = false;
-    const ms = parseTime(timeText);
+    const ms = parseTime(timeTextRef.current);
     if (ms === null || ms < 0 || ms > durationMs) {
       setTimeError(true);
       return;
@@ -133,7 +144,27 @@ export function MarkerSheet({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     dirtyPos.current = false;
-    onChange({ positionMs: ms });
+    onChangeRef.current({ positionMs: ms });
+  };
+
+  // Runs on unmount; a deleted marker has nothing left to save.
+  const finish = () => {
+    if (deleted.current) return;
+    if (titleFocused.current) commitTitle();
+    if (timeFocused.current) commitTime();
+    flush();
+  };
+
+  useEffect(() => {
+    finishRef.current = finish;
+  });
+
+  const handleDelete = () => {
+    deleted.current = true;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    dirtyPos.current = false;
+    onDelete();
   };
 
   const enterKey = (e: React.KeyboardEvent, commit: () => void) => {
@@ -216,23 +247,25 @@ export function MarkerSheet({
           {saving ? "Saving..." : ""}
         </span>
         {confirming ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-2">
             <span className="text-sm">Delete this marker?</span>
-            <button
-              type="button"
-              className={btn}
-              onClick={() => setConfirming(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              data-testid="marker-delete-confirm"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white outline-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-white/60"
-              onClick={onDelete}
-            >
-              Confirm delete
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={btn}
+                onClick={() => setConfirming(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="marker-delete-confirm"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white outline-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-white/60"
+                onClick={handleDelete}
+              >
+                Confirm delete
+              </button>
+            </div>
           </div>
         ) : (
           <button

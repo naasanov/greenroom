@@ -131,6 +131,10 @@ export class AudioEngine {
         }
       }
       data = await res.arrayBuffer();
+      if (exceedsDecodeBudget(data.byteLength, mimeType)) {
+        this.emit({ status: "too-large" });
+        return;
+      }
     } catch {
       if (!this.disposed) this.fail("Could not load this audio file.");
       return;
@@ -286,9 +290,15 @@ export class AudioEngine {
     else this.play();
   }
 
+  // With a loop active, targets outside it snap to the loop start.
+  private clampToLoop(s: number): number {
+    const loop = this.loop;
+    return loop && (s < loop.start || s >= loop.end) ? loop.start : s;
+  }
+
   seek(ms: number) {
     if (this.snapshot.status !== "ready") return;
-    const s = clamp(ms / 1000, 0, this.durationS);
+    const s = this.clampToLoop(clamp(ms / 1000, 0, this.durationS));
     this.pausedAt = s;
     if (this.snapshot.playing) this.schedule(true, s);
     this.opts.onPosition(s * 1000);
@@ -300,7 +310,7 @@ export class AudioEngine {
     if (this.snapshot.status !== "ready") return;
     if (this.snapshot.playing) this.seek(ms);
     else {
-      this.pausedAt = clamp(ms / 1000, 0, this.durationS);
+      this.pausedAt = this.clampToLoop(clamp(ms / 1000, 0, this.durationS));
       this.startPlayback();
     }
   }

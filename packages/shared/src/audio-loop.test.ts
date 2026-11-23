@@ -85,8 +85,8 @@ test("defaultLoopRange with a marker at the duration", () => {
     endId: "a",
   });
   const r = defaultLoopRange(pts, D);
-  assert.equal(r.startId, LOOP_END);
-  assert.equal(r.endId, LOOP_END);
+  assert.equal(r.startId, LOOP_BEGINNING);
+  assert.equal(r.endId, "a");
 });
 
 test("endOptions are strictly after the start", () => {
@@ -157,4 +157,24 @@ test("marker schemas", () => {
     updateAudioMarkerSchema.safeParse({ title: "ok" }).success,
     true,
   );
+});
+
+test("defaultLoopRange at the end never returns End to End", () => {
+  assert.deepEqual(defaultLoopRange(loopPoints([], D), D), {
+    startId: LOOP_BEGINNING,
+    endId: LOOP_END,
+  });
+  const mid = loopPoints([M("a", 50_000)], D);
+  assert.deepEqual(defaultLoopRange(mid, D), { startId: "a", endId: LOOP_END });
+  const atEnd = loopPoints([M("a", 50_000), M("z", D)], D);
+  assert.deepEqual(defaultLoopRange(atEnd, D), { startId: "a", endId: "z" });
+});
+
+test("resolveLoopRange never returns a zero-length range", () => {
+  const pts = loopPoints([M("a", 50_000)], D);
+  const r = resolveLoopRange(pts, "a", LOOP_END, D)!;
+  assert.ok(r.endMs > r.startMs);
+  const atEnd = resolveLoopRange(pts, LOOP_END, LOOP_END, D)!;
+  assert.deepEqual([atEnd.startId, atEnd.endId], ["a", LOOP_END]);
+  assert.equal(resolveLoopRange(loopPoints([], 0), "", "", 0), null);
 });
