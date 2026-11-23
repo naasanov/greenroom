@@ -8,3 +8,4 @@ export * from "./sync.js";
 export * from "./feedback.js";
 export * from "./google-links.js";
 export * from "./chords.js";
+export * from "./audio-markers.js";

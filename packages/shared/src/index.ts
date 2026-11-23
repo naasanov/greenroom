@@ -14,3 +14,5 @@ export * from "./public-calendar.js";
 export * from "./gig-path.js";
 export * from "./chords.js";
 export * from "./load-in.js";
+export * from "./audio.js";
+export * from "./audio-loop.js";
