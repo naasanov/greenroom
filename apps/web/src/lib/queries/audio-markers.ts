@@ -185,6 +185,8 @@ export function useDeleteAudioMarker(bandId: string, fileId: string) {
   const key = audioMarkerKeys.list(bandId, fileId);
   return useMutation({
     mutationKey: audioMarkerKeys.remove(bandId, fileId),
+    // Shares the update scope so a delete never overtakes a queued PATCH.
+    scope: { id: `audio-markers-${fileId}` },
     mutationFn: (markerId: string) =>
       api(`/bands/${bandId}/audio-markers/${encodeURIComponent(markerId)}`, {
         method: "DELETE",
