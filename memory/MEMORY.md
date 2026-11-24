@@ -51,3 +51,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Calendar grid date dependence](calendar-grid-date-dependence.md) — seed dates are relative to today; page the grid with `pageToDay` / `pageAwayFromDay`
 - [Untrusted file parsing caps](untrusted-file-parsing-caps.md) — cap bytes, pixels and element counts before decoding user files
 - [Upload type allowlist](upload-type-allowlist.md) — type exceptions must still pass the per-link allow callback
+- [Dialog grid min-width](dialog-grid-min-width.md) — long names widen the DialogContent grid track; use grid-cols-[minmax(0,1fr)] plus min-w-0 on direct children, not on the container
+- [Folder link provenance](folder-link-provenance.md) — source_folder_id null means a hand link; hand upserts null it, backfill and poller keep the IS NOT NULL guard, chunk at 500, take the drive-poll lock
+- [Migration journal collisions](migration-journal-collisions.md) — parallel branches claim the same migration number; rebuild _journal.json in ascending when order, never rename an applied migration
+- [Factory DATABASE_URL is staging](factory-database-url-is-staging.md) — export local DATABASE_URL and TEST_DATABASE_URL in the same shell before any db, migrate, api test or e2e command
