@@ -221,6 +221,43 @@ export class TestingController {
     return this.registry.spotify.createdPlaylists();
   }
 
+  /** Makes every issued Google refresh token fail with invalid-grant. */
+  @Post("google/revoke-refresh-tokens")
+  @HttpCode(200)
+  revokeGoogleRefreshTokens(): { ok: true } {
+    this.registry.googleOAuth.revokeAllRefreshTokens();
+    return { ok: true };
+  }
+
+  /** Playlists the YouTube fake created through export, in creation order. */
+  @Get("youtube/created-playlists")
+  youtubeCreatedPlaylists(): {
+    id: string;
+    name: string;
+    isPublic: boolean;
+    videoIds: string[];
+  }[] {
+    return this.registry.youtube.createdPlaylists();
+  }
+
+  /** Makes YouTube playlist writes fail as if the daily quota ran out. */
+  @Post("youtube/quota-exceeded")
+  @HttpCode(200)
+  setYoutubeQuotaExceeded(@Body() body: { on?: boolean }): { ok: true } {
+    this.registry.youtube.setQuotaExceeded(body.on !== false);
+    return { ok: true };
+  }
+
+  /** Makes YouTube refuse the given video ids when they are added to a playlist. */
+  @Post("youtube/unavailable-videos")
+  @HttpCode(200)
+  setYoutubeUnavailableVideos(@Body() body: { ids?: string[] }): {
+    ok: true;
+  } {
+    this.registry.youtube.setUnavailableVideos(body.ids ?? []);
+    return { ok: true };
+  }
+
   /** Seeds the MusicLink fake: links (platform to URL) for a source URL. */
   @Post("musiclink/seed")
   @HttpCode(200)

@@ -3,6 +3,7 @@ export * from "./auth.js";
 export * from "./instruments.js";
 export * from "./bands.js";
 export * from "./songs.js";
+export * from "./youtube.js";
 export * from "./events.js";
 export * from "./setlists.js";
 export * from "./links.js";

@@ -12,10 +12,45 @@ export interface YoutubeVideo {
 export type YoutubeVideoResult =
   { status: "ok"; video: YoutubeVideo } | { status: "not-found" };
 
+export interface YoutubePlaylist {
+  id: string;
+  url: string;
+  name: string;
+}
+
+/** `quota-exceeded` is the Data API's daily quota running out; `no-channel` is an account without a YouTube channel. */
+export type YoutubeCreatePlaylistResult =
+  | { status: "ok"; playlist: YoutubePlaylist }
+  | { status: "unauthorized" }
+  | { status: "quota-exceeded" }
+  | { status: "no-channel" };
+
+/** `rejected` holds ids YouTube refused (removed, private or unknown videos). */
+export type YoutubeAddItemsResult =
+  | { status: "ok"; added: string[]; rejected: string[] }
+  | { status: "unauthorized" }
+  | { status: "quota-exceeded" }
+  | { status: "not-found" };
+
 export interface YoutubeAdapter {
   /** oEmbed-style lookup from a youtube.com or youtu.be URL. */
   getVideoMetadata(url: string): Promise<YoutubeVideoResult>;
+
+  /** User-level operations take the user's Google access token. */
+  createPlaylist(
+    userToken: string,
+    input: { name: string; description?: string; isPublic?: boolean },
+  ): Promise<YoutubeCreatePlaylistResult>;
+  /** Appends videos in the given order, one at a time. */
+  addPlaylistItems(
+    userToken: string,
+    playlistId: string,
+    videoIds: string[],
+  ): Promise<YoutubeAddItemsResult>;
 }
+
+export const youtubePlaylistUrl = (id: string): string =>
+  `https://www.youtube.com/playlist?list=${id}`;
 
 /** Extracts the video id from common YouTube URL shapes; null if none. */
 export function parseYoutubeId(url: string): string | null {

@@ -101,6 +101,11 @@ export class FakeGoogleOAuthAdapter implements GoogleOAuthAdapter {
     this.refreshTokens.delete(refreshToken);
   }
 
+  /** Makes every issued refresh token fail with invalid-grant. */
+  revokeAllRefreshTokens(): void {
+    this.refreshTokens.clear();
+  }
+
   reset(): void {
     this.codes.clear();
     this.refreshTokens.clear();

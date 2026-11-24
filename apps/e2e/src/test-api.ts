@@ -153,6 +153,28 @@ export class TestApi {
     return this.call("get", "spotify/created-playlists");
   }
 
+  /** Makes the Google fake reject every issued refresh token. */
+  async revokeGoogleRefreshTokens(): Promise<void> {
+    await this.call("post", "google/revoke-refresh-tokens");
+  }
+
+  /** Playlists created in the YouTube fake by export, in creation order. */
+  async youtubeCreatedPlaylists(): Promise<
+    { id: string; name: string; isPublic: boolean; videoIds: string[] }[]
+  > {
+    return this.call("get", "youtube/created-playlists");
+  }
+
+  /** Makes YouTube playlist writes fail as if the daily quota ran out. */
+  async setYoutubeQuotaExceeded(on: boolean): Promise<void> {
+    await this.call("post", "youtube/quota-exceeded", { data: { on } });
+  }
+
+  /** Makes the YouTube fake refuse these video ids when added to a playlist. */
+  async setYoutubeUnavailableVideos(ids: string[]): Promise<void> {
+    await this.call("post", "youtube/unavailable-videos", { data: { ids } });
+  }
+
   /** Seeds the MusicLink fake with platform links for a source URL. */
   async seedMusicLink(
     sourceUrl: string,
