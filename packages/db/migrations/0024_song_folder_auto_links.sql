@@ -1,0 +1,2 @@
+ALTER TABLE "drive_file_song_links" ADD COLUMN "source_folder_id" text;--> statement-breakpoint
+CREATE INDEX "drive_file_song_links_band_source_idx" ON "drive_file_song_links" USING btree ("band_id","source_folder_id");
