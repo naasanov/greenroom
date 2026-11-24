@@ -41,7 +41,7 @@ export function FolderPickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="folder-picker"
-        className="z-[60] pointer-events-auto! max-h-[85dvh] min-w-0 overflow-x-hidden overflow-y-auto"
+        className="z-[60] pointer-events-auto! max-h-[85dvh] grid-cols-[minmax(0,1fr)] overflow-x-hidden overflow-y-auto"
         // Keeps drawers underneath from treating clicks here as outside clicks.
         onPointerDown={(e) => e.stopPropagation()}
         // Focus lands on the dialog itself so the close button shows no ring on open.
@@ -79,7 +79,7 @@ function Browser({
     return (
       <p
         role="status"
-        className="flex items-center gap-2 text-sm text-muted-foreground"
+        className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
       >
         <Loader2 className="size-4 animate-spin" />
         Loading folders...
@@ -88,7 +88,7 @@ function Browser({
   }
   if (listing.isError) {
     return (
-      <p role="alert" className="text-sm text-destructive">
+      <p role="alert" className="min-w-0 text-sm text-destructive">
         We could not load that folder. Please try again.
       </p>
     );
@@ -100,7 +100,7 @@ function Browser({
   );
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <nav
         aria-label="Breadcrumbs"
         className="flex min-w-0 flex-wrap items-center gap-1 text-sm"
@@ -113,11 +113,12 @@ function Browser({
               className="flex min-w-0 max-w-full items-center gap-1"
             >
               {i > 0 ? (
-                <ChevronRight className="size-3 text-muted-foreground" />
+                <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
               ) : null}
               {last ? (
                 <span
                   aria-current="page"
+                  title={b.name}
                   className="min-w-0 truncate font-medium"
                 >
                   {b.name}
@@ -125,6 +126,7 @@ function Browser({
               ) : (
                 <button
                   type="button"
+                  title={b.name}
                   className="min-w-0 truncate text-muted-foreground hover:underline"
                   onClick={() => setFolderId(i === 0 ? null : b.id)}
                 >
@@ -147,6 +149,7 @@ function Browser({
                 <Button
                   variant="outline"
                   className="min-w-0 flex-1 justify-start"
+                  title={e.name}
                   onClick={() => setFolderId(e.id)}
                 >
                   <Folder />
@@ -156,6 +159,7 @@ function Browser({
                 <Button
                   variant="outline"
                   className="min-w-0 flex-1 justify-start"
+                  title={e.name}
                   aria-label={`Select ${e.name}`}
                   disabled={pending}
                   onClick={() => onSelect(e.id, e.name, e)}
