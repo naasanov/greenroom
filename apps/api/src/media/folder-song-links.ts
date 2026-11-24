@@ -5,6 +5,18 @@ import { FOLDER_MIME } from "./media-util.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
+const INSERT_CHUNK = 500;
+
+/** Takes the band's Drive poll lock until the transaction ends, waiting if held. */
+export async function lockDrivePoll(tx: Tx, bandId: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${drivePollLockKey(bandId)}, 0))`,
+  );
+}
+
+export const drivePollLockKey = (bandId: string): string =>
+  `drive-poll:${bandId}`;
+
 /**
  * Attaches top-level files of a song-linked folder to each song, tagged with
  * the folder id. Idempotent on band + song + file; an existing manual link
@@ -19,33 +31,35 @@ export async function attachFolderFiles(
 ): Promise<void> {
   const live = files.filter((f) => f.mimeType !== FOLDER_MIME && !f.trashed);
   if (!live.length || !songIds.length) return;
-  await tx
-    .insert(driveFileSongLinks)
-    .values(
-      songIds.flatMap((songId) =>
-        live.map((f) => ({
-          bandId,
-          songId,
-          driveFileId: f.id,
-          name: f.name,
-          mimeType: f.mimeType,
-          isFolder: false,
-          sourceFolderId: folderId,
-        })),
-      ),
-    )
-    .onConflictDoUpdate({
-      target: [
-        driveFileSongLinks.bandId,
-        driveFileSongLinks.songId,
-        driveFileSongLinks.driveFileId,
-      ],
-      set: {
-        name: sql`excluded.name`,
-        mimeType: sql`excluded.mime_type`,
-      },
-      setWhere: isNotNull(driveFileSongLinks.sourceFolderId),
-    });
+  const rows = songIds.flatMap((songId) =>
+    live.map((f) => ({
+      bandId,
+      songId,
+      driveFileId: f.id,
+      name: f.name,
+      mimeType: f.mimeType,
+      isFolder: false,
+      sourceFolderId: folderId,
+    })),
+  );
+  // Chunked to stay under Postgres's 65,535 bind-parameter limit per statement.
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+    await tx
+      .insert(driveFileSongLinks)
+      .values(rows.slice(i, i + INSERT_CHUNK))
+      .onConflictDoUpdate({
+        target: [
+          driveFileSongLinks.bandId,
+          driveFileSongLinks.songId,
+          driveFileSongLinks.driveFileId,
+        ],
+        set: {
+          name: sql`excluded.name`,
+          mimeType: sql`excluded.mime_type`,
+        },
+        setWhere: isNotNull(driveFileSongLinks.sourceFolderId),
+      });
+  }
 }
 
 /** Deletes links a folder created; `keepSongIds` are songs that stay linked to it. */

@@ -31,6 +31,7 @@ import {
 import {
   attachFolderFiles,
   detachFolderFiles,
+  lockDrivePoll,
 } from "../media/folder-song-links.js";
 import type { OkDownload } from "../media/media-util.js";
 
@@ -346,12 +347,14 @@ export class FilesService {
       : [];
     if (found.length !== unique.length)
       throw new UnprocessableEntityException("Song not found");
-    // A linked folder's current top-level files are backfilled in this request.
-    const children =
-      isFolder(file) && unique.length
-        ? await this.drive.listChildren(ctx.token, file.id)
-        : [];
     await this.db.transaction(async (tx) => {
+      // Holding the poll lock while listing keeps the backfill and poller from racing.
+      let children: DriveFile[] = [];
+      if (isFolder(file)) {
+        await lockDrivePoll(tx, bandId);
+        if (unique.length)
+          children = await this.drive.listChildren(ctx.token, file.id);
+      }
       const mine = and(
         eq(driveFileSongLinks.bandId, bandId),
         eq(driveFileSongLinks.driveFileId, file.id),
@@ -387,6 +390,7 @@ export class FilesService {
               name: file.name,
               mimeType: isFolder(file) ? null : file.mimeType,
               isFolder: isFolder(file),
+              sourceFolderId: null,
             },
           });
       if (isFolder(file))

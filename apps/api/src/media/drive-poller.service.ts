@@ -19,7 +19,12 @@ import {
 } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
 import { HeicConversionService } from "./heic-conversion.service.js";
-import { attachFolderFiles, detachMovedFile } from "./folder-song-links.js";
+import {
+  attachFolderFiles,
+  detachMovedFile,
+  drivePollLockKey,
+  lockDrivePoll,
+} from "./folder-song-links.js";
 import { isHeic } from "./heic-util.js";
 import {
   applyConvertedFile,
@@ -84,14 +89,11 @@ export class DrivePollerService implements OnModuleInit {
     if (!token) return skipped;
     const heic: DriveFile[] = [];
     const result = await this.db.transaction(async (tx) => {
-      const key = `drive-poll:${bandId}`;
       if (wait) {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
-        );
+        await lockDrivePoll(tx, bandId);
       } else {
         const rows = await tx.execute(
-          sql`select pg_try_advisory_xact_lock(hashtextextended(${key}, 0)) as locked`,
+          sql`select pg_try_advisory_xact_lock(hashtextextended(${drivePollLockKey(bandId)}, 0)) as locked`,
         );
         if (!(rows[0] as { locked: boolean } | undefined)?.locked)
           return skipped;

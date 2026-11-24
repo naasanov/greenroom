@@ -117,14 +117,22 @@ test("a folder linked to a song attaches its top-level files, now and on later p
   expect(await names(ava, planes)).toEqual([]);
   expect(await names(ava, skyline)).toContain("d.png");
 
-  // Unlinking the folder removes its auto links and keeps the manual one.
+  // Hand-linking an auto-linked file takes it over, so it outlives the folder link.
+  const f = await add("f.png", folder.id);
+  await fake.poll();
+  expect(await names(ava, skyline)).toContain("f.png");
+  expect(
+    (await ava.put(itemUrl(f.id), { data: { songIds: [skyline] } })).status(),
+  ).toBe(200);
+
+  // Unlinking the folder removes its auto links and keeps the manual ones.
   const d = (await fake.byName("d.png"))!;
   const del = await ava.delete(`${songUrl(skyline)}/${folder.id}`);
   expect(del.status()).toBe(204);
-  expect(await names(ava, skyline)).toEqual(["c.png"]);
+  expect(await names(ava, skyline)).toEqual(["c.png", "f.png"]);
   await add("e.png", folder.id);
   await fake.poll();
-  expect(await names(ava, skyline)).toEqual(["c.png"]);
+  expect(await names(ava, skyline)).toEqual(["c.png", "f.png"]);
   expect(
     await db
       .select()
