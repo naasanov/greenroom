@@ -20,12 +20,9 @@ async function openImport(page: import("@playwright/test").Page) {
   return page.getByRole("dialog", { name: "Import playlist" });
 }
 
-async function startImport(page: import("@playwright/test").Page) {
-  await openLibrary(page);
-  await fabAction(page, "import-playlist");
-  const dialog = page.getByRole("dialog", { name: "Import playlist" });
+async function pasteLink(page: import("@playwright/test").Page) {
+  const dialog = await openImport(page);
   await dialog.getByRole("textbox", { name: "Playlist link" }).fill(PLAYLIST);
-  await dialog.getByRole("button", { name: "Import" }).click();
   return dialog;
 }
 
@@ -98,6 +95,19 @@ test("a revoked grant shows the connect prompt again", async ({
   await db
     .update(oauthConnections)
     .set({ accessTokenExpiresAt: new Date(Date.now() - 1000) });
-  const dialog = await startImport(page);
+  const dialog = await pasteLink(page);
   await expect(dialog.getByTestId("import-connect")).toBeVisible();
+  await expect(dialog.getByTestId("import-check")).toHaveCount(0);
+});
+
+test("the connect prompt explains that only owned or collaborative playlists import", async ({
+  page,
+}) => {
+  const dialog = await openImport(page);
+  await expect(dialog.getByTestId("import-connect")).toContainText(
+    "Only playlists you own or collaborate on can be imported",
+  );
+  await expect(dialog.getByTestId("import-connect")).not.toContainText(
+    "Private playlists",
+  );
 });

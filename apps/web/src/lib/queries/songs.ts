@@ -16,6 +16,7 @@ import {
   type CreateSong,
   type DeletedSong,
   type ImportProgress,
+  type PlaylistCheck,
   type Reference,
   type ReferenceTag,
   type ResolveResult,
@@ -41,6 +42,8 @@ export const songKeys = {
     ["bands", bandId, "song-resolve", input] as const,
   referenceTags: (bandId: string) =>
     [...songsRoot(bandId), "reference-tags"] as const,
+  playlistCheck: (bandId: string, url: string) =>
+    ["bands", bandId, "playlist-check", url] as const,
   importStatus: (bandId: string, importId: string) =>
     ["bands", bandId, "song-imports", importId] as const,
 };
@@ -305,6 +308,22 @@ export function useStartImport(bandId: string) {
         body: { url },
         schema: typed<ImportProgress>(),
       }),
+  });
+}
+
+/** Pre-flight check for a playlist link; results are cached per link, so stale ones never show. */
+export function usePlaylistCheck(bandId: string, url: string) {
+  return useQuery({
+    queryKey: songKeys.playlistCheck(bandId, url),
+    queryFn: () =>
+      api(`/bands/${bandId}/songs/import/check`, {
+        method: "POST",
+        body: { url },
+        schema: typed<PlaylistCheck>(),
+      }),
+    enabled: url !== "",
+    retry: false,
+    staleTime: 30_000,
   });
 }
 

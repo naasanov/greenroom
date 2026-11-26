@@ -3,6 +3,7 @@ import {
   type SpotifyAdapter,
   type SpotifyCreatePlaylistResult,
   type SpotifyExchangeResult,
+  type SpotifyPlaylistCheckResult,
   type SpotifyPlaylistResult,
   type SpotifyRefreshResult,
   type SpotifyTrack,
@@ -74,6 +75,29 @@ function playlistMiss(status: number): SpotifyPlaylistResult | null {
     return { status: "not-found-or-private" };
   }
   return null;
+}
+
+/** A page of items that Spotify refuses while the playlist itself resolved. */
+const isItemsMiss = (status: number): boolean =>
+  status === 403 || status === 404 || status === 400;
+
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+/** Track count from an items page, falling back to the playlist metadata. */
+function playlistTotal(meta: Json, page: unknown): number | null {
+  const nested = (v: unknown) => (isObj(v) ? num(v.total) : null);
+  return (
+    (isObj(page) ? num(page.total) : null) ??
+    nested(meta.items) ??
+    nested(meta.tracks)
+  );
+}
+
+/** A 200 first page that lists no items for a non-empty playlist is metadata only. */
+function isUnreadablePage(meta: Json, page: unknown): boolean {
+  const items = isObj(page) && Array.isArray(page.items) ? page.items : null;
+  return !items || (items.length === 0 && (playlistTotal(meta, page) ?? 0) > 0);
 }
 
 /** Spotify Web API: app-level reads plus user OAuth and user-token reads. */
@@ -194,24 +218,25 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
     const id = parseSpotifyId(idOrUrl);
     if (!id) return { status: "not-found-or-private" };
     const enc = encodeURIComponent(id);
-    const head = await this.userGet(
-      userToken,
-      `/playlists/${enc}?fields=id,name,external_urls.spotify`,
-    );
-    const miss = playlistMiss(head.status);
-    if (miss) return miss;
-    if (!head.ok) throw await failure("playlist lookup", head);
-    const meta: unknown = await head.json();
-    if (!isObj(meta)) return { status: "not-found-or-private" };
+    const head = await this.playlistHead(userToken, enc);
+    if ("miss" in head) return head.miss;
+    const meta = head.meta;
 
     const tracks: SpotifyTrack[] = [];
     let next: string | null = `${API_URL}/playlists/${enc}/items?limit=100`;
+    let firstPage = true;
     while (next) {
       const res = await this.userGet(userToken, next);
-      const pageMiss = playlistMiss(res.status);
-      if (pageMiss) return pageMiss;
+      if (res.status === 401) return { status: "unauthorized" };
+      if (isItemsMiss(res.status)) {
+        return { status: "metadata-only", name: str(meta.name) };
+      }
       if (!res.ok) throw await failure("playlist page", res);
       const page: unknown = await res.json();
+      if (firstPage && isUnreadablePage(meta, page)) {
+        return { status: "metadata-only", name: str(meta.name) };
+      }
+      firstPage = false;
       if (!isObj(page)) break;
       for (const entry of Array.isArray(page.items) ? page.items : []) {
         if (!isObj(entry)) continue;
@@ -231,6 +256,40 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
         name: str(meta.name) ?? "",
         tracks,
       },
+    };
+  }
+
+  /** One metadata read plus a one-item page: enough to tell readable from metadata-only. */
+  async checkPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistCheckResult> {
+    const id = parseSpotifyId(idOrUrl);
+    if (!id) return { status: "not-found" };
+    const enc = encodeURIComponent(id);
+    const head = await this.playlistHead(userToken, enc);
+    if ("miss" in head) {
+      const { status } = head.miss;
+      if (status === "unauthorized") return { status };
+      return status === "forbidden"
+        ? { status: "metadata-only", name: null }
+        : { status: "not-found" };
+    }
+    const meta = head.meta;
+    const name = str(meta.name);
+    const res = await this.userGet(
+      userToken,
+      `/playlists/${enc}/items?limit=1`,
+    );
+    if (res.status === 401) return { status: "unauthorized" };
+    if (isItemsMiss(res.status)) return { status: "metadata-only", name };
+    if (!res.ok) throw await failure("playlist page", res);
+    const page: unknown = await res.json();
+    if (isUnreadablePage(meta, page)) return { status: "metadata-only", name };
+    return {
+      status: "ok",
+      name: name ?? "",
+      trackCount: playlistTotal(meta, page),
     };
   }
 
@@ -283,6 +342,23 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
       if (!res.ok) throw await failure("playlist add", res);
     }
     return { status: "ok" };
+  }
+
+  /** Playlist metadata, or the miss result when Spotify refuses the lookup. */
+  private async playlistHead(
+    userToken: string,
+    encodedId: string,
+  ): Promise<{ meta: Json } | { miss: SpotifyPlaylistResult }> {
+    const res = await this.userGet(
+      userToken,
+      `/playlists/${encodedId}?fields=id,name,external_urls.spotify,items.total,tracks.total`,
+    );
+    const miss = playlistMiss(res.status);
+    if (miss) return { miss };
+    if (!res.ok) throw await failure("playlist lookup", res);
+    const meta: unknown = await res.json();
+    if (!isObj(meta)) return { miss: { status: "not-found-or-private" } };
+    return { meta };
   }
 
   private tokenRequest(form: Record<string, string>): Promise<Response> {

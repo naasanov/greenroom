@@ -21,11 +21,23 @@ export interface SpotifyPlaylist {
 export type SpotifyTrackResult =
   { status: "ok"; track: SpotifyTrack } | { status: "not-found" };
 
-/** `forbidden` is Spotify's 403 (not shared with this account); `not-found-or-private` is a 404. */
+/**
+ * `metadata-only`: the playlist exists but its items are not readable (Spotify only
+ * returns items for playlists the user owns or collaborates on). `forbidden` is a 403
+ * on the playlist itself; `not-found-or-private` is a 404.
+ */
 export type SpotifyPlaylistResult =
   | { status: "ok"; playlist: SpotifyPlaylist }
+  | { status: "metadata-only"; name: string | null }
   | { status: "not-found-or-private" }
   | { status: "forbidden" }
+  | { status: "unauthorized" };
+
+/** Lightweight pre-import probe: name and count when readable, no track mapping. */
+export type SpotifyPlaylistCheckResult =
+  | { status: "ok"; name: string; trackCount: number | null }
+  | { status: "metadata-only"; name: string | null }
+  | { status: "not-found" }
   | { status: "unauthorized" };
 
 export const SPOTIFY_IMPORT_SCOPES = [
@@ -95,6 +107,11 @@ export interface SpotifyAdapter {
     userToken: string,
     idOrUrl: string,
   ): Promise<SpotifyPlaylistResult>;
+  /** Looks the playlist up and reads one page of items, without mapping tracks. */
+  checkPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistCheckResult>;
   createPlaylist(
     userToken: string,
     input: { name: string; description?: string; isPublic?: boolean },
