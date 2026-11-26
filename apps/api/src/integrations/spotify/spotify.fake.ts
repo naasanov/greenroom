@@ -7,6 +7,7 @@ import {
   type SpotifyCreatePlaylistResult,
   type SpotifyExchangeResult,
   type SpotifyPlaylist,
+  type SpotifyPlaylistCheckResult,
   type SpotifyPlaylistResult,
   type SpotifyRefreshResult,
   type SpotifyTrack,
@@ -20,6 +21,8 @@ export const FAKE_SPOTIFY_OWNER_TOKEN = "fake-spotify-owner-token";
 export const FAKE_PRIVATE_OWNER_USER = "owner";
 export const FAKE_PUBLIC_PLAYLIST_ID = "fakePlaylistPublic";
 export const FAKE_PRIVATE_PLAYLIST_ID = "fakePlaylistPrivate";
+/** Public playlist owned by someone else: Spotify returns its metadata but not its items. */
+export const FAKE_NOT_OWNED_PLAYLIST_ID = "fakePlaylistNotOwned";
 
 function track(
   id: string,
@@ -131,6 +134,8 @@ interface StoredPlaylist {
   ownerToken: string;
   /** Fake Spotify account name that owns the playlist, when seeded for one. */
   ownerUser?: string;
+  /** Items are readable only by the owner, even when the playlist is public. */
+  ownerOnlyItems?: boolean;
   trackIds: string[];
 }
 
@@ -238,7 +243,9 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     if (!this.validToken(userToken)) return { status: "unauthorized" };
     const p = this.find(idOrUrl);
     if (p) {
-      return this.canRead(p, userToken) ? this.ok(p) : { status: "forbidden" };
+      return this.canRead(p, userToken)
+        ? this.ok(p)
+        : { status: "metadata-only", name: p.name };
     }
     // Staging has no real playlists, so any id resolves to the demo set.
     const id = parseSpotifyId(idOrUrl);
@@ -254,6 +261,29 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
       };
     }
     return { status: "not-found-or-private" };
+  }
+
+  async checkPlaylist(
+    userToken: string,
+    idOrUrl: string,
+  ): Promise<SpotifyPlaylistCheckResult> {
+    const res = await this.getPlaylist(userToken, idOrUrl);
+    switch (res.status) {
+      case "ok":
+        return {
+          status: "ok",
+          name: res.playlist.name,
+          trackCount: res.playlist.tracks.length,
+        };
+      case "metadata-only":
+        return { status: "metadata-only", name: res.name };
+      case "forbidden":
+        return { status: "metadata-only", name: null };
+      case "unauthorized":
+        return { status: "unauthorized" };
+      case "not-found-or-private":
+        return { status: "not-found" };
+    }
   }
 
   async createPlaylist(
@@ -308,6 +338,7 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     isPublic: boolean;
     ownerToken?: string;
     ownerUser?: string;
+    ownerOnlyItems?: boolean;
     trackIds: string[];
   }): void {
     this.playlists.set(p.id, { ownerToken: FAKE_SPOTIFY_OWNER_TOKEN, ...p });
@@ -368,6 +399,14 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
       ownerUser: FAKE_PRIVATE_OWNER_USER,
       trackIds: ["fakeTrack4", "fakeTrack5"],
     });
+    this.seedPlaylist({
+      id: FAKE_NOT_OWNED_PLAYLIST_ID,
+      name: "Fake Not Owned Setlist",
+      isPublic: true,
+      ownerOnlyItems: true,
+      ownerUser: "someone-else",
+      trackIds: ["fakeTrack1", "fakeTrack3"],
+    });
   }
 
   private expiry(): string {
@@ -382,7 +421,8 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
   }
 
   private canRead(p: StoredPlaylist, token: string): boolean {
-    return p.isPublic || this.isOwner(p, token);
+    if (this.isOwner(p, token)) return true;
+    return p.isPublic && !p.ownerOnlyItems;
   }
 
   private validToken(token: string): boolean {

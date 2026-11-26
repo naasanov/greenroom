@@ -33,10 +33,12 @@ After the round trip the browser lands on `${WEB_URL}${redirectTo}?...&spotify=c
 `POST /bands/:bandId/songs/import` with `{ url }`:
 
 - No connection, or the grant was revoked (connection removed): `409 { "code": "SPOTIFY_LOGIN_REQUIRED", "message": ... }`. The UI should send the user through `start` with `redirectTo` set to the page they were on, then retry the import on return with `spotify=connected`.
-- Spotify answers 403 (private playlist the linked account cannot read): `403 { "code": "PLAYLIST_FORBIDDEN" }`.
+- The playlist exists but only its metadata is readable for the linked account (Spotify returns items only for playlists the user owns or collaborates on, whether public or private; a 403 or an empty items page for a non-empty playlist): `403 { "code": "PLAYLIST_FORBIDDEN" }`.
 - Spotify answers 404 (missing playlist): `404 { "code": "PLAYLIST_NOT_FOUND_OR_PRIVATE" }`.
 - Reads always use the user's token; the app token cannot read playlist items, so there is no unconnected fallback.
 - Otherwise `202` with import progress (unchanged).
+
+`POST /bands/:bandId/songs/import/check` with `{ url }` is the pre-flight for the same link. It uses the same token and answers `200 { status: "importable" | "metadata-only" | "invalid", name, trackCount }` without queueing anything. With no connection or a revoked grant it answers the same `409 SPOTIFY_LOGIN_REQUIRED` as the import.
 
 ## Playlist export contract
 
@@ -49,4 +51,4 @@ After the round trip the browser lands on `${WEB_URL}${redirectTo}?...&spotify=c
 
 ## Fakes and staging
 
-With `INTEGRATIONS_MODE=fake` the authorize URL is a dead domain, except when `STAGING_LOGIN_PASSCODE` is set (staging): then it is `${API_PUBLIC_URL}/fake-spotify/authorize`, an API-served page with a "Connect demo Spotify" button (and Cancel, which returns `error=access_denied`). On staging any playlist id imports a 10-track demo set. Fake codes are `fake-code:<name>`, and the fake grants the scopes of the most recent authorize URL, and connecting as `fake-code:owner` links the account that owns the private playlist `fakePlaylistPrivate` (any other account gets 403); `GET /__test__/spotify/created-playlists` lists playlists created by export; `POST /__test__/spotify/revoke-refresh-tokens` makes refreshes fail with invalid-grant.
+With `INTEGRATIONS_MODE=fake` the authorize URL is a dead domain, except when `STAGING_LOGIN_PASSCODE` is set (staging): then it is `${API_PUBLIC_URL}/fake-spotify/authorize`, an API-served page with a "Connect demo Spotify" button (and Cancel, which returns `error=access_denied`). On staging any playlist id imports a 10-track demo set. Fake codes are `fake-code:<name>`, and the fake grants the scopes of the most recent authorize URL, and connecting as `fake-code:owner` links the account that owns the private playlist `fakePlaylistPrivate` (any other account gets metadata only, so import answers 403 and the check answers `metadata-only`; the public `fakePlaylistNotOwned` behaves that way for everyone but its owner); `GET /__test__/spotify/created-playlists` lists playlists created by export; `POST /__test__/spotify/revoke-refresh-tokens` makes refreshes fail with invalid-grant.

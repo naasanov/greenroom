@@ -2,7 +2,7 @@
 
 import { Check, ListMusic } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ImportProgress } from "@greenroom/shared";
+import type { ImportProgress, PlaylistCheck } from "@greenroom/shared";
 import { SONG_ERROR_CODES } from "@greenroom/shared";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { connectSpotify, useSpotifyStatus } from "@/lib/queries/spotify";
-import { useImportProgress, useStartImport } from "@/lib/queries/songs";
+import {
+  useImportProgress,
+  usePlaylistCheck,
+  useStartImport,
+} from "@/lib/queries/songs";
+
+const CHECK_DEBOUNCE_MS = 350;
+const OWNER_ONLY =
+  "Only playlists you own or collaborate on can be imported. Spotify doesn't share the songs of other playlists.";
 
 function summary(p: ImportProgress): string {
   const parts = [`${p.added} added`];
@@ -54,6 +62,60 @@ function Progress({ progress }: { progress: ImportProgress | undefined }) {
   );
 }
 
+function checkMessage(check: PlaylistCheck): string {
+  if (check.status === "importable") {
+    const count =
+      check.trackCount === null
+        ? ""
+        : ` (${check.trackCount} ${check.trackCount === 1 ? "song" : "songs"})`;
+    return `Valid to import: ${check.name ? `"${check.name}"` : "this playlist"}${count}`;
+  }
+  if (check.status === "metadata-only") {
+    return `${check.name ? `"${check.name}" can't be imported. ` : ""}${OWNER_ONLY}`;
+  }
+  return "Invalid link. Paste a link to a Spotify playlist.";
+}
+
+function CheckStatus({
+  state,
+  message,
+  onRetry,
+}: {
+  state: "checking" | "importable" | "metadata-only" | "invalid" | "error";
+  message: string;
+  onRetry?: () => void;
+}) {
+  const bad =
+    state === "invalid" || state === "metadata-only" || state === "error";
+  return (
+    <p
+      role={bad ? "alert" : "status"}
+      data-testid="import-check"
+      data-state={state}
+      className={
+        bad ? "text-sm text-destructive" : "text-sm text-muted-foreground"
+      }
+    >
+      {message}
+      {onRetry ? (
+        <>
+          {" "}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 align-baseline text-sm"
+            data-testid="import-check-retry"
+            onClick={onRetry}
+          >
+            Try again
+          </Button>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 function ConnectPrompt({
   url,
   notice,
@@ -72,7 +134,7 @@ function ConnectPrompt({
       <p className="text-sm text-muted-foreground">
         Spotify only shares playlist contents with a signed-in account, so you
         need to connect yours once. You can also connect Spotify in settings.
-        Private playlists can only be imported from the account that owns them.
+        Only playlists you own or collaborate on can be imported.
       </p>
       {notice ? (
         <p
@@ -118,10 +180,34 @@ function ImportBody({
   const status = useSpotifyStatus();
   const [needsLogin, setNeedsLogin] = useState(connectError);
   const startedRef = useRef(false);
+
+  // The check runs for the link as it stood after a short pause in typing.
+  const link = url.trim();
+  const [checkedLink, setCheckedLink] = useState(link);
+  useEffect(() => {
+    if (link === checkedLink) return;
+    const t = setTimeout(() => setCheckedLink(link), CHECK_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [link, checkedLink]);
+  // An auto-started import (after the Spotify round trip) skips the check until the link is edited.
+  const [skipCheck, setSkipCheck] = useState(autoStart);
+  const check = usePlaylistCheck(
+    bandId,
+    importId || needsLogin || skipCheck ? "" : checkedLink,
+  );
+  const checkNeedsLogin =
+    isApiError(check.error, 409) &&
+    check.error.code === SONG_ERROR_CODES.spotifyLoginRequired;
+  const checkCurrent = link !== "" && checkedLink === link;
+  const checked = checkCurrent ? check.data : undefined;
+  const canImport = checked?.status === "importable";
+
   const begin = (value: string) =>
     start.mutate(value, {
       onSuccess: (p) => setImportId(p.importId),
       onError: (e) => {
+        // A failed auto-start falls back to the normal check for the current link.
+        setSkipCheck(false);
         if (
           isApiError(e, 409) &&
           e.code === SONG_ERROR_CODES.spotifyLoginRequired
@@ -160,7 +246,7 @@ function ImportBody({
 
   if (importId) return <Progress progress={data} />;
 
-  if (needsLogin || status.data?.connected === false) {
+  if (needsLogin || checkNeedsLogin || status.data?.connected === false) {
     return (
       <ConnectPrompt
         url={url}
@@ -177,7 +263,7 @@ function ImportBody({
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!url.trim()) return;
+        if (!url.trim() || !canImport) return;
         if (status.data && !status.data.connected) {
           setNeedsLogin(true);
           return;
@@ -194,9 +280,23 @@ function ImportBody({
         value={url}
         onChange={(e) => {
           setUrl(e.target.value);
+          setSkipCheck(false);
           start.reset();
         }}
       />
+      {link && !start.isError ? (
+        checked ? (
+          <CheckStatus state={checked.status} message={checkMessage(checked)} />
+        ) : checkCurrent && check.isError ? (
+          <CheckStatus
+            state="error"
+            message="Couldn't check this link."
+            onRetry={() => void check.refetch()}
+          />
+        ) : (
+          <CheckStatus state="checking" message="Checking link..." />
+        )
+      ) : null}
       {start.isError ? (
         <p
           role="alert"
@@ -204,16 +304,16 @@ function ImportBody({
           className="text-sm text-destructive"
         >
           {forbidden
-            ? "Spotify won't share this playlist with your account. Private playlists can only be imported from the account that owns them. You can manage your connection in settings."
+            ? "Spotify won't share this playlist with your account. Only playlists you own or collaborate on can be imported."
             : missing
-              ? "Can't find this playlist. Check the link, or connect Spotify in settings if it is private."
+              ? "Can't find this playlist. Check the link."
               : isApiError(error, 400)
                 ? "That doesn't look like a Spotify playlist link."
                 : "Could not start the import. Please try again."}
         </p>
       ) : null}
-      <Button type="submit" size="lg" disabled={!url.trim() || start.isPending}>
-        <ListMusic /> {start.isPending ? "Checking..." : "Import"}
+      <Button type="submit" size="lg" disabled={!canImport || start.isPending}>
+        <ListMusic /> {start.isPending ? "Starting..." : "Import"}
       </Button>
     </form>
   );

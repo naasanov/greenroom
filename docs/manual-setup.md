@@ -49,7 +49,7 @@ Optional: enable **YouTube Data API v3** and store a server key restricted to it
 Keychain names: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_PLACES_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PROJECT_NUMBER`.
 
 ## Spotify developer app
-Used for song search, track lookup, and public playlist import (app-level), and later for exporting playlists and importing private ones (user login).
+Used for song search and track lookup (app-level), and for exporting playlists and importing playlists (user login). Spotify's development mode only returns playlist items for playlists the signed-in user owns or collaborates on.
 
 1. Go to https://developer.spotify.com/dashboard and log in with the Spotify account that should own the app. Accept the developer terms if asked.
 2. **Create app**:
@@ -60,7 +60,7 @@ Used for song search, track lookup, and public playlist import (app-level), and 
      - `http://127.0.0.1:4000/integrations/spotify/callback`
    - Which APIs: tick **Web API**. Agree to the terms and **Save**.
 3. Open the app > **Settings** > **Basic Information**. Store **Client ID** as `SPOTIFY_CLIENT_ID`, then click **View client secret** and store it as `SPOTIFY_CLIENT_SECRET`.
-4. **User Management** tab: add the name and Spotify account email of each band member who will export playlists or import private ones. In development mode only listed users can log in with Spotify. Search and public imports work without this.
+4. **User Management** tab: add the name and Spotify account email of each band member who will export or import playlists. In development mode only listed users can log in with Spotify, and imports only work for playlists that user owns or collaborates on (the Import dialog checks this on paste). Search and track lookup work without this.
 
 Keychain names: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`.
 

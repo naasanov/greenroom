@@ -10,6 +10,7 @@ import {
   Query,
 } from "@nestjs/common";
 import {
+  checkPlaylistSchema,
   createSongSchema,
   exportLibrarySchema,
   importPlaylistSchema,
@@ -17,6 +18,7 @@ import {
   resolveSongSchema,
   suggestReferencesSchema,
   updateSongSchema,
+  type CheckPlaylist,
   type CreateSong,
   type DeletedSong,
   type ExportLibrary,
@@ -24,6 +26,7 @@ import {
   type ImportPlaylist,
   type ImportProgress,
   type ListSongsQuery,
+  type PlaylistCheck,
   type ReferenceTag,
   type ResolveResult,
   type ResolveSong,
@@ -108,6 +111,15 @@ export class SongsController {
     @Body(new ZodPipe(importPlaylistSchema)) body: ImportPlaylist,
   ): Promise<ImportProgress> {
     return this.imports.start(user.id, m.bandId, body.url);
+  }
+
+  @Post("import/check")
+  @HttpCode(200)
+  checkImport(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(checkPlaylistSchema)) body: CheckPlaylist,
+  ): Promise<PlaylistCheck> {
+    return this.imports.check(user.id, body.url);
   }
 
   // Declared before `:songId` routes; exports in the requested library sort.
