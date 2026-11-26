@@ -1,17 +1,4 @@
 {
   "desktop": [],
-  "mobile": [
-    {
-      "file": "agenda-drawer.spec.ts",
-      "title": "tapping another card while a drawer is open hands off to it"
-    },
-    {
-      "file": "media-upload.spec.ts",
-      "title": "the screen wake lock is held while uploading and released after"
-    },
-    {
-      "file": "media-upload.spec.ts",
-      "title": "EXIF-rotated photos preview upright and the uploaded file is untouched"
-    }
-  ]
+  "mobile": []
 }

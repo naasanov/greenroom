@@ -40,7 +40,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [E2E test scope](e2e-test-scope.md) — locally only targeted specs + smoke, never the full suite; CI runs the full suite on push
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting; factory runs desktop only (WebKit crashes)
 - [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together
-- [Known flaky e2e specs](flaky-e2e-specs.md) — files-import gigs root (desktop), agenda-drawer hand-off and media-upload wake lock (mobile) and the setlist-gig drag-reorder spec (desktop) are quarantined in a non-blocking CI job (apps/e2e/quarantine.json); failures there are not CI failures, never weaken assertions
+- [Known flaky e2e specs](flaky-e2e-specs.md) — the quarantine mechanism (apps/e2e/quarantine.json, now empty, non-blocking CI job) and the causes of past flakes; failures there are never CI failures, never weaken assertions
 - [Stage snapshot source](stage-snapshot-source.md) — stage renders from the offline snapshot; write mutations through, return undefined (not empty) on fetch failure
 - [Swipe gestures](swipe-gestures.md) — track pointerId, cancel on multi-touch, skip controls/portals, guard window keys, reset scroll
 - [WebKit route interception](webkit-route-interception.md) — page.route does not hold or fulfill reliably on mobile; MutationObserver, desktop-only specs
