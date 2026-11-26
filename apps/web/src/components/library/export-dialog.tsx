@@ -456,7 +456,6 @@ function ExportBody({
           </p>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <CopyListButton lines={copyLines} />
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
@@ -471,6 +470,21 @@ function ExportBody({
               ? "Reconnect Spotify"
               : "Connect Spotify"}
           </Button>
+        </div>
+        <div
+          aria-hidden="true"
+          data-testid="export-connect-divider"
+          className="flex items-center gap-3 text-xs text-muted-foreground uppercase"
+        >
+          <span className="h-px flex-1 bg-border" />
+          or
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <div
+          data-testid="export-connect-copy"
+          className="flex flex-col sm:flex-row sm:justify-end"
+        >
+          <CopyListButton lines={copyLines} />
         </div>
       </div>
     );

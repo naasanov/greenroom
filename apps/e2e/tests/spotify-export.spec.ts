@@ -45,6 +45,19 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByTestId("export-connect")).toContainText(
     "Connect Spotify to export playlists",
   );
+  // Cancel and Connect share the first row; Copy sits below the "or" divider.
+  const connect = dialog(page).getByTestId("export-connect");
+  await expect(connect.getByTestId("export-connect-divider")).toContainText(
+    "or",
+  );
+  await expect(
+    connect.getByTestId("export-connect-copy").getByTestId("export-copy"),
+  ).toBeVisible();
+  const connectBox = await dialog(page)
+    .getByRole("button", { name: "Connect Spotify" })
+    .boundingBox();
+  const copyBox = await connect.getByTestId("export-copy").boundingBox();
+  expect(copyBox!.y).toBeGreaterThan(connectBox!.y + connectBox!.height);
   await dialog(page).getByRole("button", { name: "Connect Spotify" }).click();
 
   const reopened = dialog(page);
