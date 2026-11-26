@@ -4,6 +4,7 @@ import {
   isSuggestionSourceUrl,
   validateMagicReferenceValue,
   songSortSchema,
+  youtubeVideoId,
   type MagicReference,
   type ReferenceSuggestion,
   type SongSort,
@@ -58,10 +59,7 @@ export function songArt(song: {
   youtubeUrl: string | null;
 }): string | null {
   if (song.imageUrl) return song.imageUrl;
-  const id = song.youtubeUrl
-    ? (/[?&]v=([\w-]{6,})/.exec(song.youtubeUrl)?.[1] ??
-      /youtu\.be\/([\w-]{6,})/.exec(song.youtubeUrl)?.[1])
-    : null;
+  const id = youtubeVideoId(song.youtubeUrl);
   return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }
 

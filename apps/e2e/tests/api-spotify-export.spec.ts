@@ -214,3 +214,125 @@ test("export validates the name and requires band membership", async ({
   await api.dispose();
   await outsider.dispose();
 });
+
+test("a song with only a hand-added Spotify reference is exported", async ({
+  testApi,
+}) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await connect(api);
+  const created = await api.post(`/bands/${BAND}/songs`, {
+    data: {
+      title: "Reference Only",
+      references: [
+        {
+          label: "spotify",
+          value: "https://open.spotify.com/intl-de/track/fakeTrack1?si=abc",
+        },
+      ],
+    },
+  });
+  expect(created.status()).toBe(201);
+  const song = await created.json();
+  expect(song).toMatchObject({ spotifyTrackId: "fakeTrack1" });
+
+  const res = await api.post(LIBRARY, { data: { name: "With reference" } });
+  expect((await res.json()).exported).toBe(4);
+  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  expect(playlist!.trackIds).toContain("fakeTrack1");
+
+  // The same song is exported from a setlist.
+  const slId = await gigSetlist(api, seed.gigs.upcomingClub.id);
+  await api.put(`/bands/${BAND}/setlists/${slId}/items`, {
+    data: { songIds: [song.id] },
+  });
+  const items = await (await api.get(`/bands/${BAND}/setlists/${slId}`)).json();
+  expect(items.items[0]).toMatchObject({ spotifyTrackId: "fakeTrack1" });
+  const viaSetlist = await api.post(`/bands/${BAND}/setlists/${slId}/export`, {
+    data: { name: "Setlist" },
+  });
+  expect((await viaSetlist.json()).exported).toBe(1);
+  const created2 = await testApi.spotifyCreatedPlaylists();
+  expect(created2[1]!.trackIds).toEqual(["fakeTrack1"]);
+  await api.dispose();
+});
+
+test("a Spotify reference wins over the stored column, and an unresolved short link has no id", async ({
+  testApi,
+}) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await connect(api);
+  const base = `/bands/${BAND}/songs`;
+  const viaColumn = await (
+    await api.post(base, {
+      data: { title: "Column", spotifyTrackId: "fakeTrack2" },
+    })
+  ).json();
+  expect(viaColumn.spotifyTrackId).toBe("fakeTrack2");
+
+  // A reference replaces the fallback, even when it carries no parseable id.
+  const patched = await api.patch(`${base}/${viaColumn.id}`, {
+    data: {
+      references: [
+        { label: "Spotify", value: "https://spotify.link/noSuchOne" },
+      ],
+    },
+  });
+  const body = await patched.json();
+  expect(body.spotifyTrackId).toBeNull();
+  expect(body.references[0].value).toBe("https://spotify.link/noSuchOne");
+
+  const res = await api.post(`${base}/export`, { data: { name: "Library" } });
+  const exported = await res.json();
+  expect(exported.skipped.map((s: { songId: string }) => s.songId)).toContain(
+    viaColumn.id,
+  );
+  await api.dispose();
+});
+
+test("a spotify.link reference is saved as the canonical track link", async ({
+  testApi,
+}) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await connect(api);
+  const base = `/bands/${BAND}/songs`;
+  const created = await (
+    await api.post(base, {
+      data: {
+        title: "Short",
+        references: [
+          { label: "Spotify", value: "https://spotify.link/fakeTrack2" },
+        ],
+      },
+    })
+  ).json();
+  expect(created.spotifyTrackId).toBe("fakeTrack2");
+  expect(created.references[0].value).toBe(
+    "https://open.spotify.com/track/fakeTrack2",
+  );
+
+  // Editing an existing song resolves it the same way.
+  const other = await (
+    await api.post(base, { data: { title: "Later" } })
+  ).json();
+  const patched = await (
+    await api.patch(`${base}/${other.id}`, {
+      data: {
+        references: [
+          { label: "Spotify", value: "https://spotify.link/fakeTrack3" },
+        ],
+      },
+    })
+  ).json();
+  expect(patched.spotifyTrackId).toBe("fakeTrack3");
+  expect(patched.references[0].value).toBe(
+    "https://open.spotify.com/track/fakeTrack3",
+  );
+
+  const res = await api.post(`${base}/export`, { data: { name: "Library" } });
+  expect((await res.json()).exported).toBe(5);
+  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  expect(playlist!.trackIds).toEqual(
+    expect.arrayContaining(["fakeTrack2", "fakeTrack3"]),
+  );
+  await api.dispose();
+});

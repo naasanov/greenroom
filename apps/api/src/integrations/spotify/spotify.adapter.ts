@@ -77,6 +77,8 @@ export interface SpotifyAdapter {
   searchTracks(query: string, limit?: number): Promise<SpotifyTrack[]>;
   /** Accepts a bare id, a spotify: URI, or an open.spotify.com URL. */
   getTrack(idOrUrl: string): Promise<SpotifyTrackResult>;
+  /** Follows a spotify.link short URL to the track id it points at; null when it is not a track link or cannot be resolved. */
+  resolveShortLink(url: string): Promise<string | null>;
 
   /** User OAuth (authorization code flow). */
   buildAuthUrl(input: {

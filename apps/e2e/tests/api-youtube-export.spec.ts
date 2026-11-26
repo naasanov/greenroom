@@ -225,3 +225,46 @@ test("export validates the name and requires band membership", async ({
   await api.dispose();
   await outsider.dispose();
 });
+
+test("a song with only a hand-added YouTube reference is exported and exposes its link", async ({
+  testApi,
+}) => {
+  const api = await apiAs(testApi, USERS.ava.email);
+  await connectYoutube(api);
+  const link = "https://youtu.be/refOnly0001";
+  const created = await api.post(`/bands/${BAND}/songs`, {
+    data: {
+      title: "Reference Only",
+      references: [{ label: "youtube", value: link }],
+    },
+  });
+  expect(created.status()).toBe(201);
+  const song = await created.json();
+  expect(song.youtubeUrl).toBe(link);
+
+  // The library list carries the derived link the web queue reads.
+  const list = await (await api.get(`/bands/${BAND}/songs`)).json();
+  expect(list.find((s: { id: string }) => s.id === song.id).youtubeUrl).toBe(
+    link,
+  );
+
+  const res = await api.post(LIBRARY, { data: { name: "With reference" } });
+  expect((await res.json()).exported).toBe(4);
+  const [playlist] = await testApi.youtubeCreatedPlaylists();
+  expect(playlist!.videoIds).toContain("refOnly0001");
+
+  const slId = await gigSetlist(api, seed.gigs.upcomingClub.id);
+  await api.put(`/bands/${BAND}/setlists/${slId}/items`, {
+    data: { songIds: [song.id] },
+  });
+  const detail = await (
+    await api.get(`/bands/${BAND}/setlists/${slId}`)
+  ).json();
+  expect(detail.items[0].youtubeUrl).toBe(link);
+  const viaSetlist = await api.post(
+    `/bands/${BAND}/setlists/${slId}/export/youtube`,
+    { data: { name: "Setlist" } },
+  );
+  expect((await viaSetlist.json()).exported).toBe(1);
+  await api.dispose();
+});
