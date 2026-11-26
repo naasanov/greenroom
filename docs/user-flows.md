@@ -751,7 +751,7 @@ Expected: song's "Files" section lists both gig media links and Drive file/folde
 ### LIB-22 Import playlist, summary
 Tags: [real-spotify] for real; fake mode uses fake playlists.
 1. Import a playlist; wait.
-Expected: progress indicator, then summary like "52 added, 8 already in library"; duplicates skipped.
+Expected: progress indicator, then summary like "52 added, 8 already in library"; duplicates skipped. The "already in library" and "failed" parts appear only when their count is above zero (e.g. "52 added"); an import that adds nothing and skips nothing reads "Nothing to import".
 
 ---
 
@@ -783,8 +783,8 @@ Section: Playlists & Spotify auth.
 Expected: signup and first sign-in never ask for Spotify. Track lookup and search work without login.
 
 ### SPOT-02 Playlist import requires Spotify login [real-spotify]
-1. Import a playlist link while not connected.
-Expected: import dialog shows a connect step; after login the import proceeds. Account must be in the Spotify app's User Management.
+1. Open Import playlist while not connected.
+Expected: the dialog shows the connect step as soon as it opens, before any link is pasted; a link carried in from Add song resumes the import after login. Account must be in the Spotify app's User Management.
 
 ### SPOT-03 Private or missing playlist while logged out [real-spotify]
 1. Paste an inaccessible playlist link.
