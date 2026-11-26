@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Download,
-  ExternalLink,
-  FileQuestion,
-  HardDrive,
-  X,
-} from "lucide-react";
+import { Download, ExternalLink, FileQuestion, X } from "lucide-react";
 import { useEffect } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { startDownload } from "@/components/media/media-download";
@@ -66,7 +60,7 @@ export function FileViewer({
             aria-label="Open in Drive"
             data-testid="viewer-drive-link"
           >
-            <HardDrive />
+            <ExternalLink />
           </a>
         </Button>
         {canDownload ? (
