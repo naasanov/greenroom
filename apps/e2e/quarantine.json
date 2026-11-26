@@ -1,26 +1,5 @@
 {
-  "desktop": [
-    {
-      "file": "files-import.spec.ts",
-      "title": "choose an existing folder as the gigs root"
-    },
-    {
-      "file": "files-import.spec.ts",
-      "title": "create a new Gigs folder"
-    },
-    {
-      "file": "files-import.spec.ts",
-      "title": "skip keeps the default Gigs folder"
-    },
-    {
-      "file": "files-import.spec.ts",
-      "title": "admins change the gigs folder later from settings"
-    },
-    {
-      "file": "setlist-gig.spec.ts",
-      "title": "a row can be reordered by dragging its handle"
-    }
-  ],
+  "desktop": [],
   "mobile": [
     {
       "file": "agenda-drawer.spec.ts",

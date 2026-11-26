@@ -301,16 +301,43 @@ test("a row can be reordered with the keyboard", async ({ page, isMobile }) => {
     .toEqual(["Midnight Train", "Skyline Drive"]);
 });
 
+/** Resolves once the element's box is identical on two reads a few frames apart. */
+async function expectStill(locator: Locator) {
+  let last = "";
+  await expect(async () => {
+    const box = JSON.stringify(await locator.boundingBox());
+    await locator
+      .page()
+      .evaluate(
+        () =>
+          new Promise<void>((r) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => r())),
+          ),
+      );
+    const still = box === last;
+    last = box;
+    expect(still).toBe(true);
+  }).toPass();
+}
+
 test("a row can be reordered by dragging its handle", async ({
   page,
   isMobile,
 }) => {
   test.skip(isMobile, "Pointer drag is covered on desktop");
-  await openGig(page, seed.gigs.upcomingClub);
-  await expect(rows(page)).toHaveCount(5);
+  await openClubGig(page, 5);
+  // Centre the list so the drop point is far from the drawer's auto-scroll edge bands.
+  await rows(page)
+    .nth(2)
+    .evaluate((el) => el.scrollIntoView({ block: "center" }));
   const handle = page.getByRole("button", { name: "Reorder Skyline Drive" });
+  await expectStill(handle);
   const from = (await handle.boundingBox())!;
   const target = (await rows(page).nth(2).boundingBox())!;
+  const bodyBox = (await (await drawerBody(page)).asElement()!.boundingBox())!;
+  const dropY = target.y + target.height - 8;
+  expect(dropY).toBeGreaterThan(bodyBox.y + bodyBox.height * 0.1);
+  expect(dropY).toBeLessThan(bodyBox.y + bodyBox.height * 0.9);
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(from.x + 10, target.y + target.height - 8, {
@@ -361,13 +388,13 @@ const drawerBody = (page: Page) =>
     return n!;
   });
 
-/** Opens the club gig from the agenda and waits for its 30 setlist rows. */
-async function openLongGig(page: Page) {
+/** Opens the club gig from the agenda, waits for its setlist rows and for the drawer to stop sliding. */
+async function openClubGig(page: Page, rowCount: number) {
   await page.goto("/events");
   const card = agendaCard(page, seed.gigs.upcomingClub.title);
-  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card).toBeVisible({ timeout: 45_000 });
   await card.click();
-  await expect(rows(page)).toHaveCount(30, { timeout: 20_000 });
+  await expect(rows(page)).toHaveCount(rowCount, { timeout: 45_000 });
   // Measure only after the drawer's slide-up has settled.
   const drawer = page.locator("[data-vaul-drawer]:not([data-exiting])");
   let last = -1;
@@ -378,6 +405,8 @@ async function openLongGig(page: Page) {
     expect(settled).toBe(true);
   }).toPass();
 }
+
+const openLongGig = (page: Page) => openClubGig(page, 30);
 
 test("dropping a row near the top edge leaves the drawer scroll where it was", async ({
   page,
