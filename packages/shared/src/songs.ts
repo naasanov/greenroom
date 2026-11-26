@@ -222,6 +222,86 @@ export function youtubeMusicReferenceUrl(
   return ref?.value ?? null;
 }
 
+type LabeledValue = { label: string; value: string };
+
+/** The value of the first reference row whose label is the given magic key, or null. */
+function firstReferenceValue(
+  refs: readonly LabeledValue[],
+  key: MagicReference["key"],
+): string | null {
+  return (
+    refs.find((r) => findMagicReference(r.label)?.key === key)?.value ?? null
+  );
+}
+
+/** The value of the first "Spotify" reference row, or null. */
+export const spotifyReferenceUrl = (refs: readonly LabeledValue[]) =>
+  firstReferenceValue(refs, "spotify");
+
+/** The value of the first "YouTube" reference row, or null. */
+export const youtubeReferenceUrl = (refs: readonly LabeledValue[]) =>
+  firstReferenceValue(refs, "youtube");
+
+/** The canonical link for a Spotify track id. */
+export const spotifyTrackUrl = (id: string): string =>
+  `https://open.spotify.com/track/${id}`;
+
+/**
+ * The track id in an open.spotify.com track link (an intl- prefix and any
+ * query string are allowed); null for other hosts, kinds and short links.
+ */
+export function spotifyTrackIdFromUrl(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return null;
+  let u: URL;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    return null;
+  }
+  if (
+    u.protocol !== "https:" ||
+    u.hostname.toLowerCase() !== "open.spotify.com"
+  )
+    return null;
+  const m = /^\/(?:intl-[a-z]+\/)?track\/([A-Za-z0-9_-]+)\/?$/.exec(u.pathname);
+  return m?.[1] ?? null;
+}
+
+/**
+ * The Spotify track id derived from the first "Spotify" reference. A song with
+ * that reference but no parseable link (a short link) has no id; only a song
+ * without the reference falls back to the stored id.
+ */
+export function deriveSpotifyTrackId(
+  refs: readonly LabeledValue[],
+  fallback: string | null | undefined,
+): string | null {
+  const ref = spotifyReferenceUrl(refs);
+  return ref === null ? (fallback ?? null) : spotifyTrackIdFromUrl(ref);
+}
+
+/** The first "YouTube" reference value, else the stored link. */
+export function deriveYoutubeUrl(
+  refs: readonly LabeledValue[],
+  fallback: string | null | undefined,
+): string | null {
+  return youtubeReferenceUrl(refs) ?? fallback ?? null;
+}
+
+/** True for a https spotify.link short URL, which carries no track id. */
+export function isSpotifyShortLink(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return (
+      u.protocol === "https:" && u.hostname.toLowerCase() === "spotify.link"
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** True for an https link on one of the magic key's hosts (Ultimate Guitar also bans ports and credentials). */
 export function validateMagicReferenceValue(
   entry: MagicReference,

@@ -1,5 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { ResolveResult, SongCandidate } from "@greenroom/shared";
+import {
+  isSpotifyShortLink,
+  spotifyTrackUrl,
+  type ResolveResult,
+  type SongCandidate,
+} from "@greenroom/shared";
 import {
   SPOTIFY,
   YOUTUBE,
@@ -30,7 +35,7 @@ export class SmartAddService {
   ) {}
 
   async resolve(bandId: string, rawInput: string): Promise<ResolveResult> {
-    const input = rawInput.trim();
+    const input = await this.expandShortLink(rawInput.trim());
     if (SPOTIFY_PLAYLIST_RE.test(input)) {
       return { kind: "playlist", candidates: [] };
     }
@@ -80,6 +85,13 @@ export class SmartAddService {
       kind: "search",
       candidates: tracks.map((t) => this.fromTrack(t, index)),
     };
+  }
+
+  /** A spotify.link short URL becomes its canonical track link; anything else, or a failed lookup, is unchanged. */
+  private async expandShortLink(input: string): Promise<string> {
+    if (!isSpotifyShortLink(input)) return input;
+    const id = await this.spotify.resolveShortLink(input).catch(() => null);
+    return id ? spotifyTrackUrl(id) : input;
   }
 
   private fromTrack(t: SpotifyTrack, index: SongIndex): SongCandidate {

@@ -6,7 +6,7 @@ import {
   type SetlistDetail,
   type SetlistItem,
 } from "@greenroom/shared";
-import { youtubeMusicUrls } from "../songs/youtube-music.js";
+import { referenceLinks } from "../songs/reference-links.js";
 
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Db = Database | Tx;
@@ -24,19 +24,20 @@ export async function liveItems(
       artist: songs.artist,
       durationSeconds: songs.durationSeconds,
       imageUrl: songs.imageUrl,
+      spotifyTrackId: songs.spotifyTrackId,
       youtubeUrl: songs.youtubeUrl,
     })
     .from(setlistItems)
     .innerJoin(songs, eq(songs.id, setlistItems.songId))
     .where(and(eq(setlistItems.setlistId, setlistId), isNull(songs.deletedAt)))
     .orderBy(asc(setlistItems.position), asc(setlistItems.id));
-  const musicUrls = await youtubeMusicUrls(
+  const links = await referenceLinks(
     db,
-    rows.map((r) => r.songId),
+    rows.map((r) => ({ ...r, id: r.songId })),
   );
   return rows.map((r, position) => ({
     ...r,
-    youtubeMusicUrl: musicUrls.get(r.songId) ?? null,
+    ...links.get(r.songId)!,
     position,
   }));
 }

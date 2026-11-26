@@ -1,3 +1,4 @@
+import { spotifyTrackIdFromUrl } from "@greenroom/shared";
 import {
   parseSpotifyId,
   type SpotifyAdapter,
@@ -19,6 +20,26 @@ const MAX_RETRY_WAIT_MS = 5000;
 const SEARCH_MAX = 50;
 
 const ADD_BATCH = 100;
+
+const SHORT_LINK_HOSTS = ["spotify.link", "open.spotify.com"];
+const SHORT_LINK_MAX_REDIRECTS = 4;
+const SHORT_LINK_TIMEOUT_MS = 6000;
+
+/** A plain https URL on a short-link host, with no credentials or custom port; else null. */
+function safeShortLinkUrl(raw: string): URL | null {
+  try {
+    const u = new URL(raw.trim());
+    const ok =
+      u.protocol === "https:" &&
+      SHORT_LINK_HOSTS.includes(u.hostname.toLowerCase()) &&
+      !u.username &&
+      !u.password &&
+      !u.port;
+    return ok ? u : null;
+  } catch {
+    return null;
+  }
+}
 
 type Json = Record<string, unknown>;
 
@@ -110,6 +131,31 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
     if (!res.ok) throw await failure("track lookup", res);
     const track = mapTrack(await res.json());
     return track ? { status: "ok", track } : { status: "not-found" };
+  }
+
+  /** Follows redirects by hand so every hop stays on an allowed host over https. */
+  async resolveShortLink(url: string): Promise<string | null> {
+    try {
+      return await this.followShortLink(url);
+    } catch {
+      return null;
+    }
+  }
+
+  private async followShortLink(url: string): Promise<string | null> {
+    let current = safeShortLinkUrl(url);
+    const signal = AbortSignal.timeout(SHORT_LINK_TIMEOUT_MS);
+    for (let hop = 0; current && hop <= SHORT_LINK_MAX_REDIRECTS; hop++) {
+      const id = spotifyTrackIdFromUrl(current.toString());
+      if (id) return id;
+      if (current.hostname.toLowerCase() !== "spotify.link") return null;
+      const res = await fetch(current, { redirect: "manual", signal });
+      await res.body?.cancel();
+      const location = res.headers.get("location");
+      if (res.status < 300 || res.status >= 400 || !location) return null;
+      current = safeShortLinkUrl(new URL(location, current).toString());
+    }
+    return null;
   }
 
   buildAuthUrl(input: {

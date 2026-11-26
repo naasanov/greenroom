@@ -11,6 +11,7 @@ import { API_URL } from "../src/env.js";
 import { expect, test } from "../src/fixtures.js";
 import type { TestApi } from "../src/test-api.js";
 import { connectSpotify } from "./spotify-helpers.js";
+import { connectYoutube } from "./youtube-helpers.js";
 
 test.skip(({ isMobile }) => isMobile, "API-level spec, desktop only");
 
@@ -826,4 +827,241 @@ test("updates only validate magic rows that changed", async ({
     },
   });
   expect(edited.status()).toBe(400);
+});
+
+test("a song with only a hand-added Spotify reference is found by dedupe and smart add", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const saved = await addSong(api, base, {
+    title: "Seven Nation Army",
+    artist: "The White Stripes",
+    references: [
+      {
+        label: "spotify",
+        value: "https://open.spotify.com/intl-fr/track/fakeTrack2?si=x",
+      },
+    ],
+  });
+  const detail = await (await api.get(`${base}/${saved.id}`)).json();
+  expect(detail).toMatchObject({ spotifyTrackId: "fakeTrack2" });
+
+  // Same track under other text, by column or by reference, is a duplicate.
+  for (const data of [
+    { title: "Other title", spotifyTrackId: "fakeTrack2" },
+    {
+      title: "Another title",
+      references: [
+        {
+          label: "Spotify",
+          value: "https://open.spotify.com/track/fakeTrack2",
+        },
+      ],
+    },
+  ]) {
+    const dup = await api.post(base, { data });
+    expect(dup.status()).toBe(409);
+    expect(await dup.json()).toMatchObject({
+      code: "DUPLICATE_SONG",
+      songId: saved.id,
+    });
+  }
+
+  // A candidate for that track points at the saved song even though titles differ.
+  await api.patch(`${base}/${saved.id}`, { data: { title: "Renamed" } });
+  const res = await api.post(`${base}/resolve`, {
+    data: { input: "https://open.spotify.com/track/fakeTrack2" },
+  });
+  expect((await res.json()).candidates[0].existingSongId).toBe(saved.id);
+
+  // Removing the reference removes the id: references are the source of truth.
+  const cleared = await (
+    await api.patch(`${base}/${saved.id}`, { data: { references: [] } })
+  ).json();
+  expect(cleared.spotifyTrackId).toBeNull();
+  await api.dispose();
+});
+
+test("the stored columns remain a fallback when a song has no matching reference", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const yt = "https://www.youtube.com/watch?v=fakeVid0001";
+  const song = await addSong(api, base, {
+    title: "Columns only",
+    spotifyTrackId: "fakeTrack4",
+    youtubeUrl: yt,
+    references: [{ label: "Lyrics", value: "https://lyrics.example.com/x" }],
+  });
+  const fromList = (await (await api.get(base)).json())[0];
+  expect(fromList).toMatchObject({
+    spotifyTrackId: "fakeTrack4",
+    youtubeUrl: yt,
+  });
+  expect(await (await api.get(`${base}/${song.id}`)).json()).toMatchObject({
+    spotifyTrackId: "fakeTrack4",
+    youtubeUrl: yt,
+  });
+
+  // A reference takes over from the column once it exists.
+  const withRef = await (
+    await api.patch(`${base}/${song.id}`, {
+      data: {
+        references: [
+          { label: "YouTube", value: "https://youtu.be/fakeVid0002" },
+        ],
+      },
+    })
+  ).json();
+  expect(withRef).toMatchObject({
+    spotifyTrackId: "fakeTrack4",
+    youtubeUrl: "https://youtu.be/fakeVid0002",
+  });
+  await api.dispose();
+});
+
+test("YouTube references fill an empty duration when added or changed", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const ref = (id: string) => [
+    { label: "YouTube", value: `https://www.youtube.com/watch?v=${id}` },
+  ];
+
+  const created = await (
+    await api.post(base, {
+      data: { title: "From reference", references: ref("fakeVid0001") },
+    })
+  ).json();
+  expect(created.durationSeconds).toBe(215);
+
+  const explicit = await (
+    await api.post(base, {
+      data: {
+        title: "Explicit",
+        durationSeconds: 99,
+        references: ref("fakeVid0001"),
+      },
+    })
+  ).json();
+  expect(explicit.durationSeconds).toBe(99);
+
+  // Adding the reference later fills only an empty duration.
+  const bare = await (await api.post(base, { data: { title: "Bare" } })).json();
+  const added = await (
+    await api.patch(`${base}/${bare.id}`, {
+      data: { references: ref("fakeVid0002") },
+    })
+  ).json();
+  expect(added.durationSeconds).toBe(3725);
+  const changed = await (
+    await api.patch(`${base}/${bare.id}`, {
+      data: { references: ref("fakeVid0001") },
+    })
+  ).json();
+  expect(changed.durationSeconds).toBe(3725);
+
+  // An unchanged reference triggers no lookup for a song still without a duration.
+  const unknown = await (
+    await api.post(base, {
+      data: { title: "Gone", references: ref("noSuchVid99") },
+    })
+  ).json();
+  expect(unknown.durationSeconds).toBeNull();
+  await api.dispose();
+});
+
+test("smart add resolves a pasted spotify.link and leaves unknown ones empty", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  const resolve = async (input: string) =>
+    (await api.post(`${base}/resolve`, { data: { input } })).json();
+  const hit = await resolve("https://spotify.link/fakeTrack1");
+  expect(hit.kind).toBe("spotify-link");
+  expect(hit.candidates[0]).toMatchObject({
+    spotifyTrackId: "fakeTrack1",
+    references: [
+      { label: "Spotify", value: "https://open.spotify.com/track/fakeTrack1" },
+    ],
+  });
+  expect((await resolve("https://spotify.link/unknownOne")).candidates).toEqual(
+    [],
+  );
+  await api.dispose();
+});
+
+test("deleting a reference clears the legacy column so the link does not come back", async ({
+  testApi,
+}) => {
+  const { api, base } = await bandWithClient(testApi);
+  await connectSpotify(api);
+  await connectYoutube(api);
+  const yt = "https://www.youtube.com/watch?v=fakeVid0001";
+  const refs = [
+    { label: "spotify", value: "https://open.spotify.com/track/fakeTrack1" },
+    { label: " YouTube ", value: yt },
+  ];
+  const song = await addSong(api, base, {
+    title: "Dropped",
+    spotifyTrackId: "fakeTrack1",
+    youtubeUrl: yt,
+  });
+  // Keeps the fallback while it never had a reference row, even on unrelated edits.
+  const untouched = await (
+    await api.patch(`${base}/${song.id}`, {
+      data: {
+        references: [{ label: "Lyrics", value: "https://l.example.com" }],
+      },
+    })
+  ).json();
+  expect(untouched).toMatchObject({
+    spotifyTrackId: "fakeTrack1",
+    youtubeUrl: yt,
+  });
+
+  // A control song that stays linked keeps both exports valid.
+  await addSong(api, base, {
+    title: "Kept",
+    references: [
+      { label: "Spotify", value: "https://open.spotify.com/track/fakeTrack2" },
+      {
+        label: "YouTube",
+        value: "https://www.youtube.com/watch?v=fakeVid0002",
+      },
+    ],
+  });
+
+  const withRows = await (
+    await api.patch(`${base}/${song.id}`, { data: { references: refs } })
+  ).json();
+  expect(withRows).toMatchObject({
+    spotifyTrackId: "fakeTrack1",
+    youtubeUrl: yt,
+  });
+
+  const cleared = await (
+    await api.patch(`${base}/${song.id}`, { data: { references: [] } })
+  ).json();
+  expect(cleared.spotifyTrackId).toBeNull();
+  expect(cleared.youtubeUrl).toBeNull();
+  const reread = await (await api.get(`${base}/${song.id}`)).json();
+  expect(reread.spotifyTrackId).toBeNull();
+  expect(reread.youtubeUrl).toBeNull();
+
+  const spotify = await (
+    await api.post(`${base}/export`, { data: { name: "S" } })
+  ).json();
+  expect(spotify.exported).toBe(1);
+  expect(spotify.skipped.map((x: { songId: string }) => x.songId)).toContain(
+    song.id,
+  );
+  const youtube = await (
+    await api.post(`${base}/export/youtube`, { data: { name: "Y" } })
+  ).json();
+  expect(youtube.exported).toBe(1);
+  expect(youtube.skipped.map((x: { songId: string }) => x.songId)).toContain(
+    song.id,
+  );
+  await api.dispose();
 });

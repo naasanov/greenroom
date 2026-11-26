@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, inArray, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import {
   gigSetlists,
   gigs,
@@ -58,21 +58,13 @@ export class SetlistsService {
     name: string,
   ): Promise<ExportResult> {
     const detail = await this.get(bandId, setlistId);
-    const ids = detail.items.map((i) => i.songId);
-    const rows = ids.length
-      ? await this.db
-          .select({ id: songs.id, spotifyTrackId: songs.spotifyTrackId })
-          .from(songs)
-          .where(inArray(songs.id, ids))
-      : [];
-    const track = new Map(rows.map((r) => [r.id, r.spotifyTrackId]));
     return this.exporter.exportSongs(
       userId,
       name,
       detail.items.map((i) => ({
         id: i.songId,
         title: i.title,
-        spotifyTrackId: track.get(i.songId) ?? null,
+        spotifyTrackId: i.spotifyTrackId,
       })),
     );
   }

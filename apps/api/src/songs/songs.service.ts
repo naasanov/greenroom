@@ -29,7 +29,10 @@ import {
 } from "@greenroom/db";
 import {
   SONG_ERROR_CODES,
+  deriveSpotifyTrackId,
   findMagicReference,
+  isSpotifyShortLink,
+  spotifyTrackUrl,
   validateMagicReferenceValue,
   type CreateSong,
   type DeletedSong,
@@ -42,14 +45,23 @@ import {
   type SongSummary,
   type UpdateSong,
   type UsedIn,
-  youtubeMusicReferenceUrl,
+  youtubeReferenceUrl,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { resolveAssignment } from "../events/assignment.js";
 import { expandSeries } from "../events/occurrences.js";
-import { YOUTUBE, type YoutubeAdapter } from "../integrations/index.js";
+import {
+  SPOTIFY,
+  YOUTUBE,
+  type SpotifyAdapter,
+  type YoutubeAdapter,
+} from "../integrations/index.js";
+import {
+  linksFromReferences,
+  referenceLinks,
+  type ReferenceLinks,
+} from "./reference-links.js";
 import { SongIndex } from "./song-match.js";
-import { youtubeMusicUrls } from "./youtube-music.js";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type SongRow = typeof songs.$inferSelect;
@@ -89,6 +101,7 @@ export class SongsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: Database,
     @Inject(YOUTUBE) private readonly youtube: YoutubeAdapter,
+    @Inject(SPOTIFY) private readonly spotify: SpotifyAdapter,
   ) {}
 
   // ---- list ----
@@ -140,13 +153,13 @@ export class SongsService {
       .from(songs)
       .where(where)
       .orderBy(...order);
-    const musicUrls = await youtubeMusicUrls(
+    const links = await referenceLinks(
       this.db,
-      rows.map((r) => r.song.id),
+      rows.map((r) => r.song),
     );
     return rows.map((r) => ({
       ...this.summary(r.song),
-      youtubeMusicUrl: musicUrls.get(r.song.id) ?? null,
+      ...links.get(r.song.id)!,
       setlistCount: r.setlistCount,
       lastPlayedDate: r.lastPlayedDate,
     }));
@@ -178,8 +191,15 @@ export class SongsService {
   // ---- create ----
 
   async create(bandId: string, input: CreateSong): Promise<SongCreated> {
+    const references = await this.resolveSpotifyShortLink(
+      normalizeReferences(input.references ?? [], []),
+    );
     if (!input.force) {
-      const existing = await this.findDuplicate(bandId, input);
+      const existing = await this.findDuplicate(bandId, {
+        title: input.title,
+        artist: input.artist,
+        spotifyTrackId: deriveSpotifyTrackId(references, input.spotifyTrackId),
+      });
       if (existing) {
         throw new ConflictException({
           code: SONG_ERROR_CODES.duplicateSong,
@@ -188,9 +208,11 @@ export class SongsService {
         });
       }
     }
-    const references = normalizeReferences(input.references ?? [], []);
     const durationSeconds =
-      input.durationSeconds ?? (await this.youtubeDuration(input.youtubeUrl));
+      input.durationSeconds ??
+      (await this.youtubeDuration(
+        youtubeReferenceUrl(references) ?? input.youtubeUrl,
+      ));
     const row = await this.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(songs)
@@ -220,23 +242,47 @@ export class SongsService {
   ): Promise<SongDetail> {
     const existing = await this.findRow(this.db, bandId, songId);
     const { references: rawRefs, ...fields } = input;
+    const stored = rawRefs
+      ? await this.db
+          .select({ label: songLinks.label, value: songLinks.value })
+          .from(songLinks)
+          .where(eq(songLinks.songId, songId))
+          .orderBy(asc(songLinks.position), asc(songLinks.id))
+      : [];
     const references = rawRefs
-      ? normalizeReferences(
-          rawRefs,
-          await this.db
-            .select({ label: songLinks.label, value: songLinks.value })
-            .from(songLinks)
-            .where(eq(songLinks.songId, songId)),
-        )
+      ? await this.resolveSpotifyShortLink(normalizeReferences(rawRefs, stored))
       : undefined;
-    // A changed YouTube link fills an empty duration; a set duration is never overwritten.
+    // An added or changed YouTube link fills an empty duration; a set duration is never overwritten.
+    const newYoutube =
+      (references && youtubeReferenceUrl(references)) || fields.youtubeUrl;
+    const oldYoutube =
+      (references && youtubeReferenceUrl(stored)) || existing.youtubeUrl;
     if (
       fields.durationSeconds == null &&
       existing.durationSeconds == null &&
-      fields.youtubeUrl &&
-      fields.youtubeUrl !== existing.youtubeUrl
+      newYoutube &&
+      newYoutube !== oldYoutube
     ) {
-      fields.durationSeconds = await this.youtubeDuration(fields.youtubeUrl);
+      fields.durationSeconds = await this.youtubeDuration(newYoutube);
+    }
+    // Removing a reference also clears the legacy column, which would otherwise bring the link back.
+    if (references) {
+      const had = (key: "spotify" | "youtube", rows: ReferenceInput[]) =>
+        rows.some((r) => findMagicReference(r.label)?.key === key);
+      if (
+        had("spotify", stored) &&
+        !had("spotify", references) &&
+        fields.spotifyTrackId === undefined
+      ) {
+        fields.spotifyTrackId = null;
+      }
+      if (
+        had("youtube", stored) &&
+        !had("youtube", references) &&
+        fields.youtubeUrl === undefined
+      ) {
+        fields.youtubeUrl = null;
+      }
     }
     const patch = Object.fromEntries(
       Object.entries(fields).filter(([, v]) => v !== undefined),
@@ -268,6 +314,30 @@ export class SongsService {
     }
   }
 
+  /**
+   * Replaces a spotify.link short URL in the first "Spotify" row with the
+   * canonical track link. A failed lookup keeps the row as entered.
+   */
+  private async resolveSpotifyShortLink(
+    refs: ReferenceInput[],
+  ): Promise<ReferenceInput[]> {
+    const at = refs.findIndex(
+      (r) => findMagicReference(r.label)?.key === "spotify",
+    );
+    const ref = refs[at];
+    if (!ref || !isSpotifyShortLink(ref.value)) return refs;
+    let id: string | null = null;
+    try {
+      id = await this.spotify.resolveShortLink(ref.value);
+    } catch {
+      id = null;
+    }
+    if (!id) return refs;
+    return refs.map((r, i) =>
+      i === at ? { ...r, value: spotifyTrackUrl(id) } : r,
+    );
+  }
+
   // ---- delete ----
 
   async remove(bandId: string, songId: string): Promise<DeletedSong> {
@@ -292,7 +362,36 @@ export class SongsService {
       })
       .from(songs)
       .where(and(eq(songs.bandId, bandId), isNull(songs.deletedAt)));
-    return new SongIndex(rows);
+    // Only Spotify rows matter for dedupe; the first row per song wins.
+    const spotifyRows = await this.db
+      .select({ songId: songLinks.songId, value: songLinks.value })
+      .from(songLinks)
+      .innerJoin(songs, eq(songs.id, songLinks.songId))
+      .where(
+        and(
+          eq(songs.bandId, bandId),
+          isNull(songs.deletedAt),
+          sql`lower(btrim(${songLinks.label})) = 'spotify'`,
+        ),
+      )
+      .orderBy(asc(songLinks.position), asc(songLinks.id));
+    const firstSpotify = new Map<string, string>();
+    for (const r of spotifyRows) {
+      if (!firstSpotify.has(r.songId)) firstSpotify.set(r.songId, r.value);
+    }
+    return new SongIndex(
+      rows.map((r) => {
+        const ref = firstSpotify.get(r.id);
+        return {
+          id: r.id,
+          title: r.title,
+          artist: r.artist,
+          spotifyTrackId: ref
+            ? deriveSpotifyTrackId([{ label: "Spotify", value: ref }], null)
+            : r.spotifyTrackId,
+        };
+      }),
+    );
   }
 
   async findDuplicate(
@@ -310,15 +409,16 @@ export class SongsService {
 
   private summary(
     s: SongRow,
-  ): Omit<SongSummary, "setlistCount" | "lastPlayedDate" | "youtubeMusicUrl"> {
+  ): Omit<
+    SongSummary,
+    keyof ReferenceLinks | "setlistCount" | "lastPlayedDate"
+  > {
     return {
       id: s.id,
       title: s.title,
       artist: s.artist,
       durationSeconds: s.durationSeconds,
       imageUrl: s.imageUrl,
-      spotifyTrackId: s.spotifyTrackId,
-      youtubeUrl: s.youtubeUrl,
       createdAt: s.createdAt.toISOString(),
     };
   }
@@ -388,7 +488,7 @@ export class SongsService {
     }));
     return {
       ...this.summary(song),
-      youtubeMusicUrl: youtubeMusicReferenceUrl(references),
+      ...linksFromReferences(references, song),
       setlistCount,
       lastPlayedDate,
       bandId: song.bandId,

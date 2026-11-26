@@ -567,7 +567,11 @@ export function SongSheet({
     setPending(values);
     setDuplicateId(null);
     create.mutate(
-      { ...toSongBody(values), ...draft.meta, ...(force ? { force } : {}) },
+      {
+        ...toSongBody(values),
+        imageUrl: draft.meta.imageUrl,
+        ...(force ? { force } : {}),
+      },
       {
         onSuccess: (created) => {
           handleDirty(false);

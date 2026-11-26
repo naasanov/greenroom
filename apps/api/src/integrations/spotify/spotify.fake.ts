@@ -168,6 +168,18 @@ export class FakeSpotifyAdapter implements SpotifyAdapter {
     return t ? { status: "ok", track: { ...t } } : { status: "not-found" };
   }
 
+  /** `https://spotify.link/<trackId>` resolves to that catalog track; anything else fails. */
+  async resolveShortLink(url: string): Promise<string | null> {
+    try {
+      const u = new URL(url.trim());
+      if (u.protocol !== "https:" || u.hostname !== "spotify.link") return null;
+      const id = u.pathname.split("/")[1] ?? "";
+      return this.tracks.has(id) ? id : null;
+    } catch {
+      return null;
+    }
+  }
+
   buildAuthUrl(input: {
     redirectUri: string;
     state: string;

@@ -227,7 +227,6 @@ export class ImportsService implements OnModuleInit {
             artist,
             durationSeconds: Math.round(t.durationMs / 1000),
             imageUrl: t.albumArtUrl,
-            spotifyTrackId: t.id,
           })
           .returning({ id: songs.id });
         await tx.insert(songLinks).values({
