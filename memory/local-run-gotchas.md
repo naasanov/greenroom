@@ -18,3 +18,4 @@ applies-to: apps/e2e/**
 - A dev-owned cluster started with `initdb -U greenroom -D ~/pgdata-dev` and `pg_ctl -o "-k /tmp -p 5432"` (create the `greenroom` and `greenroom_test` DBs) needs no env changes (seen 2026-11-19).
 Seen again: 2026-11-23 (system Postgres down at build start; the dev-owned cluster in `~/pgdata-dev` on :5432 worked, escalated in #141).
 Seen again: 2026-11-24 (system Postgres down at build start for the 10th night); the entrypoint chown and supervisor restart fix landed in factory-infra (#141) and takes effect after the owner runs a box deploy.
+Seen again: 2026-11-26 (single-agent runs, not only parallel ones: hypervisor CPU steal of 75 to 90% made page loads and OAuth-resume specs time out locally and agent runs take 1 to 3 hours; CI stayed the only reliable e2e signal).
