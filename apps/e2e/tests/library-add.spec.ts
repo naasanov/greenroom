@@ -233,7 +233,5 @@ test("a pasted playlist link switches to the import flow", async ({
     dialog.getByRole("textbox", { name: "Playlist link" }),
   ).toHaveValue("https://open.spotify.com/playlist/fakePlaylistPublic");
   await dialog.getByRole("button", { name: "Import" }).click();
-  await expect(dialog.getByTestId("import-summary")).toHaveText(
-    "3 added, 0 already in library",
-  );
+  await expect(dialog.getByTestId("import-summary")).toHaveText("3 added");
 });

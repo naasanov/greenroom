@@ -15,16 +15,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api";
 import { connectSpotify, useSpotifyStatus } from "@/lib/queries/spotify";
-import {
-  useImportProgress,
-  useSongs,
-  useStartImport,
-} from "@/lib/queries/songs";
-import { useDebounced } from "./use-debounced";
+import { useImportProgress, useStartImport } from "@/lib/queries/songs";
 
 function summary(p: ImportProgress): string {
-  const parts = [`${p.added} added`, `${p.skipped} already in library`];
+  const parts = [`${p.added} added`];
+  if (p.skipped > 0) parts.push(`${p.skipped} already in library`);
   if (p.failed > 0) parts.push(`${p.failed} failed`);
+  if (p.added === 0 && p.skipped === 0 && p.failed === 0) {
+    return "Nothing to import";
+  }
   return parts.join(", ");
 }
 
@@ -51,44 +50,6 @@ function Progress({ progress }: { progress: ImportProgress | undefined }) {
           ? `Importing ${progress?.done ?? 0} of ${total}...`
           : "Importing..."}
       </p>
-    </div>
-  );
-}
-
-/** Read-only search over songs already in the band's library. */
-function LibrarySearch({ bandId }: { bandId: string }) {
-  const [q, setQ] = useState("");
-  const debounced = useDebounced(q.trim(), 200);
-  const songs = useSongs(bandId, { q: debounced, sort: "title" });
-  const rows = songs.data ?? [];
-  return (
-    <div className="flex flex-col gap-3" data-testid="import-library">
-      <Input
-        autoFocus
-        aria-label="Search your library"
-        placeholder="Search by title or artist"
-        autoComplete="off"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <ul
-        className="flex max-h-64 flex-col overflow-y-auto"
-        data-testid="import-library-results"
-      >
-        {rows.map((s) => (
-          <li key={s.id} className="flex flex-col py-1.5 text-sm">
-            <span className="font-medium">{s.title}</span>
-            {s.artist ? (
-              <span className="text-muted-foreground">{s.artist}</span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {songs.isSuccess && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No songs in your library match.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -176,7 +137,6 @@ function ImportBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [mode, setMode] = useState<"playlist" | "library">("playlist");
   const error = start.error;
   const missing = isApiError(error, 404);
   const forbidden = isApiError(error, 403);
@@ -200,7 +160,7 @@ function ImportBody({
 
   if (importId) return <Progress progress={data} />;
 
-  if (needsLogin) {
+  if (needsLogin || status.data?.connected === false) {
     return (
       <ConnectPrompt
         url={url}
@@ -209,38 +169,6 @@ function ImportBody({
         }
         onCancel={onDone}
       />
-    );
-  }
-
-  const toggle = (
-    <div className="flex gap-2" role="group" aria-label="Import source">
-      <Button
-        type="button"
-        size="sm"
-        variant={mode === "playlist" ? "default" : "outline"}
-        aria-pressed={mode === "playlist"}
-        onClick={() => setMode("playlist")}
-      >
-        Spotify playlist
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant={mode === "library" ? "default" : "outline"}
-        aria-pressed={mode === "library"}
-        onClick={() => setMode("library")}
-      >
-        Your library
-      </Button>
-    </div>
-  );
-
-  if (mode === "library") {
-    return (
-      <div className="flex flex-col gap-3">
-        {toggle}
-        <LibrarySearch bandId={bandId} />
-      </div>
     );
   }
 
@@ -257,7 +185,6 @@ function ImportBody({
         begin(url.trim());
       }}
     >
-      {toggle}
       <Input
         autoFocus
         aria-label="Playlist link"
@@ -318,8 +245,8 @@ export function ImportDialog({
             Import playlist
           </DialogTitle>
           <DialogDescription>
-            Paste a Spotify playlist link to add its songs (ones already in your
-            library are skipped), or search the songs you already have.
+            Paste a Spotify playlist link to add its songs. Songs already in
+            your library are skipped.
           </DialogDescription>
         </DialogHeader>
         {open ? (
