@@ -14,6 +14,7 @@ import {
   SONG_ERROR_CODES,
   type ImportProgress,
   type ImportStatus,
+  type PlaylistCheck,
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import {
@@ -47,6 +48,8 @@ interface ImportOutput extends Counters {
 
 const PLAYLIST_URL_RE =
   /spotify:playlist:|open\.spotify\.com\/(?:intl-[a-z]+\/)?playlist\//;
+const NOT_READABLE_MESSAGE =
+  "Only playlists you own or collaborate on can be imported";
 const MEMORY_TTL_MS = 60 * 60 * 1000;
 
 /**
@@ -77,7 +80,34 @@ export class ImportsService implements OnModuleInit {
     );
   }
 
-  /** Validates the link, then queues the import. Private and missing playlists look the same. */
+  /** Looks the playlist up without queueing anything; a missing login is a 409. */
+  async check(userId: string, url: string): Promise<PlaylistCheck> {
+    const playlistId = PLAYLIST_URL_RE.test(url) ? parseSpotifyId(url) : null;
+    const invalid: PlaylistCheck = {
+      status: "invalid",
+      name: null,
+      trackCount: null,
+    };
+    if (!playlistId) return invalid;
+    const token = await this.requireToken(userId);
+    const res = await this.spotify.checkPlaylist(token, playlistId);
+    switch (res.status) {
+      case "ok":
+        return {
+          status: "importable",
+          name: res.name,
+          trackCount: res.trackCount,
+        };
+      case "metadata-only":
+        return { status: "metadata-only", name: res.name, trackCount: null };
+      case "not-found":
+        return invalid;
+      case "unauthorized":
+        throw this.loginRequired();
+    }
+  }
+
+  /** Validates the link, then queues the import; unreadable playlists are a 403, missing ones a 404. */
   async start(
     userId: string,
     bandId: string,
@@ -88,16 +118,16 @@ export class ImportsService implements OnModuleInit {
       throw new BadRequestException("Not a Spotify playlist link");
     }
     const res = await this.fetchPlaylist(userId, playlistId);
-    if (res.status === "forbidden") {
+    if (res.status === "forbidden" || res.status === "metadata-only") {
       throw new ForbiddenException({
         code: SONG_ERROR_CODES.playlistForbidden,
-        message: "Spotify does not share this playlist with your account",
+        message: NOT_READABLE_MESSAGE,
       });
     }
     if (res.status !== "ok") {
       throw new NotFoundException({
         code: SONG_ERROR_CODES.playlistNotFound,
-        message: "Can't find this playlist, it may not exist",
+        message: "Can't find this playlist. Check the link.",
       });
     }
     const importId = randomUUID();
@@ -159,7 +189,10 @@ export class ImportsService implements OnModuleInit {
     this.remember(importId, data.bandId, progress);
     try {
       const res = await this.fetchPlaylist(data.userId, data.playlistId);
-      if (res.status !== "ok") throw new Error("Playlist not found or private");
+      if (res.status === "forbidden" || res.status === "metadata-only") {
+        throw new Error(NOT_READABLE_MESSAGE);
+      }
+      if (res.status !== "ok") throw new Error("Playlist not found");
       const { playlist } = res;
       progress.playlistName = playlist.name;
       progress.total = playlist.tracks.length;
@@ -192,17 +225,23 @@ export class ImportsService implements OnModuleInit {
     userId: string,
     playlistId: string,
   ): Promise<Exclude<SpotifyPlaylistResult, { status: "unauthorized" }>> {
-    const token = await this.connections.getAccessToken(userId);
-    const res = token
-      ? await this.spotify.getPlaylist(token, playlistId)
-      : ({ status: "unauthorized" } as const);
-    if (res.status === "unauthorized") {
-      throw new ConflictException({
-        code: SONG_ERROR_CODES.spotifyLoginRequired,
-        message: "Connect Spotify to import playlists",
-      });
-    }
+    const token = await this.requireToken(userId);
+    const res = await this.spotify.getPlaylist(token, playlistId);
+    if (res.status === "unauthorized") throw this.loginRequired();
     return res;
+  }
+
+  private async requireToken(userId: string): Promise<string> {
+    const token = await this.connections.getAccessToken(userId);
+    if (!token) throw this.loginRequired();
+    return token;
+  }
+
+  private loginRequired(): ConflictException {
+    return new ConflictException({
+      code: SONG_ERROR_CODES.spotifyLoginRequired,
+      message: "Connect Spotify to import playlists",
+    });
   }
 
   private async importTrack(

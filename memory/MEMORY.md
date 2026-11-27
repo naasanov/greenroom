@@ -30,7 +30,7 @@ Before adding an entry, check for an existing one that covers it and update that
 
 - [Orchestrator role](orchestrator-role.md) — sessions start as Opus orchestrator; all code is written by Sonnet subagents
 - [No plan approval](no-plan-approval.md) — never present a plan or use plan mode; design internally and start delegating
-- [Parallel agent coordination](parallel-agent-coordination.md) — one lockfile owner per wave, orchestrator pre-installs deps, e2e mutex lock
+- [Parallel agent coordination](parallel-agent-coordination.md) — one lockfile owner per wave, orchestrator pre-installs deps, e2e and build mutex locks (`pnpm build:locked`)
 - [Commit cadence](commit-cadence.md) — orchestrator commits and pushes on its own after validated checkpoints; watch CI + staging deploy
 - [Status updates are immediate](status-updates-immediate.md) — push execution-plan status changes the moment they happen; /status reads GitHub main
 - [Secrets in Keychain](secrets-in-keychain.md) — Mac: Keychain generic passwords named after the env var, inject with `security`, never print; factory: env vars only, real-mode secrets absent
@@ -40,7 +40,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [E2E test scope](e2e-test-scope.md) — locally only targeted specs + smoke, never the full suite; CI runs the full suite on push
 - [Local run gotchas](local-run-gotchas.md) — full e2e across midnight fails date specs; `pnpm format` writes, revert stray reformatting; factory runs desktop only (WebKit crashes)
 - [Batch pushes](batch-pushes.md) — CI cancels in-progress runs per push; push validated commits together
-- [Known flaky e2e specs](flaky-e2e-specs.md) — files-import gigs root (desktop), agenda-drawer hand-off and media-upload wake lock (mobile) and the setlist-gig drag-reorder spec (desktop) are quarantined in a non-blocking CI job (apps/e2e/quarantine.json); failures there are not CI failures, never weaken assertions
+- [Known flaky e2e specs](flaky-e2e-specs.md) — the quarantine mechanism (apps/e2e/quarantine.json, now empty, non-blocking CI job) and the causes of past flakes; failures there are never CI failures, never weaken assertions
 - [Stage snapshot source](stage-snapshot-source.md) — stage renders from the offline snapshot; write mutations through, return undefined (not empty) on fetch failure
 - [Swipe gestures](swipe-gestures.md) — track pointerId, cancel on multi-touch, skip controls/portals, guard window keys, reset scroll
 - [WebKit route interception](webkit-route-interception.md) — page.route does not hold or fulfill reliably on mobile; MutationObserver, desktop-only specs
@@ -51,6 +51,11 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Calendar grid date dependence](calendar-grid-date-dependence.md) — seed dates are relative to today; page the grid with `pageToDay` / `pageAwayFromDay`
 - [Untrusted file parsing caps](untrusted-file-parsing-caps.md) — cap bytes, pixels and element counts before decoding user files
 - [Upload type allowlist](upload-type-allowlist.md) — type exceptions must still pass the per-link allow callback
+- [Dialog grid min-width](dialog-grid-min-width.md) — long names widen the DialogContent grid track; use grid-cols-[minmax(0,1fr)] plus min-w-0 on direct children, not on the container
+- [Folder link provenance](folder-link-provenance.md) — source_folder_id null means a hand link; hand upserts null it, backfill and poller keep the IS NOT NULL guard, chunk at 500, take the drive-poll lock
+- [Migration journal collisions](migration-journal-collisions.md) — parallel branches claim the same migration number; rebuild _journal.json in ascending when order, never rename an applied migration
+- [Factory DATABASE_URL is staging](factory-database-url-is-staging.md) — export local DATABASE_URL and TEST_DATABASE_URL in the same shell before any db, migrate, api test or e2e command
+- [Legacy column fallback and deletes](legacy-column-fallback-delete.md) — deleting a source reference must clear the fallback column or the derived value returns
 - [Audio worklet bundling](audio-worklet-bundling.md) — worklet libraries built from Function#toString break when bundled; serve from public/, verify in a browser
 - [WebKit audio e2e](webkit-audio-e2e.md) — assert play state not the audio clock; WebKit decodes durations short, round for display; small test WAVs
 - [Public assets and the proxy](public-assets-proxy-matcher.md) — new public/ file extensions need the proxy matcher exclusion or they redirect to sign-in

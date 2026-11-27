@@ -286,6 +286,24 @@ export const importPlaylistSchema = z.object({
 });
 export type ImportPlaylist = z.infer<typeof importPlaylistSchema>;
 
+/** Pre-import probe: same body as an import, nothing is started. */
+export const checkPlaylistSchema = importPlaylistSchema;
+export type CheckPlaylist = ImportPlaylist;
+
+/**
+ * `importable`: items are readable. `metadata-only`: the playlist exists but only
+ * its owner and collaborators can read the items. `invalid`: not a playlist link or not found.
+ */
+export type PlaylistCheckStatus = "importable" | "metadata-only" | "invalid";
+
+export interface PlaylistCheck {
+  status: PlaylistCheckStatus;
+  /** Present for `importable`, and for `metadata-only` when Spotify returned it. */
+  name: string | null;
+  /** Present for `importable` when Spotify reports it. */
+  trackCount: number | null;
+}
+
 export type ImportStatus = "queued" | "running" | "completed" | "failed";
 
 export interface ImportProgress {

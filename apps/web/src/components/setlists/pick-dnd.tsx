@@ -126,6 +126,14 @@ const collision: CollisionDetection = (args) => {
 
 const EDGE_BAND = 0.05;
 const EDGE_DWELL_MS = 200;
+// Reorder scrolling stays on until the pointer leaves this wider band, so
+// jitter across the entry band edge cannot stop and restart the scroll.
+const EDGE_EXIT_BAND = 0.1;
+// Reorder auto-scroll: speed ramps linearly over the exit band up to
+// ITEM_SCROLL_ACCEL px per tick; 4 ms keeps ticks close to the frame rate.
+const ITEM_SCROLL_ACCEL = 2;
+const ITEM_SCROLL_INTERVAL_MS = 4;
+const ITEM_SCROLL_THRESHOLD = { x: 0.2, y: EDGE_EXIT_BAND };
 
 function scrollParent(node: EventTarget | null): Element | null {
   let el = node instanceof Element ? node.parentElement : null;
@@ -145,7 +153,12 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     if (dwell.current !== null) window.clearTimeout(dwell.current);
     dwell.current = null;
   };
-  const [scrollEdge, setScrollEdge] = useState(true);
+  const [scrollEdge, setScrollEdgeState] = useState(true);
+  const edgeOpen = useRef(true);
+  const setScrollEdge = (open: boolean) => {
+    edgeOpen.current = open;
+    setScrollEdgeState(open);
+  };
   const [active, setActive] = useState<ActiveDrag | null>(null);
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -194,15 +207,23 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     // the pointer's viewport position.
     const scrolled = (scroller.current?.scrollTop ?? 0) - scrollStart.current;
     const y = src.clientY + e.delta.y - scrolled;
-    const band = box.height * EDGE_BAND;
-    const inBand =
-      (y >= box.top && y <= box.top + band) ||
-      (y >= box.bottom - band && y <= box.bottom);
-    if (inBand && dwell.current === null && !scrollEdge) {
-      dwell.current = window.setTimeout(
-        () => setScrollEdge(true),
-        EDGE_DWELL_MS,
+    const within = (fraction: number) => {
+      const band = box.height * fraction;
+      return (
+        (y >= box.top && y <= box.top + band) ||
+        (y >= box.bottom - band && y <= box.bottom)
       );
+    };
+    const isItem =
+      (e.active.data.current as DragData | undefined)?.type === "item";
+    // An open reorder scroll holds until the pointer leaves the wider exit band.
+    const inBand =
+      isItem && edgeOpen.current ? within(EDGE_EXIT_BAND) : within(EDGE_BAND);
+    if (inBand && dwell.current === null && !edgeOpen.current) {
+      dwell.current = window.setTimeout(() => {
+        dwell.current = null;
+        setScrollEdge(true);
+      }, EDGE_DWELL_MS);
     } else if (!inBand) {
       clearDwell();
       setScrollEdge(false);
@@ -248,7 +269,12 @@ export function PickDndProvider({ children }: { children: ReactNode }) {
     active?.type === "pick"
       ? { threshold: { x: 0.2, y: 0.05 }, enabled: scrollEdge }
       : active?.type === "item"
-        ? { canScroll }
+        ? {
+            canScroll,
+            acceleration: ITEM_SCROLL_ACCEL,
+            interval: ITEM_SCROLL_INTERVAL_MS,
+            threshold: ITEM_SCROLL_THRESHOLD,
+          }
         : { enabled: scrollEdge };
 
   return (

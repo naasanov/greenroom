@@ -1,6 +1,6 @@
 import { USERS, oauthConnections } from "@greenroom/db";
 import { expect, test } from "../src/fixtures.js";
-import { fabAction, openLibrary } from "./library-helpers.js";
+import { fabAction, openLibrary, sheet } from "./library-helpers.js";
 import {
   apiWithCookie,
   connectSpotify,
@@ -14,33 +14,52 @@ test.beforeEach(async ({ testApi, loginAs }) => {
   await loginAs(USERS.ava.email);
 });
 
-async function startImport(page: import("@playwright/test").Page) {
+async function openImport(page: import("@playwright/test").Page) {
   await openLibrary(page);
   await fabAction(page, "import-playlist");
-  const dialog = page.getByRole("dialog", { name: "Import playlist" });
+  return page.getByRole("dialog", { name: "Import playlist" });
+}
+
+async function pasteLink(page: import("@playwright/test").Page) {
+  const dialog = await openImport(page);
   await dialog.getByRole("textbox", { name: "Playlist link" }).fill(PLAYLIST);
-  await dialog.getByRole("button", { name: "Import" }).click();
   return dialog;
 }
 
-test("import without a connection asks to connect, then resumes", async ({
+test("opening import without a connection asks to connect up front", async ({
+  page,
+}) => {
+  const dialog = await openImport(page);
+  await expect(dialog.getByTestId("import-connect")).toContainText(
+    "Connect Spotify to import playlists",
+  );
+  await expect(
+    dialog.getByRole("textbox", { name: "Playlist link" }),
+  ).toHaveCount(0);
+});
+
+test("a link pasted into Add song reaches the connect prompt and resumes", async ({
   page,
 }) => {
   await fakeSpotifyConsent(page);
-  const dialog = await startImport(page);
+  await openLibrary(page);
+  await fabAction(page, "add-song");
+  await sheet(page)
+    .getByRole("textbox", { name: "Song link or search" })
+    .fill(PLAYLIST);
+  await sheet(page).getByRole("button", { name: "Import playlist" }).click();
+  const dialog = page.getByRole("dialog", { name: "Import playlist" });
   await expect(dialog.getByTestId("import-connect")).toContainText(
     "Connect Spotify to import playlists",
   );
   await dialog.getByRole("button", { name: "Connect Spotify" }).click();
   const reopened = page.getByRole("dialog", { name: "Import playlist" });
-  await expect(reopened.getByTestId("import-summary")).toHaveText(
-    "3 added, 0 already in library",
-  );
+  await expect(reopened.getByTestId("import-summary")).toHaveText("3 added");
   await expect(page).toHaveURL(/\/library$/);
 });
 
 test("cancel closes the connect prompt", async ({ page }) => {
-  const dialog = await startImport(page);
+  const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
@@ -49,7 +68,7 @@ test("a failed Spotify login reopens with an error and Connect", async ({
   page,
 }) => {
   await fakeSpotifyConsent(page, "deny");
-  const dialog = await startImport(page);
+  const dialog = await openImport(page);
   await dialog.getByRole("button", { name: "Connect Spotify" }).click();
   const reopened = page.getByRole("dialog", { name: "Import playlist" });
   await expect(reopened.getByTestId("import-connect-error")).toHaveText(
@@ -76,6 +95,19 @@ test("a revoked grant shows the connect prompt again", async ({
   await db
     .update(oauthConnections)
     .set({ accessTokenExpiresAt: new Date(Date.now() - 1000) });
-  const dialog = await startImport(page);
+  const dialog = await pasteLink(page);
   await expect(dialog.getByTestId("import-connect")).toBeVisible();
+  await expect(dialog.getByTestId("import-check")).toHaveCount(0);
+});
+
+test("the connect prompt explains that only owned or collaborative playlists import", async ({
+  page,
+}) => {
+  const dialog = await openImport(page);
+  await expect(dialog.getByTestId("import-connect")).toContainText(
+    "Only playlists you own or collaborate on can be imported",
+  );
+  await expect(dialog.getByTestId("import-connect")).not.toContainText(
+    "Private playlists",
+  );
 });

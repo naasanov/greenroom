@@ -750,8 +750,17 @@ Expected: song's "Files" section lists both gig media links and Drive file/folde
 
 ### LIB-22 Import playlist, summary
 Tags: [real-spotify] for real; fake mode uses fake playlists.
-1. Import a playlist; wait.
-Expected: progress indicator, then summary like "52 added, 8 already in library"; duplicates skipped.
+1. Import a playlist you own; wait.
+Expected: progress indicator, then summary like "52 added, 8 already in library"; duplicates skipped. The "already in library" and "failed" parts appear only when their count is above zero (e.g. "52 added"); an import that adds nothing and skips nothing reads "Nothing to import".
+
+### LIB-22a Import playlist, pre-flight check
+Tags: [real-spotify] for real; fake mode uses fake playlists (public, private-of-another-account, and not-owned).
+1. Open Import playlist (connected) and paste a link; the Import button is greyed out while "Checking link..." shows.
+2. Paste a playlist you own or collaborate on.
+3. Paste a playlist someone else owns (public or private).
+4. Paste a track link, a malformed link, or a playlist id that does not exist.
+5. Edit the link after any result.
+Expected: (2) a "Valid to import" message with the playlist name and song count, and Import enabled. (3) an error that only playlists you own or collaborate on can be imported (Spotify returns only metadata for others' playlists), Import disabled. (4) an "Invalid link" message, Import disabled. (5) the check re-runs for the new link; a slow earlier check never overwrites the newer result. Not being connected shows the connect step instead of an invalid-link message.
 
 ---
 
@@ -783,12 +792,12 @@ Section: Playlists & Spotify auth.
 Expected: signup and first sign-in never ask for Spotify. Track lookup and search work without login.
 
 ### SPOT-02 Playlist import requires Spotify login [real-spotify]
-1. Import a playlist link while not connected.
-Expected: import dialog shows a connect step; after login the import proceeds. Account must be in the Spotify app's User Management.
+1. Open Import playlist while not connected.
+Expected: the dialog shows the connect step as soon as it opens, before any link is pasted; a link carried in from Add song resumes the import after login. Account must be in the Spotify app's User Management.
 
-### SPOT-03 Private or missing playlist while logged out [real-spotify]
-1. Paste an inaccessible playlist link.
-Expected: "Can't see this playlist. It might be private" with a "Log in with Spotify" button; after login the link is retried automatically; still failing shows "playlist not found".
+### SPOT-03 Playlist you do not own [real-spotify]
+1. Paste a link to a public or private playlist owned by another account.
+Expected: the pre-flight check says only playlists you own or collaborate on can be imported and Import stays disabled (Spotify's development mode returns no items for other people's playlists). Connecting a different Spotify account does not help unless that account owns or collaborates on the playlist.
 
 ### SPOT-04 Export library to Spotify [real-spotify]
 1. Library header, "Export to Spotify"; edit name; confirm.
@@ -1243,7 +1252,7 @@ Expected: icon-only buttons have aria-labels (Edit, Close, etc.).
 16. Calendar month cell overflow behavior for many events is unspecified.
 17. Practice "cancel" display (canceled chip versus removed) is unspecified.
 18. Whether the Files tab and gigs root appear when Drive is unlinked, and the exact copy of Files-specific messages, are unspecified.
-19. Spotify playlist import in fake mode versus real: only real mode exercises the User Management restriction.
+19. Spotify playlist import in fake mode versus real: only real mode exercises the User Management restriction and Spotify's owner-or-collaborator rule for playlist items (fake mode models it with a not-owned playlist).
 
 ---
 

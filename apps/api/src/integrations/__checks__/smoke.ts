@@ -12,6 +12,7 @@ import {
   SPOTIFY,
   ULTIMATE_GUITAR,
   YOUTUBE,
+  FAKE_NOT_OWNED_PLAYLIST_ID,
   FAKE_PRIVATE_PLAYLIST_ID,
   FAKE_PUBLIC_PLAYLIST_ID,
   FAKE_SPOTIFY_OWNER_TOKEN,
@@ -181,7 +182,38 @@ async function main(): Promise<void> {
   assert.equal(
     (await spotify.getPlaylist("fake-spotify-other", FAKE_PRIVATE_PLAYLIST_ID))
       .status,
-    "forbidden",
+    "metadata-only",
+  );
+  assert.equal(
+    (
+      await spotify.getPlaylist(
+        "fake-spotify-other",
+        FAKE_NOT_OWNED_PLAYLIST_ID,
+      )
+    ).status,
+    "metadata-only",
+  );
+  assert.deepEqual(
+    await spotify.checkPlaylist("fake-spotify-other", FAKE_PUBLIC_PLAYLIST_ID),
+    { status: "ok", name: "Fake Public Setlist", trackCount: 3 },
+  );
+  assert.equal(
+    (
+      await spotify.checkPlaylist(
+        "fake-spotify-other",
+        FAKE_NOT_OWNED_PLAYLIST_ID,
+      )
+    ).status,
+    "metadata-only",
+  );
+  assert.equal(
+    (await spotify.checkPlaylist("fake-spotify-other", "nope")).status,
+    "not-found",
+  );
+  assert.equal(
+    (await spotify.checkPlaylist("not-a-token", FAKE_PUBLIC_PLAYLIST_ID))
+      .status,
+    "unauthorized",
   );
   assert.equal(
     (
