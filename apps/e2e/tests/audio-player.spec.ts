@@ -12,13 +12,13 @@ const NAME = "riff.wav";
 const RATE = 4000;
 const SECONDS = 6;
 
-/** 6 s mono 16-bit PCM sine (4 kHz keeps the base64 body under the JSON limit): loud for the first half, quiet for the second. */
-function wav(): Buffer {
-  const samples = RATE * SECONDS;
+/** Mono 16-bit PCM sine (low rates keep the base64 body under the JSON limit): loud for the first half, quiet for the second. */
+function wav(seconds = SECONDS, rate = RATE): Buffer {
+  const samples = rate * seconds;
   const data = Buffer.alloc(samples * 2);
   for (let i = 0; i < samples; i++) {
     const amp = i < samples / 2 ? 0.8 : 0.1;
-    const v = Math.sin((2 * Math.PI * 440 * i) / RATE) * amp * 32767;
+    const v = Math.sin((2 * Math.PI * 440 * i) / rate) * amp * 32767;
     data.writeInt16LE(Math.round(v), i * 2);
   }
   const header = Buffer.alloc(44);
@@ -28,8 +28,8 @@ function wav(): Buffer {
   header.writeUInt32LE(16, 16);
   header.writeUInt16LE(1, 20);
   header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(RATE, 24);
-  header.writeUInt32LE(RATE * 2, 28);
+  header.writeUInt32LE(rate, 24);
+  header.writeUInt32LE(rate * 2, 28);
   header.writeUInt16LE(2, 32);
   header.writeUInt16LE(16, 34);
   header.write("data", 36);
@@ -41,12 +41,13 @@ let seed: BandSeedResult;
 let m: MediaSeed;
 let fileId: string;
 
-const viewerOf = (page: Page) => page.getByRole("dialog", { name: NAME });
+const viewerOf = (page: Page, name = NAME) =>
+  page.getByRole("dialog", { name });
 
-async function openPlayer(page: Page) {
+async function openPlayer(page: Page, name = NAME) {
   await page.goto("/files");
-  await page.getByRole("button", { name: `Open ${NAME}` }).click();
-  const viewer = viewerOf(page);
+  await page.getByRole("button", { name: `Open ${name}` }).click();
+  const viewer = viewerOf(page, name);
   await expect(viewer.getByRole("slider", { name: "Seek" })).toBeVisible({
     timeout: 30_000,
   });
@@ -161,6 +162,51 @@ test("playing emits audible output and pausing silences it", async ({
   await toggle.click();
   await expect(toggle).toHaveAccessibleName("Play");
   await expect.poll(rms, { timeout: 5_000 }).toBeLessThan(0.001);
+});
+
+// An 11 s file spans three 5 s chunks if the engine splits it; a seam at 5 s kills the worklet.
+test("audio keeps playing across the 5 s mark without worklet errors", async ({
+  page,
+}) => {
+  test.skip(
+    test.info().project.name !== "desktop",
+    "WebKit headless audio output is not asserted",
+  );
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  const LONG = "long.wav";
+  const root = await (await m.ava.get(`/bands/${BAND}/files/folder`)).json();
+  await m.fake.external({
+    action: "add",
+    name: LONG,
+    parentId: root.folder.id,
+    mimeType: "audio/wav",
+    contentBase64: wav(11, 3000).toString("base64"),
+  });
+  await installOutputProbe(page);
+  const viewer = await openPlayer(page, LONG);
+  const rms = () =>
+    page.evaluate(() => (window as unknown as { __rms: () => number }).__rms());
+  const toggle = viewer.getByRole("button", { name: /^(Play|Pause)$/ });
+  const time = viewer.getByTestId("player-time");
+
+  await seekTo(viewer, 4.5 / 11);
+  await toggle.click();
+  await expect(toggle).toHaveAccessibleName("Pause");
+  await expect(time).toHaveText(/^0:05 \//, { timeout: 10_000 });
+  await page.waitForTimeout(400);
+
+  // Still audible just past the 5 s seam; silence measures below 0.001.
+  for (let i = 0; i < 3; i++) {
+    expect(await rms()).toBeGreaterThan(0.01);
+    await page.waitForTimeout(100);
+  }
+  expect(errors.filter((e) => /RangeError|processorerror/i.test(e))).toEqual(
+    [],
+  );
 });
 
 test("adds a marker at the playhead and it persists", async ({ page }) => {
@@ -304,15 +350,48 @@ test("loop panel defaults to the playhead's stretch", async ({ page }) => {
 
 test("speed and transpose are remembered per recording", async ({ page }) => {
   const viewer = await openPlayer(page);
+  const speedBtn = viewer.getByTestId("speed-button");
+  const pitchBtn = viewer.getByTestId("pitch-button");
+  const speedPanel = viewer.getByTestId("speed-panel");
+  const pitchPanel = viewer.getByTestId("pitch-panel");
+  await expect(speedBtn).toHaveAccessibleName("Speed 1x");
+  await expect(pitchBtn).toHaveAccessibleName("Pitch 0");
+
+  await speedBtn.click();
+  await expect(speedPanel).toBeVisible();
   await viewer.getByRole("button", { name: "Faster" }).click();
-  await viewer.getByRole("button", { name: "Transpose up" }).click();
   await expect(viewer.getByTestId("speed-readout")).toHaveText("1.1x");
+
+  // Only one panel is open at a time.
+  await pitchBtn.click();
+  await expect(pitchPanel).toBeVisible();
+  await expect(speedPanel).toBeHidden();
+  await viewer.getByRole("button", { name: "Transpose up" }).click();
   await expect(viewer.getByTestId("transpose-readout")).toHaveText("+1 st");
+
+  // Escape closes the panel but not the viewer.
+  await page.keyboard.press("Escape");
+  await expect(pitchPanel).toBeHidden();
+  await expect(viewer).toBeVisible();
+  await expect(speedBtn).toHaveAccessibleName("Speed 1.1x");
+  await expect(pitchBtn).toHaveAccessibleName("Pitch +1");
 
   await page.reload();
   const again = await openPlayer(page);
+  await expect(again.getByTestId("speed-button")).toHaveAccessibleName(
+    "Speed 1.1x",
+  );
+  await expect(again.getByTestId("pitch-button")).toHaveAccessibleName(
+    "Pitch +1",
+  );
+  await again.getByTestId("speed-button").click();
   await expect(again.getByTestId("speed-readout")).toHaveText("1.1x");
+  await again.getByRole("button", { name: "Reset speed" }).click();
+  await expect(again.getByTestId("speed-readout")).toHaveText("1x");
+  await again.getByTestId("pitch-button").click();
   await expect(again.getByTestId("transpose-readout")).toHaveText("+1 st");
+  await again.getByRole("button", { name: "Reset transpose" }).click();
+  await expect(again.getByTestId("transpose-readout")).toHaveText("0 st");
 });
 
 test("Escape closes the marker sheet first, then the viewer", async ({
