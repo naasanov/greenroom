@@ -49,6 +49,7 @@ export type SetlistSong = Pick<
   | "artist"
   | "durationSeconds"
   | "imageUrl"
+  | "spotifyTrackId"
   | "youtubeUrl"
   | "youtubeMusicUrl"
 >;
@@ -121,6 +122,7 @@ const optimisticItem = (song: SetlistSong): SetlistItem => ({
   artist: song.artist,
   durationSeconds: song.durationSeconds,
   imageUrl: song.imageUrl,
+  spotifyTrackId: song.spotifyTrackId,
   youtubeUrl: song.youtubeUrl,
   youtubeMusicUrl: song.youtubeMusicUrl,
 });

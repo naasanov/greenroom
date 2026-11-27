@@ -72,48 +72,23 @@ export function exportDateLabel(
   return m && month ? `${month} ${Number(m[3])} ${m[1]}` : null;
 }
 
-/** YouTube caps a watch_videos queue at 50 ids. */
-export const YOUTUBE_QUEUE_MAX = 50;
+export type ExportProvider = "spotify" | "youtube";
 
-export interface YoutubeQueue {
-  /** Link that opens the included songs as a temporary queue, null if none. */
-  url: string | null;
-  included: number;
-  /** Titles without a usable YouTube link. */
-  noLink: string[];
-  /** Titles dropped because the queue is full. */
-  overflow: string[];
+/** The song fields that decide whether a song can go to Spotify or YouTube. */
+export interface ExportLinkFields {
+  spotifyTrackId: string | null;
+  youtubeUrl: string | null;
+  youtubeMusicUrl: string | null;
 }
 
-/** Builds a no-login YouTube queue link from songs' YouTube or YouTube Music links. */
-export function buildYoutubeQueue(
-  songs: {
-    title: string;
-    youtubeUrl: string | null;
-    youtubeMusicUrl: string | null;
-  }[],
-): YoutubeQueue {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  const noLink: string[] = [];
-  const overflow: string[] = [];
-  for (const song of songs) {
-    const id =
-      youtubeVideoId(song.youtubeUrl) ?? youtubeVideoId(song.youtubeMusicUrl);
-    if (!id) noLink.push(song.title);
-    else if (seen.has(id)) continue;
-    else if (ids.length >= YOUTUBE_QUEUE_MAX) overflow.push(song.title);
-    else {
-      seen.add(id);
-      ids.push(id);
-    }
-  }
-  return {
-    url: ids.length
-      ? `https://www.youtube.com/watch_videos?video_ids=${ids.join(",")}`
-      : null,
-    included: ids.length,
-    noLink,
-    overflow,
-  };
+/** Whether the song has a link the provider's export can use. */
+export function hasExportLink(
+  provider: ExportProvider,
+  song: ExportLinkFields,
+): boolean {
+  return provider === "spotify"
+    ? !!song.spotifyTrackId
+    : !!(
+        youtubeVideoId(song.youtubeUrl) ?? youtubeVideoId(song.youtubeMusicUrl)
+      );
 }

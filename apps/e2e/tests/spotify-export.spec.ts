@@ -19,6 +19,11 @@ const dialog = (page: Page) =>
   page.getByRole("dialog", { name: "Export songs" });
 const exportButton = (page: Page) =>
   dialog(page).getByRole("button", { name: "Export to Spotify", exact: true });
+const connectButton = (page: Page) =>
+  dialog(page).getByRole("button", {
+    name: "Connect to Spotify to export",
+    exact: true,
+  });
 
 test("library export asks to connect, resumes, and shows skipped songs", async ({
   page,
@@ -33,19 +38,24 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByLabel("Playlist name")).toHaveValue(
     "The Night Owls library",
   );
-  await expect(exportButton(page)).toBeVisible();
-  await expect(dialog(page).getByTestId("export-youtube-open")).toBeVisible();
+  // Not connected: the export button is replaced by a connect button.
+  await expect(connectButton(page)).toBeVisible();
+  await expect(connectButton(page).locator("svg")).toHaveCount(1);
+  await expect(exportButton(page)).toHaveCount(0);
   await expect(dialog(page).getByTestId("export-copy")).toBeVisible();
   // The name field carries a visible label above it.
   await expect(
     dialog(page).locator("label", { hasText: "Playlist name" }),
   ).toBeVisible();
-  await dialog(page).getByLabel("Playlist name").fill("Owls all songs");
-  await exportButton(page).click();
-  await expect(dialog(page).getByTestId("export-connect")).toContainText(
-    "Connect Spotify to export playlists",
+  // Copy sits on its own row under the "or" divider, below the connect button.
+  await expect(dialog(page).getByTestId("export-copy-divider")).toContainText(
+    "or",
   );
-  await dialog(page).getByRole("button", { name: "Connect Spotify" }).click();
+  const connectBox = await connectButton(page).boundingBox();
+  const copyBox = await dialog(page).getByTestId("export-copy").boundingBox();
+  expect(copyBox!.y).toBeGreaterThan(connectBox!.y + connectBox!.height);
+  await dialog(page).getByLabel("Playlist name").fill("Owls all songs");
+  await connectButton(page).click();
 
   const reopened = dialog(page);
   await expect(reopened.getByTestId("export-summary")).toContainText(
@@ -62,7 +72,9 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   );
   await expect(page).toHaveURL(/\/library$/);
 
-  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist).toMatchObject({ name: "Owls all songs", isPublic: false });
   expect(playlist!.trackIds).toHaveLength(3);
 
@@ -73,6 +85,7 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 3 songs",
   );
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(2);
 });
 
 test("a denied Spotify login reopens with an error and Connect", async ({
@@ -85,11 +98,11 @@ test("a denied Spotify login reopens with an error and Connect", async ({
   await fakeSpotifyConsent(page, "deny");
   await openLibrary(page);
   await page.getByRole("button", { name: "Export to Spotify" }).click();
-  await exportButton(page).click();
-  await dialog(page).getByRole("button", { name: "Connect Spotify" }).click();
+  await connectButton(page).click();
   await expect(dialog(page).getByTestId("export-connect-error")).toHaveText(
     "Couldn't connect Spotify. Try again.",
   );
+  await expect(connectButton(page)).toBeVisible();
   await expect(page).toHaveURL(/\/library$/);
 });
 
@@ -123,8 +136,7 @@ test("gig setlist export from the drawer", async ({
   await page.getByRole("button", { name: "Export to Spotify" }).click();
   const name = `${gig.title} setlist (${label(gig.date)})`;
   await expect(dialog(page).getByLabel("Playlist name")).toHaveValue(name);
-  await exportButton(page).click();
-  await dialog(page).getByRole("button", { name: "Connect Spotify" }).click();
+  await connectButton(page).click();
 
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     `Exported 2 songs to “${name}”.`,
@@ -133,7 +145,9 @@ test("gig setlist export from the drawer", async ({
     "Skipped 1 song without a Spotify link.",
   );
   await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
-  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist!.trackIds).toEqual([
     "spotify-track-skyline",
     "spotify-track-lowTide",
@@ -170,7 +184,31 @@ test("a connected user exports without being asked to connect again", async ({
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 3 songs",
   );
-  await expect(dialog(page).getByTestId("export-connect")).toHaveCount(0);
+  await expect(connectButton(page)).toHaveCount(0);
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(1);
+});
+
+test("pressing Enter in the name field exports exactly once", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  const { cookie } = await loginAs(USERS.ava.email);
+  const api = await apiWithCookie(cookie);
+  await connectSpotify(api);
+  await api.dispose();
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const name = dialog(page).getByLabel("Playlist name");
+  await name.fill("Enter once");
+  await name.press("Enter");
+  await expect(dialog(page).getByTestId("export-summary")).toContainText(
+    "Exported 3 songs to “Enter once”.",
+  );
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  expect(playlists[0]).toMatchObject({ name: "Enter once" });
 });
 
 test("a read-only link asks to reconnect once with a clear message", async ({
@@ -196,10 +234,13 @@ test("a read-only link asks to reconnect once with a clear message", async ({
   await expect(dialog(page).getByTestId("export-connect")).toContainText(
     "Reconnect Spotify to grant playlist access",
   );
+  await expect(dialog(page).getByTestId("export-copy-divider")).toBeVisible();
+  await expect(dialog(page).getByTestId("export-copy")).toBeVisible();
   await dialog(page).getByRole("button", { name: "Reconnect Spotify" }).click();
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 3 songs",
   );
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(1);
 });
 
 test("copy to clipboard puts Title - Artist lines on the clipboard", async ({
@@ -275,67 +316,4 @@ test("copy shows a failure state when no clipboard path works", async ({
   await expect(copy).toBeEnabled();
   await copy.click();
   await expect(copy).toHaveText("Copy failed");
-});
-
-test("YouTube queue falls back to a YouTube Music reference", async ({
-  page,
-  testApi,
-  loginAs,
-}) => {
-  const seed = await testApi.seed("band");
-  await loginAs(USERS.ava.email);
-  const bandId = seed.bands.nightOwls.id;
-  const api = await apiAs(testApi, USERS.ava.email);
-  for (const [title, value] of [
-    ["Music Only", "https://music.youtube.com/watch?v=musicOnly01&si=abc"],
-    ["Music Playlist", "https://music.youtube.com/playlist?list=PLmusic01"],
-  ] as const) {
-    await api.post(`/bands/${bandId}/songs`, {
-      data: { title, references: [{ label: "YouTube Music", value }] },
-    });
-  }
-  await api.dispose();
-  await openLibrary(page);
-  await page.getByRole("button", { name: "Export to Spotify" }).click();
-  await expect(dialog(page).getByTestId("export-note")).toHaveText(
-    "Songs without a Spotify or YouTube link are skipped.",
-  );
-  let queueUrl = "";
-  await page.context().route("**://www.youtube.com/**", (route) => {
-    queueUrl = route.request().url();
-    return route.fulfill({ status: 200, body: "ok" });
-  });
-  const popup = page.waitForEvent("popup");
-  await dialog(page).getByTestId("export-youtube-open").click();
-  await popup;
-  await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
-  expect(queueUrl).toContain("musicOnly01");
-  const ids = new URL(queueUrl).searchParams.get("video_ids") ?? "";
-  expect(ids.split(",")).toHaveLength(4);
-});
-
-test("library export can open a YouTube Music queue without logging in", async ({
-  page,
-  testApi,
-  loginAs,
-}) => {
-  await testApi.seed("band");
-  await loginAs(USERS.ava.email);
-  await openLibrary(page);
-  await page.getByRole("button", { name: "Export to Spotify" }).click();
-  await expect(dialog(page).getByTestId("export-note")).toHaveText(
-    "Songs without a Spotify or YouTube link are skipped.",
-  );
-  let queueUrl = "";
-  await page.context().route("**://www.youtube.com/**", (route) => {
-    queueUrl = route.request().url();
-    return route.fulfill({ status: 200, body: "ok" });
-  });
-  const popup = page.waitForEvent("popup");
-  await dialog(page).getByTestId("export-youtube-open").click();
-  await popup;
-  await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
-  expect(queueUrl).toContain("harborLights,redLine,midnightTrain");
-  const ids = new URL(queueUrl).searchParams.get("video_ids") ?? "";
-  expect(ids.split(",")).toHaveLength(3);
 });
