@@ -6,6 +6,7 @@ import { AuthModule } from "./auth/auth.module.js";
 import { BandsModule } from "./bands/bands.module.js";
 import { CalendarInviteModule } from "./calendar-invites/calendar-invite.module.js";
 import { ChordsModule } from "./chords/chords.module.js";
+import { AudioMarkersModule } from "./audio-markers/audio-markers.module.js";
 import { DatabaseModule } from "./db/db.module.js";
 import { EventsModule } from "./events/events.module.js";
 import { FeedbackModule } from "./feedback/feedback.module.js";
@@ -38,6 +39,7 @@ import { TestingModule } from "./testing/testing.module.js";
     JobsModule,
     SongsModule,
     ChordsModule,
+    AudioMarkersModule,
     SpotifyConnectModule,
     GoogleConnectModule,
     CalendarInviteModule,

@@ -10,5 +10,6 @@ import { GigFolderLinkService } from "./gig-folder-link.service.js";
   imports: [BandsModule, MediaModule],
   controllers: [FilesController],
   providers: [FilesService, GigFolderLinkService],
+  exports: [FilesService],
 })
 export class FilesModule {}

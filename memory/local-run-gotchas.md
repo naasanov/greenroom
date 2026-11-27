@@ -19,3 +19,5 @@ applies-to: apps/e2e/**
 Seen again: 2026-11-23 (system Postgres down at build start; the dev-owned cluster in `~/pgdata-dev` on :5432 worked, escalated in #141).
 Seen again: 2026-11-24 (system Postgres down at build start for the 10th night); the entrypoint chown and supervisor restart fix landed in factory-infra (#141) and takes effect after the owner runs a box deploy.
 Seen again: 2026-11-26 (single-agent runs, not only parallel ones: hypervisor CPU steal of 75 to 90% made page loads and OAuth-resume specs time out locally and agent runs take 1 to 3 hours; CI stayed the only reliable e2e signal).
+Seen again: 2026-11-23, epic #148 (Postgres down again; same `~/pgdata-dev` workaround, started with `/usr/lib/postgresql/17/bin/pg_ctl` since `pg_ctl` is not on PATH).
+- On the factory, Playwright's Chromium headless shell build 1248 segfaults at launch (exit 139). Run local e2e with `PLAYWRIGHT_BROWSERS_PATH` pointing at a directory whose `*-1248` entries symlink to the working `*-1234` builds in `~/.cache/ms-playwright` (seen 2026-11-23, #148).

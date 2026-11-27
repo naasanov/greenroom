@@ -1,9 +1,11 @@
 "use client";
 
 import { Download, ExternalLink, FileQuestion, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { FileEntry } from "@greenroom/shared";
+import { AudioPlayer } from "@/components/audio-player/audio-player";
 import { startDownload } from "@/components/media/media-download";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { filesContentUrl } from "@/lib/queries/files";
 import { driveOpenUrl, isGoogleDoc, previewKind } from "./file-utils";
@@ -24,9 +26,18 @@ export function FileViewer({
   const download = () =>
     startDownload(filesContentUrl(bandId, entry.id, true), entry.name);
 
+  const escapeRef = useRef<(() => boolean) | null>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // An open select listbox closes itself; the player may consume Escape first.
+      if (e.target instanceof Element && e.target.closest('[role="listbox"]'))
+        return;
+      if (escapeRef.current?.()) {
+        e.stopImmediatePropagation();
+        return;
+      }
       // Window capture runs before any sheet or drawer Escape handler.
       e.stopImmediatePropagation();
       onClose();
@@ -84,7 +95,12 @@ export function FileViewer({
           <X />
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center p-3 pb-safe">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 p-3 pb-safe",
+          kind === "audio" ? "flex-col" : "items-center justify-center",
+        )}
+      >
         {kind === "image" ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -103,13 +119,7 @@ export function FileViewer({
             className="max-h-full max-w-full"
           />
         ) : kind === "audio" ? (
-          <audio
-            data-testid="viewer-audio"
-            src={src}
-            controls
-            crossOrigin="use-credentials"
-            className="w-full max-w-md"
-          />
+          <AudioPlayer bandId={bandId} entry={entry} escapeRef={escapeRef} />
         ) : kind === "pdf" ? (
           <iframe
             data-testid="viewer-pdf"

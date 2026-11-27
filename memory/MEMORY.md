@@ -56,3 +56,7 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Migration journal collisions](migration-journal-collisions.md) — parallel branches claim the same migration number; rebuild _journal.json in ascending when order, never rename an applied migration
 - [Factory DATABASE_URL is staging](factory-database-url-is-staging.md) — export local DATABASE_URL and TEST_DATABASE_URL in the same shell before any db, migrate, api test or e2e command
 - [Legacy column fallback and deletes](legacy-column-fallback-delete.md) — deleting a source reference must clear the fallback column or the derived value returns
+- [Audio worklet bundling](audio-worklet-bundling.md) — worklet libraries built from Function#toString break when bundled; serve from public/, verify in a browser
+- [WebKit audio e2e](webkit-audio-e2e.md) — assert play state not the audio clock; WebKit decodes durations short, round for display; small test WAVs
+- [Public assets and the proxy](public-assets-proxy-matcher.md) — new public/ file extensions need the proxy matcher exclusion or they redirect to sign-in
+- [Escalate unknown test failures](escalate-unknown-test-failures.md) — owner rule: a Sonnet agent that cannot explain a failing test hands it to Opus
