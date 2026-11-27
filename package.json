@@ -19,6 +19,8 @@
     "db:migrate": "pnpm --filter @greenroom/db migrate",
     "db:seed": "turbo run build --filter=@greenroom/db && pnpm --filter @greenroom/db seed",
     "test:unit": "turbo run test:unit",
+    "test:scripts": "node --test scripts/check-migration-journal.test.mjs",
+    "check:migration-journal": "node scripts/check-migration-journal.mjs",
     "test:e2e": "scripts/build-locked.sh turbo run test:e2e",
     "deploy:staging": "fly deploy . --config infra/fly/staging.api.toml --dockerfile apps/api/Dockerfile --remote-only && fly deploy . --config infra/fly/staging.web.toml --dockerfile apps/web/Dockerfile --remote-only"
   },
