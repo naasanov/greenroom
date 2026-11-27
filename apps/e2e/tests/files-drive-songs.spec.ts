@@ -110,6 +110,27 @@ test("the Link to songs drawer focuses its search field", async ({ page }) => {
   ).toBeFocused();
 });
 
+test("the Link to songs drawer lists already linked songs first", async ({
+  page,
+}) => {
+  const put = await m.ava.put(`/bands/${BAND}/files/items/${chartId}/songs`, {
+    data: { songIds: [SONGS.skyline.id] },
+  });
+  expect(put.ok()).toBe(true);
+  await page.goto("/files");
+  await openMenu(page, "chart.txt");
+  await page.getByRole("menuitem", { name: "Link to songs" }).click();
+  const drawer = page.getByRole("dialog", { name: "Link to songs" });
+  const boxes = drawer.getByRole("checkbox");
+  await expect(boxes.first()).toHaveAccessibleName(/Skyline Drive/);
+  await expect(boxes.first()).toBeChecked();
+  await expect(drawer.getByRole("checkbox", { checked: true })).toHaveCount(1);
+  // Unchecking does not move the row.
+  await boxes.first().click();
+  await expect(boxes.first()).toHaveAccessibleName(/Skyline Drive/);
+  await expect(boxes.first()).not.toBeChecked();
+});
+
 test("selection mode links songs to every selected file and keeps existing links", async ({
   page,
 }) => {
