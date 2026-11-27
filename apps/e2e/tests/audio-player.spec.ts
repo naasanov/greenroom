@@ -102,11 +102,75 @@ test("opens the player, plays and pauses", async ({ page }) => {
   await expect(toggle).toHaveAccessibleName("Play");
 });
 
+// Taps whatever connects to the destination with an AnalyserNode and exposes its RMS.
+async function installOutputProbe(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __rms: () => number };
+    const analysers: AnalyserNode[] = [];
+    const connect = AudioNode.prototype.connect as (
+      this: AudioNode,
+      ...args: unknown[]
+    ) => unknown;
+    (AudioNode.prototype as { connect: unknown }).connect = function (
+      this: AudioNode,
+      dest: unknown,
+      ...rest: unknown[]
+    ) {
+      if (dest instanceof AudioDestinationNode) {
+        const ctx = this.context as AudioContext;
+        const tap = ctx.createAnalyser();
+        const mute = ctx.createGain();
+        mute.gain.value = 0;
+        connect.call(this, tap);
+        connect.call(tap, mute);
+        connect.call(mute, dest);
+        analysers.push(tap);
+      }
+      return connect.call(this, dest, ...rest);
+    };
+    w.__rms = () => {
+      let peak = 0;
+      for (const tap of analysers) {
+        const buf = new Float32Array(tap.fftSize);
+        tap.getFloatTimeDomainData(buf);
+        const rms = Math.sqrt(buf.reduce((s, x) => s + x * x, 0) / buf.length);
+        peak = Math.max(peak, rms);
+      }
+      return peak;
+    };
+  });
+}
+
+test("playing emits audible output and pausing silences it", async ({
+  page,
+}) => {
+  test.skip(
+    test.info().project.name !== "desktop",
+    "WebKit headless audio output is not asserted",
+  );
+  await installOutputProbe(page);
+  const viewer = await openPlayer(page);
+  const rms = () =>
+    page.evaluate(() => (window as unknown as { __rms: () => number }).__rms());
+  const toggle = viewer.getByRole("button", { name: /^(Play|Pause)$/ });
+
+  await toggle.click();
+  await expect(toggle).toHaveAccessibleName("Pause");
+  await expect.poll(rms, { timeout: 5_000 }).toBeGreaterThan(0.01);
+
+  await toggle.click();
+  await expect(toggle).toHaveAccessibleName("Play");
+  await expect.poll(rms, { timeout: 5_000 }).toBeLessThan(0.001);
+});
+
 test("adds a marker at the playhead and it persists", async ({ page }) => {
   const viewer = await openPlayer(page);
   await seekTo(viewer, 0.5);
   await viewer.getByRole("button", { name: "Add marker" }).click();
 
+  const sheet = viewer.getByRole("dialog", { name: "Edit marker" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel("Marker title")).toBeFocused();
   const row = viewer.getByTestId("marker-row").filter({ hasText: "Marker 1" });
   await expect(row).toBeVisible();
   await expect(row).toContainText("added by Ava Admin");
@@ -125,6 +189,38 @@ test("adds a marker at the playhead and it persists", async ({ page }) => {
   const again = await openPlayer(page);
   await expect(
     again.getByTestId("marker-row").filter({ hasText: "Marker 1" }),
+  ).toBeVisible();
+});
+
+test("Space toggles playback even when a button has focus", async ({
+  page,
+}) => {
+  const viewer = await openPlayer(page);
+  const toggle = viewer.getByRole("button", { name: /^(Play|Pause)$/ });
+  const add = viewer.getByRole("button", { name: "Add marker" });
+  await add.click();
+  await expect(viewer.getByTestId("marker-row")).toHaveCount(1);
+  await add.focus();
+
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAccessibleName("Pause");
+  // Space must not re-click the focused Add marker button.
+  await expect(viewer.getByTestId("marker-row")).toHaveCount(1);
+
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAccessibleName("Play");
+  await expect(viewer.getByTestId("marker-row")).toHaveCount(1);
+});
+
+test("Space types normally in the marker title field", async ({ page }) => {
+  const viewer = await openPlayer(page);
+  await viewer.getByRole("button", { name: "Add marker" }).click();
+  const title = viewer.getByLabel("Marker title");
+  await expect(title).toBeFocused();
+  await page.keyboard.type("Big end");
+  await expect(title).toHaveValue("Big end");
+  await expect(
+    viewer.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
 });
 
@@ -147,15 +243,36 @@ test("the marker sheet renames, retimes, nudges and deletes", async ({
   await expect(row).toContainText("0:02.5");
 
   await sheet.getByRole("button", { name: "Nudge forward 1 second" }).click();
-  await expect(row).toContainText("0:03.5");
+  // The row moves before the 400 ms PATCH debounce fires.
+  await expect(row).toContainText("0:03.5", { timeout: 200 });
   await expect(
-    viewer.getByRole("button", { name: "Pause", exact: true }),
+    viewer.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
 
   await sheet.getByRole("button", { name: "Delete marker" }).click();
   await sheet.getByRole("button", { name: "Confirm delete" }).click();
   await expect(sheet).toBeHidden();
   await expect(viewer.getByTestId("marker-row")).toHaveCount(0);
+});
+
+test("nudging a marker while playing keeps playing", async ({ page }) => {
+  await addMarkerVia("Verse", 1000);
+  const viewer = await openPlayer(page);
+  await viewer.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(
+    viewer.getByRole("button", { name: "Pause", exact: true }),
+  ).toBeVisible();
+
+  await viewer.getByTestId("marker-row").filter({ hasText: "Verse" }).click();
+  const sheet = viewer.getByRole("dialog", { name: "Edit marker" });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("button", { name: "Nudge forward 1 second" }).click();
+
+  const row = viewer.getByTestId("marker-row").filter({ hasText: "Verse" });
+  await expect(row).toContainText("0:02.0");
+  await expect(
+    viewer.getByRole("button", { name: "Pause", exact: true }),
+  ).toBeVisible();
 });
 
 test("loop panel defaults to the playhead's stretch", async ({ page }) => {

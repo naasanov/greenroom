@@ -35,6 +35,7 @@ export function MarkerSheet({
   onDelete,
   onClose,
   saving,
+  focusTitle = false,
 }: {
   marker: AudioMarker;
   durationMs: number;
@@ -43,6 +44,7 @@ export function MarkerSheet({
   onDelete(): void;
   onClose(): void;
   saving: boolean;
+  focusTitle?: boolean;
 }) {
   const [title, setTitle] = useState(marker.title);
   const [timeText, setTimeText] = useState(formatTime(marker.positionMs, true));
@@ -54,6 +56,7 @@ export function MarkerSheet({
   const dirtyPos = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleFocused = useRef(false);
+  const titleInput = useRef<HTMLInputElement>(null);
   const timeFocused = useRef(false);
   const onChangeRef = useRef(onChange);
   const titleRef = useRef(title);
@@ -66,6 +69,13 @@ export function MarkerSheet({
     titleRef.current = title;
     timeTextRef.current = timeText;
   });
+
+  // A sheet opened on a new marker starts with its title selected for typing.
+  useEffect(() => {
+    if (!focusTitle) return;
+    titleInput.current?.focus();
+    titleInput.current?.select();
+  }, [focusTitle]);
 
   // Follow bandmates' edits to this marker unless the user is mid-edit.
   useEffect(() => {
@@ -196,6 +206,7 @@ export function MarkerSheet({
         <label className="flex flex-col gap-1 text-xs text-white/70">
           Marker title
           <input
+            ref={titleInput}
             className={field}
             value={title}
             maxLength={AUDIO_MARKER_TITLE_MAX}

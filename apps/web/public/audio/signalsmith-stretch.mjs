@@ -266,7 +266,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 
 			let memory = wasmModule.exports ? wasmModule.exports.memory.buffer : wasmModule.HEAP8.buffer;
 			// Buffer list (one per channel)
-			let inputs = inputList[0];
+			let inputs = inputList[0] ?? []; // patched: nodes with numberOfInputs 0 get no input list
 			if (!currentMapSegment.active) {
 				outputList[0].forEach((_, c) => {
 					let channelBuffer = inputs[c%inputs.length];

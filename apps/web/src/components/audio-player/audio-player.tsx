@@ -30,7 +30,26 @@ import { useAudioEngine } from "./engine/use-audio-engine";
 import { usePlaybackSettings } from "./use-playback-settings";
 import { Waveform } from "./waveform";
 
-const TYPING_TARGET = "input, textarea, select, button, [role='combobox']";
+const NON_TEXT_INPUTS = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
+const OWNS_SPACE = "textarea, select, [role='combobox'], [role='listbox']";
+
+/** True where Space must keep its native meaning (typing or choosing text). */
+function ownsSpace(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  if (t.isContentEditable) return true;
+  if (t instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(t.type);
+  return t.closest(OWNS_SPACE) !== null;
+}
 
 function NativeFallback({ src, note }: { src: string; note: string }) {
   return (
@@ -80,6 +99,10 @@ export function AudioPlayer({
     0;
 
   const [pickedId, setSelectedId] = useState<string | null>(null);
+  // Set when the sheet opens on a just-added marker, so its title takes focus.
+  const [freshId, setFreshId] = useState<string | null>(null);
+  // Bumped when the user picks or closes a marker, so a late create does not override it.
+  const pickEpoch = useRef(0);
   // A marker deleted by anyone drops out of the list, which closes its sheet.
   const selected = markers.find((m) => m.id === pickedId) ?? null;
   const selectedId = selected?.id ?? null;
@@ -141,15 +164,27 @@ export function AudioPlayer({
 
   const { toggle } = engine;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    // A handled Space keydown arms this so its keyup cannot click a focused button.
+    let swallowKeyup = false;
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== " " || e.defaultPrevented) return;
-      const t = e.target;
-      if (t instanceof HTMLElement && t.closest(TYPING_TARGET)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (ownsSpace(e.target)) return;
       e.preventDefault();
-      toggle();
+      swallowKeyup = true;
+      if (!e.repeat) toggle();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== " " || !swallowKeyup) return;
+      swallowKeyup = false;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, [toggle]);
 
   if (engine.status === "too-large") {
@@ -230,12 +265,22 @@ export function AudioPlayer({
           type="button"
           variant="secondary"
           disabled={!ready}
-          onClick={() =>
-            createMarker.mutate({
-              positionMs: Math.round(engine.positionMs),
-              title: `Marker ${markers.length + 1}`,
-            })
-          }
+          onClick={() => {
+            const epoch = pickEpoch.current;
+            createMarker.mutate(
+              {
+                positionMs: Math.round(engine.positionMs),
+                title: `Marker ${markers.length + 1}`,
+              },
+              {
+                onSuccess: (created) => {
+                  if (pickEpoch.current !== epoch) return;
+                  setFreshId(created.id);
+                  setSelectedId(created.id);
+                },
+              },
+            );
+          }}
           className="h-11 self-start"
         >
           <MapPinPlus />
@@ -253,7 +298,9 @@ export function AudioPlayer({
           markers={markers}
           activeId={selectedId}
           onSelect={(id) => {
-            if (!isTempMarkerId(id)) setSelectedId(id);
+            if (isTempMarkerId(id)) return;
+            pickEpoch.current++;
+            setSelectedId(id);
           }}
         />
       </div>
@@ -275,6 +322,7 @@ export function AudioPlayer({
           marker={selected}
           durationMs={engine.durationMs}
           saving={saving}
+          focusTitle={selected.id === freshId}
           onNudge={(pos) => {
             // Seeking keeps the play state: playing continues from the marker, paused stays paused.
             engine.seek(pos);
@@ -287,7 +335,10 @@ export function AudioPlayer({
             deleteMarker.mutate(selected.id);
             setSelectedId(null);
           }}
-          onClose={() => setSelectedId(null)}
+          onClose={() => {
+            pickEpoch.current++;
+            setSelectedId(null);
+          }}
         />
       ) : null}
     </div>
