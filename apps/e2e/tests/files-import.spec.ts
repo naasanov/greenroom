@@ -396,6 +396,24 @@ test.describe("song detail Files section", () => {
     );
   });
 
+  test("a linked folder opens its Files page", async ({ page }) => {
+    const folder = await fake.external({
+      action: "folder",
+      name: "Skyline charts",
+      parentId: band,
+    });
+    const res = await ava.put(`${FILES}/items/${folder.id}/songs`, {
+      data: { songIds: [SONGS.skyline.id] },
+    });
+    expect(res.status()).toBe(200);
+    const files = await openSong(page);
+    await files.getByRole("link", { name: "Open Skyline charts" }).click();
+    await expect(page).toHaveURL(new RegExp(`/files/${folder.id}$`));
+    await expect(page.getByTestId("files-breadcrumbs")).toContainText(
+      "Skyline charts",
+    );
+  });
+
   test("unlink removes the song from the file", async ({ page }) => {
     const id = await addFile("chart.pdf", true);
     const files = await openSong(page);
