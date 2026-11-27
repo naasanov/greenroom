@@ -172,7 +172,7 @@ export class AudioEngine {
       this.durationS = buffer.duration;
 
       // One buffer: the worklet mis-indexes a read window that straddles two buffers.
-      const chunk = Math.max(1, buffer.length);
+      const chunk = Math.max(1, Math.floor(buffer.sampleRate * 5));
       for (let start = 0; start < buffer.length; start += chunk) {
         const len = Math.min(chunk, buffer.length - start);
         const arrays: Float32Array[] = [];

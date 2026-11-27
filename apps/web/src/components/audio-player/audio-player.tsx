@@ -25,7 +25,7 @@ import { formatTime } from "./format-time";
 import { LoopPanel } from "./loop-panel";
 import { MarkerList } from "./marker-list";
 import { MarkerSheet } from "./marker-sheet";
-import { SpeedPitch } from "./speed-pitch";
+import { SpeedPitch, type SettingPanel } from "./speed-pitch";
 import { useAudioEngine } from "./engine/use-audio-engine";
 import { usePlaybackSettings } from "./use-playback-settings";
 import { Waveform } from "./waveform";
@@ -140,13 +140,19 @@ export function AudioPlayer({
     setLoopOpen(open);
   }
 
-  const stateRef = useRef({ selectedId, loopOpen });
+  const [settingPanel, setSettingPanel] = useState<SettingPanel | null>(null);
+
+  const stateRef = useRef({ selectedId, loopOpen, settingPanel });
   useEffect(() => {
-    stateRef.current = { selectedId, loopOpen };
+    stateRef.current = { selectedId, loopOpen, settingPanel };
   });
   useEffect(() => {
     escapeRef.current = () => {
       const s = stateRef.current;
+      if (s.settingPanel) {
+        setSettingPanel(null);
+        return true;
+      }
       if (s.selectedId) {
         setSelectedId(null);
         return true;
@@ -261,38 +267,41 @@ export function AudioPlayer({
           </div>
         )}
 
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={!ready}
-          onClick={() => {
-            const epoch = pickEpoch.current;
-            createMarker.mutate(
-              {
-                positionMs: Math.round(engine.positionMs),
-                title: `Marker ${markers.length + 1}`,
-              },
-              {
-                onSuccess: (created) => {
-                  if (pickEpoch.current !== epoch) return;
-                  setFreshId(created.id);
-                  setSelectedId(created.id);
+        <div className="relative flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!ready}
+            onClick={() => {
+              const epoch = pickEpoch.current;
+              createMarker.mutate(
+                {
+                  positionMs: Math.round(engine.positionMs),
+                  title: `Marker ${markers.length + 1}`,
                 },
-              },
-            );
-          }}
-          className="h-11 self-start"
-        >
-          <MapPinPlus />
-          Add marker
-        </Button>
-
-        <SpeedPitch
-          rate={settings.rate}
-          semitones={settings.semitones}
-          onRateChange={settings.setRate}
-          onSemitonesChange={settings.setSemitones}
-        />
+                {
+                  onSuccess: (created) => {
+                    if (pickEpoch.current !== epoch) return;
+                    setFreshId(created.id);
+                    setSelectedId(created.id);
+                  },
+                },
+              );
+            }}
+            className="h-11"
+          >
+            <MapPinPlus />
+            Add marker
+          </Button>
+          <SpeedPitch
+            open={settingPanel}
+            onOpenChange={setSettingPanel}
+            rate={settings.rate}
+            semitones={settings.semitones}
+            onRateChange={settings.setRate}
+            onSemitonesChange={settings.setSemitones}
+          />
+        </div>
 
         <MarkerList
           markers={markers}
