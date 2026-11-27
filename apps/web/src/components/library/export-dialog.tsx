@@ -3,7 +3,13 @@
 import { Check, ClipboardCopy } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { SONG_ERROR_CODES, type ExportResult } from "@greenroom/shared";
+import {
+  SONG_ERROR_CODES,
+  YOUTUBE_ERROR_CODES,
+  YOUTUBE_PLAYLIST_MAX,
+  type ExportResult,
+  type YoutubeExportResult,
+} from "@greenroom/shared";
 import { FormField } from "@/components/app/form-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,36 +30,54 @@ import {
   useExportToSpotify,
   type ExportTarget,
 } from "@/lib/queries/spotify-export";
+import {
+  connectYoutube,
+  useDisconnectYoutube,
+  useExportToYoutube,
+  useYoutubeStatus,
+} from "@/lib/queries/youtube";
 
-/** Query params the dialog adds to the Spotify login return path. */
-export const EXPORT_PARAMS = ["spotify", "export", "exportName"] as const;
+/** Query params the dialog adds to the Spotify and YouTube login return paths. */
+export const EXPORT_PARAMS = [
+  "spotify",
+  "youtube",
+  "export",
+  "exportName",
+] as const;
 
 export interface ExportResume {
+  provider: "spotify" | "youtube";
   state: "start" | "error";
   name: string;
 }
 
 /**
- * Reads the Spotify login return (`spotify`, `export`, `exportName`) for one
- * export kind, clears those params from the URL, and holds the resume state.
+ * Reads the Spotify or YouTube login return (`spotify` or `youtube`, `export`,
+ * `exportName`) for one export kind, clears those params from the URL, and
+ * holds the resume state.
  */
 export function useExportReturn(kind: "library" | "setlist") {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const spotify = params.get("spotify");
+  const provider = params.get("spotify") ? "spotify" : "youtube";
+  const result = params.get(provider);
   const name = params.get("exportName") ?? "";
   const key =
-    (spotify === "connected" || spotify === "error") &&
+    (result === "connected" || result === "error") &&
     params.get("export") === kind
-      ? `${spotify}|${name}`
+      ? `${provider}|${result}|${name}`
       : null;
   const [handled, setHandled] = useState<string | null>(null);
   const [resume, setResume] = useState<ExportResume | null>(null);
   if (key !== handled && (key || handled)) {
     setHandled(key);
     if (key) {
-      setResume({ state: spotify === "connected" ? "start" : "error", name });
+      setResume({
+        provider,
+        state: result === "connected" ? "start" : "error",
+        name,
+      });
     }
   }
   useEffect(() => {
@@ -71,12 +95,15 @@ function returnPath(base: string, kind: string, name: string): string {
 
 function Result({
   result,
+  service,
   onDone,
 }: {
-  result: ExportResult;
+  result: ExportResult | YoutubeExportResult;
+  service: "Spotify" | "YouTube";
   onDone: () => void;
 }) {
   const { exported, skipped } = result;
+  const leftOut = "leftOut" in result ? result.leftOut : 0;
   return (
     <div className="flex flex-col gap-4">
       <div
@@ -96,7 +123,15 @@ function Result({
           >
             {`Skipped ${skipped.length} ${
               skipped.length === 1 ? "song" : "songs"
-            } without a Spotify link.`}
+            } without a ${service} link.`}
+          </p>
+        ) : null}
+        {leftOut > 0 ? (
+          <p
+            data-testid="export-left-out"
+            className="text-sm text-muted-foreground"
+          >
+            {`Playlists hold ${YOUTUBE_PLAYLIST_MAX} songs. Left out ${leftOut}.`}
           </p>
         ) : null}
       </div>
@@ -110,7 +145,7 @@ function Result({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open in Spotify
+            Open in {service}
           </a>
         </Button>
       </div>
@@ -213,23 +248,136 @@ function YoutubeQueueButton({ url }: { url: string | null }) {
   );
 }
 
+/** The saved-playlist prompt: connect YouTube, or the connected account with a way out. */
+function YoutubeAccount({
+  connected,
+  displayName,
+  justConnected,
+  failed,
+  busy,
+  onConnect,
+  onDisconnect,
+}: {
+  connected: boolean;
+  displayName: string | null;
+  justConnected: boolean;
+  failed: boolean;
+  busy: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
+  if (connected) {
+    return (
+      <div
+        data-testid="export-youtube-account"
+        className="flex flex-col gap-1 border-t pt-4"
+      >
+        {justConnected ? (
+          <p
+            role="status"
+            data-testid="export-youtube-connected"
+            className="text-sm font-medium"
+          >
+            YouTube connected.
+          </p>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-sm text-muted-foreground">
+            {displayName
+              ? `Saving playlists to YouTube as ${displayName}.`
+              : "Saving playlists to your YouTube account."}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid="export-youtube-disconnect"
+            disabled={busy}
+            onClick={onDisconnect}
+          >
+            Disconnect
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="export-youtube-connect"
+      className="flex flex-col gap-2 border-t pt-4"
+    >
+      <p className="text-sm font-medium">
+        Save as a playlist in your YouTube account
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Connect YouTube once to keep the playlist instead of a temporary queue.
+      </p>
+      {failed ? (
+        <p
+          role="alert"
+          data-testid="export-youtube-connect-error"
+          className="text-sm text-destructive"
+        >
+          Couldn&apos;t connect YouTube. Try again.
+        </p>
+      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        className="self-start"
+        data-testid="export-youtube-connect-button"
+        disabled={busy}
+        onClick={onConnect}
+      >
+        Connect YouTube
+      </Button>
+    </div>
+  );
+}
+
+function youtubeErrorMessage(error: unknown): string {
+  if (
+    isApiError(error, 503) &&
+    error.code === YOUTUBE_ERROR_CODES.quotaExceeded
+  ) {
+    return "YouTube's daily limit for Greenroom has been reached, so the playlist could not be saved. Try again tomorrow, or use Export to YouTube to open a temporary queue.";
+  }
+  if (isApiError(error, 409)) {
+    if (error.code === YOUTUBE_ERROR_CODES.loginRequired) {
+      return "Your YouTube connection is no longer valid. Connect YouTube again to save playlists.";
+    }
+    if (error.code === YOUTUBE_ERROR_CODES.noChannel) {
+      return "That Google account has no YouTube channel. Create one on YouTube, then try again.";
+    }
+  }
+  if (
+    isApiError(error, 422) &&
+    error.code === SONG_ERROR_CODES.nothingToExport
+  ) {
+    return "None of these songs have a YouTube link, so there is nothing to save.";
+  }
+  return "Could not save to YouTube. Please try again.";
+}
+
 function ExportBody({
   bandId,
   target,
   defaultName,
   returnTo,
-  autoStart,
-  connectError,
+  resume,
   onDone,
 }: {
   bandId: string;
   target: ExportTarget;
   defaultName: string;
   returnTo: string;
-  autoStart: boolean;
-  connectError: boolean;
+  resume: ExportResume | null;
   onDone: () => void;
 }) {
+  const autoStart = resume?.provider === "spotify" && resume.state === "start";
+  const connectError =
+    resume?.provider === "spotify" && resume.state === "error";
+  const youtubeReturn = resume?.provider === "youtube" ? resume.state : null;
   const [name, setName] = useState(defaultName);
   const [needsLogin, setNeedsLogin] = useState<"connect" | "reconnect" | null>(
     connectError ? "connect" : null,
@@ -240,7 +388,17 @@ function ExportBody({
   );
   const queue = buildYoutubeQueue(rows);
   const exportMutation = useExportToSpotify(bandId);
+  const youtubeExport = useExportToYoutube(bandId);
+  const youtubeStatus = useYoutubeStatus();
+  const disconnectYoutube = useDisconnectYoutube();
+  const [youtubeConnectFailed, setYoutubeConnectFailed] = useState(
+    youtubeReturn === "error",
+  );
   const startedRef = useRef(false);
+  const busy =
+    exportMutation.isPending ||
+    youtubeExport.isPending ||
+    disconnectYoutube.isPending;
 
   const run = (value: string) =>
     exportMutation.mutate(
@@ -265,7 +423,14 @@ function ExportBody({
   }, []);
 
   if (exportMutation.data) {
-    return <Result result={exportMutation.data} onDone={onDone} />;
+    return (
+      <Result result={exportMutation.data} service="Spotify" onDone={onDone} />
+    );
+  }
+  if (youtubeExport.data) {
+    return (
+      <Result result={youtubeExport.data} service="YouTube" onDone={onDone} />
+    );
   }
 
   if (needsLogin) {
@@ -337,9 +502,11 @@ function ExportBody({
             autoComplete="off"
             maxLength={100}
             value={name}
+            disabled={busy}
             onChange={(e) => {
               setName(e.target.value);
               exportMutation.reset();
+              youtubeExport.reset();
             }}
           />
         </FormField>
@@ -355,20 +522,40 @@ function ExportBody({
               : "Could not export to Spotify. Please try again."}
           </p>
         ) : null}
+        {youtubeExport.isError ? (
+          <p
+            role="alert"
+            data-testid="export-youtube-error"
+            className="text-sm text-destructive"
+          >
+            {youtubeErrorMessage(youtubeExport.error)}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-2">
           <Button
             type="submit"
             variant="outline"
-            disabled={!name.trim() || exportMutation.isPending}
+            disabled={!name.trim() || busy}
           >
             {exportMutation.isPending ? "Exporting..." : "Export to Spotify"}
           </Button>
+          {youtubeStatus.data?.connected ? (
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="export-youtube-save"
+              disabled={!name.trim() || busy}
+              onClick={() => {
+                exportMutation.reset();
+                youtubeExport.mutate({ target, name: name.trim() });
+              }}
+            >
+              {youtubeExport.isPending ? "Saving..." : "Save to YouTube"}
+            </Button>
+          ) : null}
           <YoutubeQueueButton url={queue.url} />
         </div>
-        <p
-          data-testid="export-note"
-          className="text-sm text-muted-foreground"
-        >
+        <p data-testid="export-note" className="text-sm text-muted-foreground">
           Songs without a Spotify or YouTube link are skipped.
         </p>
         {queue.overflow.length > 0 ? (
@@ -380,6 +567,20 @@ function ExportBody({
           </p>
         ) : null}
       </form>
+      {youtubeStatus.data ? (
+        <YoutubeAccount
+          connected={youtubeStatus.data.connected}
+          displayName={youtubeStatus.data.displayName}
+          justConnected={youtubeReturn === "start"}
+          failed={youtubeConnectFailed}
+          busy={busy}
+          onConnect={() => {
+            setYoutubeConnectFailed(false);
+            connectYoutube(returnPath(returnTo, target.kind, name.trim()));
+          }}
+          onDisconnect={() => disconnectYoutube.mutate()}
+        />
+      ) : null}
       <div className="border-t pt-5">
         <CopyListButton lines={copyLines} />
       </div>
@@ -387,7 +588,7 @@ function ExportBody({
   );
 }
 
-/** Name a new private Spotify playlist, export to it, and read the summary. */
+/** Name a new private playlist, export it to Spotify or YouTube, and read the summary. */
 export function ExportDialog({
   bandId,
   open,
@@ -395,20 +596,17 @@ export function ExportDialog({
   target,
   defaultName,
   returnTo,
-  autoStart = false,
-  connectError = false,
+  resume = null,
 }: {
   bandId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: ExportTarget;
   defaultName: string;
-  /** Path (with its query) to come back to after the Spotify login. */
+  /** Path (with its query) to come back to after the Spotify or YouTube login. */
   returnTo: string;
-  /** Exports as soon as the dialog opens (after a Spotify return). */
-  autoStart?: boolean;
-  /** Opens on the connect prompt with a failed-connection notice. */
-  connectError?: boolean;
+  /** The login return being resumed: a Spotify export, or a YouTube connect result. */
+  resume?: ExportResume | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -424,8 +622,7 @@ export function ExportDialog({
             target={target}
             defaultName={defaultName}
             returnTo={returnTo}
-            autoStart={autoStart}
-            connectError={connectError}
+            resume={resume}
             onDone={() => onOpenChange(false)}
           />
         ) : null}

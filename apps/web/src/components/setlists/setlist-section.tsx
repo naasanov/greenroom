@@ -12,6 +12,7 @@ import {
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
+  EXPORT_PARAMS,
   ExportDialog,
   useExportReturn,
 } from "@/components/library/export-dialog";
@@ -95,7 +96,7 @@ export function SetlistSection({
     : `${bandName} practice setlist${dateLabel ? ` (${dateLabel})` : ""}`;
   const returnTo = useMemo(() => {
     const next = new URLSearchParams(search);
-    for (const k of ["spotify", "export", "exportName"]) next.delete(k);
+    for (const k of EXPORT_PARAMS) next.delete(k);
     const qs = next.toString();
     return qs ? `${pathname}?${qs}` : pathname;
   }, [pathname, search]);
@@ -338,8 +339,7 @@ export function SetlistSection({
           target={{ kind: "setlist", setlistId: builder.setlistId }}
           defaultName={exportBack.resume?.name || defaultName}
           returnTo={returnTo}
-          autoStart={exportBack.resume?.state === "start"}
-          connectError={exportBack.resume?.state === "error"}
+          resume={exportBack.resume}
         />
       ) : null}
     </CollapsibleSection>

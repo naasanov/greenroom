@@ -18,6 +18,7 @@ import {
   type AddSongToSetlist,
   type CopySetlist,
   type ExportResult,
+  type YoutubeExportResult,
   type GigHistoryEntry,
   type GigHistoryQuery,
   type GigSetlist,
@@ -26,6 +27,7 @@ import {
 } from "@greenroom/shared";
 import { DRIZZLE } from "../db/db.constants.js";
 import { ExportService } from "../songs/export.service.js";
+import { YoutubeExportService } from "../songs/youtube-export.service.js";
 import { SongsService } from "../songs/songs.service.js";
 import {
   appendSongs,
@@ -45,6 +47,7 @@ export class SetlistsService {
     @Inject(DRIZZLE) private readonly db: Database,
     private readonly songsService: SongsService,
     private readonly exporter: ExportService,
+    private readonly youtubeExporter: YoutubeExportService,
   ) {}
 
   /** Exports the setlist's songs, in setlist order, to a new Spotify playlist. */
@@ -70,6 +73,26 @@ export class SetlistsService {
         id: i.songId,
         title: i.title,
         spotifyTrackId: track.get(i.songId) ?? null,
+      })),
+    );
+  }
+
+  /** Saves the setlist's songs, in setlist order, as a playlist in the user's YouTube account. */
+  async exportToYoutube(
+    userId: string,
+    bandId: string,
+    setlistId: string,
+    name: string,
+  ): Promise<YoutubeExportResult> {
+    const detail = await this.get(bandId, setlistId);
+    return this.youtubeExporter.exportSongs(
+      userId,
+      name,
+      detail.items.map((i) => ({
+        id: i.songId,
+        title: i.title,
+        youtubeUrl: i.youtubeUrl,
+        youtubeMusicUrl: i.youtubeMusicUrl,
       })),
     );
   }

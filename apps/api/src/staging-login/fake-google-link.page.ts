@@ -8,6 +8,8 @@ const escapeHtml = (s: string): string =>
 export function renderFakeGoogleLinkPage(i: {
   redirectUri: string;
   state: string;
+  /** What connecting links the demo account to; defaults to the band's Drive. */
+  purpose?: string;
 }): string {
   const hidden = (name: string, value: string): string =>
     `<input type="hidden" name="${name}" value="${escapeHtml(value)}">`;
@@ -27,7 +29,7 @@ button.secondary{background:transparent;color:inherit;border:1px solid #bbb}
 @media (prefers-color-scheme:dark){body{background:#151515;color:#eee}main{background:#222}p{color:#aaa}button{background:#eee;color:#111}button.secondary{background:transparent;color:#eee;border-color:#555}}
 </style></head><body><main>
 <h1>Fake Google</h1>
-<p>Staging uses a stand-in for Google sign-in. Connecting links a demo Google account to this band.</p>
+<p>Staging uses a stand-in for Google sign-in. Connecting links a demo Google account ${escapeHtml(i.purpose ?? "to this band")}.</p>
 <form method="get" action="${escapeHtml(i.redirectUri)}">
 ${hidden("code", "fake-code:demo-band@example.com")}
 ${hidden("state", i.state)}

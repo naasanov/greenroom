@@ -298,8 +298,7 @@ export function LibraryView({ bandId }: { bandId: string }) {
         target={{ kind: "library", sort }}
         defaultName={exportBack.resume?.name || `${bandName} library`}
         returnTo="/library"
-        autoStart={exportBack.resume?.state === "start"}
-        connectError={exportBack.resume?.state === "error"}
+        resume={exportBack.resume}
       />
       <DiscardChangesDialog
         open={discard !== null}

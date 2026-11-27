@@ -73,7 +73,11 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_id_idx").on(t.userId)],
 );
 
-export const oauthProvider = pgEnum("oauth_provider", ["google", "spotify"]);
+export const oauthProvider = pgEnum("oauth_provider", [
+  "google",
+  "spotify",
+  "youtube",
+]);
 
 export const oauthConnections = pgTable(
   "oauth_connections",

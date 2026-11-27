@@ -20,6 +20,7 @@ import {
   type AppendSetlistSong,
   type CopySetlist,
   type ExportResult,
+  type YoutubeExportResult,
   type ExportSetlist,
   type User,
   type GigHistoryEntry,
@@ -108,6 +109,22 @@ export class SetlistsController {
     @Body(new ZodPipe(exportSetlistSchema)) body: ExportSetlist,
   ): Promise<ExportResult> {
     return this.setlists.exportToSpotify(
+      user.id,
+      m.bandId,
+      setlistId,
+      body.name,
+    );
+  }
+
+  @Post(":setlistId/export/youtube")
+  @HttpCode(200)
+  exportToYoutube(
+    @CurrentUser() user: User,
+    @CurrentMembership() m: BandMembership,
+    @Param("setlistId") setlistId: string,
+    @Body(new ZodPipe(exportSetlistSchema)) body: ExportSetlist,
+  ): Promise<YoutubeExportResult> {
+    return this.setlists.exportToYoutube(
       user.id,
       m.bandId,
       setlistId,

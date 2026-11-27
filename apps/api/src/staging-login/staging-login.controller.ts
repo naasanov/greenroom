@@ -16,6 +16,7 @@ import { AuthService } from "../auth/auth.service.js";
 import { Public } from "../auth/decorators.js";
 import { DemoBandService } from "./demo-band.service.js";
 import { spotifyRedirectUri } from "../spotify-connect/spotify-connections.service.js";
+import { youtubeRedirectUri } from "../youtube-connect/youtube-connections.service.js";
 import { googleLinkRedirectUri } from "../google-connect/google-links.service.js";
 import { renderFakeGoogleLinkPage } from "./fake-google-link.page.js";
 import { renderFakeSpotifyPage } from "./fake-spotify.page.js";
@@ -45,11 +46,23 @@ export class StagingLoginController {
     @Query("state") state: unknown,
     @Res() res: Response,
   ): void {
-    // Per-band Drive/Calendar linking shares this URL but returns to its own callback.
+    // Drive linking and YouTube connecting share this URL but return to their own callbacks.
     if (redirectUri === googleLinkRedirectUri()) {
       if (typeof state !== "string" || !STATE_PATTERN.test(state))
         throw new HttpException("Invalid request", HttpStatus.BAD_REQUEST);
       res.type("html").send(renderFakeGoogleLinkPage({ redirectUri, state }));
+      return;
+    }
+    if (redirectUri === youtubeRedirectUri()) {
+      if (typeof state !== "string" || !STATE_PATTERN.test(state))
+        throw new HttpException("Invalid request", HttpStatus.BAD_REQUEST);
+      res.type("html").send(
+        renderFakeGoogleLinkPage({
+          redirectUri,
+          state,
+          purpose: "so playlists can be saved to YouTube",
+        }),
+      );
       return;
     }
     const p = this.params(redirectUri, state);

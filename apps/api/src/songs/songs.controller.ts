@@ -23,6 +23,7 @@ import {
   type DeletedSong,
   type ExportLibrary,
   type ExportResult,
+  type YoutubeExportResult,
   type ImportPlaylist,
   type ImportProgress,
   type ListSongsQuery,
@@ -46,6 +47,7 @@ import {
 import { CurrentUser } from "../auth/decorators.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { ExportService } from "./export.service.js";
+import { YoutubeExportService } from "./youtube-export.service.js";
 import { ImportsService } from "./imports.service.js";
 import { ReferenceSuggestionsService } from "./reference-suggestions.service.js";
 import { SmartAddService } from "./smart-add.service.js";
@@ -60,6 +62,7 @@ export class SongsController {
     private readonly smartAdd: SmartAddService,
     private readonly imports: ImportsService,
     private readonly exporter: ExportService,
+    private readonly youtubeExporter: YoutubeExportService,
     private readonly suggestions: ReferenceSuggestionsService,
   ) {}
 
@@ -132,6 +135,18 @@ export class SongsController {
   ): Promise<ExportResult> {
     const list = await this.songs.list(m.bandId, { sort: body.sort });
     return this.exporter.exportSongs(user.id, body.name, list);
+  }
+
+  // Saves the library, in the requested sort, as a playlist in the user's YouTube account.
+  @Post("export/youtube")
+  @HttpCode(200)
+  async exportLibraryToYoutube(
+    @CurrentUser() user: User,
+    @CurrentMembership() m: BandMembership,
+    @Body(new ZodPipe(exportLibrarySchema)) body: ExportLibrary,
+  ): Promise<YoutubeExportResult> {
+    const list = await this.songs.list(m.bandId, { sort: body.sort });
+    return this.youtubeExporter.exportSongs(user.id, body.name, list);
   }
 
   @Get("imports/:importId")

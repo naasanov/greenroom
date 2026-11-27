@@ -26,6 +26,7 @@ import { stagingLoginEnabled } from "./staging-login/staging-login.enabled.js";
 import { StagingLoginModule } from "./staging-login/staging-login.module.js";
 import { testingEnabled } from "./testing/testing.enabled.js";
 import { TestingModule } from "./testing/testing.module.js";
+import { YoutubeConnectModule } from "./youtube-connect/youtube-connect.module.js";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TestingModule } from "./testing/testing.module.js";
     SongsModule,
     ChordsModule,
     SpotifyConnectModule,
+    YoutubeConnectModule,
     GoogleConnectModule,
     CalendarInviteModule,
     SetlistsModule,
