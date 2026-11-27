@@ -17,6 +17,7 @@ import {
   useAudioMarkers,
   useCreateAudioMarker,
   useDeleteAudioMarker,
+  useSetAudioMarkerPositionLocal,
   useUpdateAudioMarker,
 } from "@/lib/queries/audio-markers";
 import { filesContentUrl } from "@/lib/queries/files";
@@ -69,6 +70,10 @@ export function AudioPlayer({
   const markers = useMemo(() => markersQuery.data ?? [], [markersQuery.data]);
   const createMarker = useCreateAudioMarker(bandId, entry.id);
   const updateMarker = useUpdateAudioMarker(bandId, entry.id);
+  const setMarkerPositionLocal = useSetAudioMarkerPositionLocal(
+    bandId,
+    entry.id,
+  );
   const deleteMarker = useDeleteAudioMarker(bandId, entry.id);
   const saving =
     useIsMutating({ mutationKey: audioMarkerKeys.update(bandId, entry.id) }) >
@@ -270,7 +275,11 @@ export function AudioPlayer({
           marker={selected}
           durationMs={engine.durationMs}
           saving={saving}
-          onNudge={(pos) => engine.playFrom(pos)}
+          onNudge={(pos) => {
+            // Seeking keeps the play state: playing continues from the marker, paused stays paused.
+            engine.seek(pos);
+            setMarkerPositionLocal(selected.id, pos);
+          }}
           onChange={(patch) =>
             updateMarker.mutate({ markerId: selected.id, patch })
           }

@@ -180,6 +180,23 @@ export function useUpdateAudioMarker(bandId: string, fileId: string) {
   });
 }
 
+/** Returns a cache-only position update so a marker follows a nudge in the same frame. */
+export function useSetAudioMarkerPositionLocal(bandId: string, fileId: string) {
+  const qc = useQueryClient();
+  const key = audioMarkerKeys.list(bandId, fileId);
+  return (markerId: string, positionMs: number) => {
+    // Stops an in-flight read from overwriting the position being steered.
+    void qc.cancelQueries({ queryKey: key, exact: true });
+    qc.setQueryData<AudioMarker[]>(key, (old) =>
+      old
+        ? sortMarkers(
+            old.map((m) => (m.id === markerId ? { ...m, positionMs } : m)),
+          )
+        : old,
+    );
+  };
+}
+
 export function useDeleteAudioMarker(bandId: string, fileId: string) {
   const qc = useQueryClient();
   const key = audioMarkerKeys.list(bandId, fileId);

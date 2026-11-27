@@ -1,5 +1,6 @@
 // signalsmith-stretch 1.3.2 (MIT), copied from node_modules and served unbundled.
 // Its worklet source is built with Function#toString, which bundlers rewrite and break.
+// One local patch: process() tolerates a node created with numberOfInputs 0 (inputList[0] ?? []).
 let module = {}, exports = {};
 
 var SignalsmithStretch = (() => {
