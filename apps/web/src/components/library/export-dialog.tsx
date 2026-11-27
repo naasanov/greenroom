@@ -249,9 +249,12 @@ function useExportRows(bandId: string, target: ExportTarget) {
     bandId,
     target.kind === "setlist" ? target.setlistId : undefined,
   );
-  return target.kind === "library"
-    ? (library.data ?? [])
-    : (setlist.data?.items ?? []);
+  const query = target.kind === "library" ? library : setlist;
+  const rows =
+    target.kind === "library"
+      ? (library.data ?? [])
+      : (setlist.data?.items ?? []);
+  return { rows, loading: query.isPending };
 }
 
 const SERVICE_NAME: Record<ExportProvider, string> = {
@@ -261,7 +264,8 @@ const SERVICE_NAME: Record<ExportProvider, string> = {
 
 /**
  * One provider's export action: the export button when connected (it reports
- * a missing link instead of calling the API), else a connect button.
+ * a missing link instead of calling the API), else a connect button. A submit
+ * button leaves the export to the form's submit handler.
  */
 function ProviderAction({
   provider,
@@ -291,6 +295,11 @@ function ProviderAction({
 }) {
   const service = SERVICE_NAME[provider];
   const [attempted, setAttempted] = useState(false);
+  const [seen, setSeen] = useState({ status, hasLinks });
+  if (seen.status !== status || seen.hasLinks !== hasLinks) {
+    setSeen({ status, hasLinks });
+    setAttempted(false);
+  }
   return (
     <div
       data-testid={`export-${provider}-action`}
@@ -316,11 +325,8 @@ function ProviderAction({
           data-testid={`export-${provider}-button`}
           disabled={status === "loading" || disabled}
           onClick={() => {
-            if (!hasLinks) {
-              setAttempted(true);
-              return;
-            }
-            onExport();
+            if (!hasLinks) setAttempted(true);
+            else if (!submit) onExport();
           }}
         >
           {pending ? "Exporting..." : `Export to ${service}`}
@@ -450,7 +456,7 @@ function ExportBody({
   const [spotifyConnectFailed, setSpotifyConnectFailed] = useState(
     resume?.provider === "spotify" && resume.state === "error",
   );
-  const rows = useExportRows(bandId, target);
+  const { rows, loading: rowsLoading } = useExportRows(bandId, target);
   const copyLines = rows.map((s) =>
     s.artist ? `${s.title} - ${s.artist}` : s.title,
   );
@@ -465,6 +471,7 @@ function ExportBody({
     youtubeReturn === "error",
   );
   const startedRef = useRef(false);
+  const spotifyInFlight = useRef(false);
   const busy =
     exportMutation.isPending ||
     youtubeExport.isPending ||
@@ -482,10 +489,15 @@ function ExportBody({
   const youtubeState = statusOf(youtubeStatus);
   const nameOk = !!name.trim();
 
-  const run = (value: string) =>
+  const run = (value: string) => {
+    if (spotifyInFlight.current) return;
+    spotifyInFlight.current = true;
     exportMutation.mutate(
       { target, name: value },
       {
+        onSettled: () => {
+          spotifyInFlight.current = false;
+        },
         onError: (e) => {
           if (!isApiError(e, 409)) return;
           if (e.code === SONG_ERROR_CODES.spotifyReconnectRequired) {
@@ -496,6 +508,7 @@ function ExportBody({
         },
       },
     );
+  };
   const connectReturnPath = () =>
     returnPath(returnTo, target.kind, name.trim());
 
@@ -558,7 +571,13 @@ function ExportBody({
         data-testid="export-spotify"
         onSubmit={(e) => {
           e.preventDefault();
-          if (nameOk && spotifyState === "connected" && hasSpotifyLinks) {
+          if (
+            nameOk &&
+            !busy &&
+            !rowsLoading &&
+            spotifyState === "connected" &&
+            hasSpotifyLinks
+          ) {
             run(name.trim());
           }
         }}
@@ -587,7 +606,7 @@ function ExportBody({
           provider="spotify"
           status={spotifyState}
           hasLinks={hasSpotifyLinks}
-          disabled={!nameOk || busy}
+          disabled={!nameOk || busy || rowsLoading}
           busy={busy}
           pending={exportMutation.isPending}
           submit
@@ -614,7 +633,7 @@ function ExportBody({
           provider="youtube"
           status={youtubeState}
           hasLinks={hasYoutubeLinks}
-          disabled={!nameOk || busy}
+          disabled={!nameOk || busy || rowsLoading}
           busy={busy}
           pending={youtubeExport.isPending}
           onExport={() => {

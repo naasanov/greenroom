@@ -142,7 +142,9 @@ test("a connected user saves a gig setlist in order and can disconnect", async (
   await expect(dialog(page).getByTestId("export-skipped")).toHaveText(
     "Skipped 1 song without a YouTube link.",
   );
-  const [playlist] = await testApi.youtubeCreatedPlaylists();
+  const playlists = await testApi.youtubeCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist!.videoIds).toEqual(["redLine", "harborLights"]);
 
   await dialog(page).getByRole("button", { name: "Done" }).click();
@@ -233,7 +235,9 @@ test("a YouTube Music link counts as a YouTube link", async ({
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 4 songs",
   );
-  const [playlist] = await testApi.youtubeCreatedPlaylists();
+  const playlists = await testApi.youtubeCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist!.videoIds).toContain("musicOnly01");
   expect(playlist!.videoIds).toHaveLength(4);
 });

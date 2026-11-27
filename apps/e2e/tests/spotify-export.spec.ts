@@ -72,7 +72,9 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   );
   await expect(page).toHaveURL(/\/library$/);
 
-  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist).toMatchObject({ name: "Owls all songs", isPublic: false });
   expect(playlist!.trackIds).toHaveLength(3);
 
@@ -83,6 +85,7 @@ test("library export asks to connect, resumes, and shows skipped songs", async (
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 3 songs",
   );
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(2);
 });
 
 test("a denied Spotify login reopens with an error and Connect", async ({
@@ -142,7 +145,9 @@ test("gig setlist export from the drawer", async ({
     "Skipped 1 song without a Spotify link.",
   );
   await expect(page).toHaveURL(new RegExp(`/gigs/(.*-)?${gig.id}$`));
-  const [playlist] = await testApi.spotifyCreatedPlaylists();
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  const [playlist] = playlists;
   expect(playlist!.trackIds).toEqual([
     "spotify-track-skyline",
     "spotify-track-lowTide",
@@ -180,6 +185,30 @@ test("a connected user exports without being asked to connect again", async ({
     "Exported 3 songs",
   );
   await expect(connectButton(page)).toHaveCount(0);
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(1);
+});
+
+test("pressing Enter in the name field exports exactly once", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  await testApi.seed("band");
+  const { cookie } = await loginAs(USERS.ava.email);
+  const api = await apiWithCookie(cookie);
+  await connectSpotify(api);
+  await api.dispose();
+  await openLibrary(page);
+  await page.getByRole("button", { name: "Export to Spotify" }).click();
+  const name = dialog(page).getByLabel("Playlist name");
+  await name.fill("Enter once");
+  await name.press("Enter");
+  await expect(dialog(page).getByTestId("export-summary")).toContainText(
+    "Exported 3 songs to “Enter once”.",
+  );
+  const playlists = await testApi.spotifyCreatedPlaylists();
+  expect(playlists).toHaveLength(1);
+  expect(playlists[0]).toMatchObject({ name: "Enter once" });
 });
 
 test("a read-only link asks to reconnect once with a clear message", async ({
@@ -211,6 +240,7 @@ test("a read-only link asks to reconnect once with a clear message", async ({
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
     "Exported 3 songs",
   );
+  expect(await testApi.spotifyCreatedPlaylists()).toHaveLength(1);
 });
 
 test("copy to clipboard puts Title - Artist lines on the clipboard", async ({
