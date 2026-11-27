@@ -22,7 +22,6 @@ export interface EngineOptions {
   onPosition: (ms: number) => void;
 }
 
-const CHUNK_SECONDS = 5;
 const UPDATE_INTERVAL_S = 0.05;
 // Position callbacks arriving right after a schedule can carry the old position.
 const STALE_WINDOW_S = 0.15;
@@ -172,7 +171,8 @@ export class AudioEngine {
       this.node = node;
       this.durationS = buffer.duration;
 
-      const chunk = Math.max(1, Math.floor(buffer.sampleRate * CHUNK_SECONDS));
+      // One buffer: the worklet mis-indexes a read window that straddles two buffers.
+      const chunk = Math.max(1, buffer.length);
       for (let start = 0; start < buffer.length; start += chunk) {
         const len = Math.min(chunk, buffer.length - start);
         const arrays: Float32Array[] = [];
