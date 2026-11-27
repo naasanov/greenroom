@@ -27,20 +27,21 @@ function Chevron() {
   );
 }
 
-/** Clickable path; on phones the middle folders collapse into an overflow menu. */
+/** Clickable path; on phones folders between the root and the parent collapse into an overflow menu. */
 export function Breadcrumbs({ crumbs }: { crumbs: FilesBreadcrumb[] }) {
   const last = crumbs.length - 1;
+  // Phones show Files, the menu, the parent and the current folder; crumbs 1..last-2 hide.
   const collapsible = last >= 3;
   return (
     <nav aria-label="Breadcrumb" data-testid="files-breadcrumbs">
       <ol className="flex min-w-0 items-center text-sm">
         {crumbs.map((c, i) => {
-          const middle = collapsible && i > 0 && i < last;
+          const hidden = collapsible && i > 0 && i < last - 1;
           const isLast = i === last;
           return (
             <Fragment key={c.id}>
               {collapsible && i === 1 ? (
-                <li className="flex items-center md:hidden">
+                <li className="flex shrink-0 items-center md:hidden">
                   <Chevron />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -54,7 +55,7 @@ export function Breadcrumbs({ crumbs }: { crumbs: FilesBreadcrumb[] }) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      {crumbs.slice(1, last).map((m, j) => (
+                      {crumbs.slice(1, last - 1).map((m, j) => (
                         <DropdownMenuItem key={m.id} asChild>
                           <Link href={hrefFor(crumbs, j + 1)}>{m.name}</Link>
                         </DropdownMenuItem>
@@ -66,7 +67,8 @@ export function Breadcrumbs({ crumbs }: { crumbs: FilesBreadcrumb[] }) {
               <li
                 className={cn(
                   "flex min-w-0 items-center",
-                  middle && "hidden md:flex",
+                  i === 0 && "shrink-0",
+                  hidden && "hidden md:flex",
                 )}
               >
                 {i > 0 ? <Chevron /> : null}
