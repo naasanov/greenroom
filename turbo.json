@@ -24,6 +24,7 @@
       "cache": false,
       "passThroughEnv": [
         "TEST_DATABASE_URL",
+        "ALLOW_REMOTE_DB",
         "E2E_WORKERS",
         "CI",
         "DEBUG",

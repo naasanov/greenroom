@@ -46,6 +46,7 @@ fly deploy . -c infra/fly/staging.web.toml --dockerfile apps/web/Dockerfile --re
 ```
 
 The api deploy runs `release_command` (migrations) against the db before releasing.
+The api tomls set `ALLOW_REMOTE_DB = "1"` in `[env]`: db migrate and seed refuse any host other than localhost, 127.0.0.1 and ::1 unless that flag is set, and the Fly db host is not local.
 The db app must show no IPs: `fly ips list -a greenroom-staging-db` should be empty.
 
 ## 4. Certificates
