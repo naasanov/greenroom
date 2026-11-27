@@ -19,3 +19,4 @@ applies-to: apps/e2e/**
 Seen again: 2026-11-23 (system Postgres down at build start; the dev-owned cluster in `~/pgdata-dev` on :5432 worked, escalated in #141).
 Seen again: 2026-11-24 (system Postgres down at build start for the 10th night); the entrypoint chown and supervisor restart fix landed in factory-infra (#141) and takes effect after the owner runs a box deploy.
 Seen again: 2026-11-26 (single-agent runs, not only parallel ones: hypervisor CPU steal of 75 to 90% made page loads and OAuth-resume specs time out locally and agent runs take 1 to 3 hours; CI stayed the only reliable e2e signal).
+Seen again: 2026-11-27 (box memory ran critically low with other sessions running `npm ci`, eslint and tsc, which killed a combined build, typecheck and lint command; run them one at a time. Locally 5s expect timeouts hit most UI specs for #167 while api specs passed; CI is the signal for UI specs, rerun a failing spec alone once and do not edit the shared config).
