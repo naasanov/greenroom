@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ChevronDown,
+  ChevronRight,
   Download,
   ExternalLink,
   File as FileIcon,
@@ -47,11 +49,14 @@ function FileRow({
   file,
   busy,
   onUnlink,
+  toggle,
 }: {
   bandId: string;
   file: SongFile;
   busy: boolean;
   onUnlink: () => void;
+  /** Collapse control for a folder group, rendered before the icon. */
+  toggle?: { expanded: boolean; onToggle: () => void };
 }) {
   const Icon = file.isFolder ? Folder : FileIcon;
   const muted = !file.available;
@@ -61,12 +66,25 @@ function FileRow({
   const inApp =
     file.available && !file.isFolder && (kind === "image" || kind === "audio");
   return (
-    <li
+    <div
       data-testid="song-file"
       data-name={file.name}
       data-available={file.available ? "true" : "false"}
       className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm"
     >
+      {toggle ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="-ml-1.5"
+          aria-label={`${toggle.expanded ? "Collapse" : "Expand"} ${file.name}`}
+          aria-expanded={toggle.expanded}
+          onClick={toggle.onToggle}
+        >
+          {toggle.expanded ? <ChevronDown /> : <ChevronRight />}
+        </Button>
+      ) : null}
       <Icon
         className={`size-4 shrink-0 ${muted ? "text-muted-foreground/60" : "text-muted-foreground"}`}
       />
@@ -152,6 +170,55 @@ function FileRow({
             document.body,
           )
         : null}
+    </div>
+  );
+}
+
+/** A linked folder row with the files it auto-added nested under a collapsible rail. */
+function FolderGroup({
+  bandId,
+  folder,
+  autoAdded,
+  busy,
+  onUnlink,
+}: {
+  bandId: string;
+  folder: SongFile;
+  autoAdded: SongFile[];
+  busy: boolean;
+  onUnlink: (file: SongFile) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <li className="flex min-w-0 flex-col gap-1.5">
+      <FileRow
+        bandId={bandId}
+        file={folder}
+        busy={busy}
+        onUnlink={() => onUnlink(folder)}
+        toggle={
+          autoAdded.length > 0
+            ? { expanded, onToggle: () => setExpanded((v) => !v) }
+            : undefined
+        }
+      />
+      {expanded && autoAdded.length > 0 ? (
+        <ul
+          data-testid="song-folder-files"
+          className="ml-4 flex min-w-0 flex-col gap-1.5 border-l-2 pl-2"
+        >
+          {autoAdded.map((f) => (
+            <li key={f.id} className="min-w-0">
+              <FileRow
+                bandId={bandId}
+                file={f}
+                busy={busy}
+                onUnlink={() => onUnlink(f)}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </li>
   );
 }
@@ -178,6 +245,16 @@ export function SongFiles({
   }
 
   const list = files.data ?? [];
+  const busy = setSongs.isPending || unlinkFile.isPending;
+  const folders = list.filter((f) => f.isFolder);
+  const folderIds = new Set(folders.map((f) => f.driveFileId));
+  // A hand link has no source folder, so it stays out of every group.
+  const autoAddedBy = (folder: SongFile) =>
+    list.filter((f) => !f.isFolder && f.sourceFolderId === folder.driveFileId);
+  const ungrouped = list.filter(
+    (f) =>
+      !f.isFolder && !(f.sourceFolderId && folderIds.has(f.sourceFolderId)),
+  );
   return (
     <section className="flex flex-col gap-1.5" data-testid="song-files">
       <div className="flex items-center justify-between gap-2">
@@ -203,14 +280,25 @@ export function SongFiles({
         <p className="text-sm text-muted-foreground">No files linked.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {list.map((f) => (
-            <FileRow
-              key={f.id}
+          {folders.map((folder) => (
+            <FolderGroup
+              key={folder.id}
               bandId={bandId}
-              file={f}
-              busy={setSongs.isPending || unlinkFile.isPending}
-              onUnlink={() => unlink(f)}
+              folder={folder}
+              autoAdded={autoAddedBy(folder)}
+              busy={busy}
+              onUnlink={unlink}
             />
+          ))}
+          {ungrouped.map((f) => (
+            <li key={f.id} className="min-w-0">
+              <FileRow
+                bandId={bandId}
+                file={f}
+                busy={busy}
+                onUnlink={() => unlink(f)}
+              />
+            </li>
           ))}
         </ul>
       )}

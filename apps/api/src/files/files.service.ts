@@ -506,6 +506,7 @@ export class FilesService {
         modifiedTime: f?.modifiedTime ?? null,
         thumbnailAvailable: !!f && f.thumbnailLink !== null,
         parentId: f?.parentId ?? null,
+        sourceFolderId: l.sourceFolderId,
         gig: gigByFolder.get(l.driveFileId) ?? null,
       });
     }
