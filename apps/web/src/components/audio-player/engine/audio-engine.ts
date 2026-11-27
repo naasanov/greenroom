@@ -31,7 +31,8 @@ const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 
 // Loaded from public/ at runtime so the bundler never rewrites the worklet source.
-const STRETCH_URL = "/audio/signalsmith-stretch.mjs";
+// The version query busts browser caches whenever the vendored copy is patched.
+const STRETCH_URL = "/audio/signalsmith-stretch.mjs?v=2";
 
 async function loadStretch() {
   const mod = (await import(
