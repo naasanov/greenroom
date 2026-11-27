@@ -20,8 +20,9 @@
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "typecheck": "tsgo -p tsconfig.json --noEmit",
     "lint": "eslint .",
+    "test:unit": "node --test \"dist/**/*.test.js\"",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
+    "migrate": "tsgo -p tsconfig.json && node dist/guard-remote-db-cli.js && drizzle-kit migrate",
     "seed": "node --env-file-if-exists=../../.env dist/seed/cli.js"
   },
   "devDependencies": {

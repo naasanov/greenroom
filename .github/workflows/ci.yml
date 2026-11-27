@@ -75,6 +75,8 @@ jobs:
           --health-retries 20
     env:
       TEST_DATABASE_URL: postgres://greenroom:greenroom@postgres:5432/greenroom_test
+      # The service container host is `postgres`, not localhost.
+      ALLOW_REMOTE_DB: 1
       E2E_WORKERS: 2
     steps:
       - uses: actions/checkout@v4
@@ -137,6 +139,8 @@ jobs:
           --health-retries 20
     env:
       TEST_DATABASE_URL: postgres://greenroom:greenroom@postgres:5432/greenroom_test
+      # The service container host is `postgres`, not localhost.
+      ALLOW_REMOTE_DB: 1
       E2E_WORKERS: 2
     steps:
       - uses: actions/checkout@v4

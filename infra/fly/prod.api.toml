@@ -13,6 +13,8 @@ WEB_ORIGIN = "https://greenroom.fyi"
 API_PUBLIC_URL = "https://api.greenroom.fyi"
 SESSION_COOKIE_NAME = "gr_session"
 COOKIE_DOMAIN = "greenroom.fyi"
+# Lets the release_command (migrate-cli) run against the non-local Fly db host.
+ALLOW_REMOTE_DB = "1"
 
 [deploy]
 release_command = "node packages/db/dist/migrate-cli.js"
