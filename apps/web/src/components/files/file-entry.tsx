@@ -206,7 +206,14 @@ export function FileRow(props: EntryProps) {
           subtitle={entry.gig ? `Gig · ${gigDate}` : ""}
         />
       </Activator>
-      <span className="col-span-2 col-start-1 row-start-2 min-w-0 pb-1 pl-12 empty:hidden md:col-span-1 md:col-start-2 md:row-start-1 md:pb-0 md:pl-0">
+      <span
+        className={cn(
+          "col-span-2 col-start-1 row-start-2 min-w-0 pb-1 pl-12 empty:hidden md:col-span-1 md:col-start-2 md:row-start-1 md:pb-0 md:pl-0",
+          // Pulls the mobile meta line up under the title; the activator's 44px tap target leaves slack below it.
+          mobileMeta &&
+            "-mt-2 pointer-events-none md:pointer-events-auto md:mt-0",
+        )}
+      >
         {mobileMeta ? (
           <span className="block text-xs text-muted-foreground md:hidden">
             {mobileMeta}
