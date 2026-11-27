@@ -8,12 +8,14 @@ import {
   Plus,
   Unlink,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { FileEntry, SongFile } from "@greenroom/shared";
 import { FileViewer } from "@/components/files/file-viewer";
 import {
   driveOpenUrl,
+  entryHref,
   isGoogleDoc,
   previewKind,
 } from "@/components/files/file-utils";
@@ -94,6 +96,14 @@ function FileRow({
           >
             {file.name}
           </a>
+        ) : file.available && file.isFolder ? (
+          <Link
+            href={entryHref(entry) ?? "/files"}
+            aria-label={`Open ${file.name}`}
+            className="truncate font-medium hover:underline"
+          >
+            {file.name}
+          </Link>
         ) : (
           <span
             className={`truncate font-medium ${muted ? "text-muted-foreground" : ""}`}
