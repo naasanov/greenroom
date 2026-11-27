@@ -113,6 +113,8 @@ export const songFileSchema = z.object({
   thumbnailAvailable: z.boolean(),
   /** Containing folder, for opening it in the Files tab; null when unavailable. */
   parentId: z.string().nullable(),
+  /** Linked folder that auto-added this file; null for a hand link. */
+  sourceFolderId: z.string().nullable(),
   gig: fileGigSchema.nullable(),
 });
 export type SongFile = z.infer<typeof songFileSchema>;

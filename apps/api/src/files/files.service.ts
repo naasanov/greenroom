@@ -28,6 +28,11 @@ import {
   type DriveContext,
   type DriveLookupMemo,
 } from "../media/drive-structure.service.js";
+import {
+  attachFolderFiles,
+  detachFolderFiles,
+  lockDrivePoll,
+} from "../media/folder-song-links.js";
 import type { OkDownload } from "../media/media-util.js";
 
 const isFolder = (f: { mimeType: string }) => f.mimeType === DRIVE_FOLDER_MIME;
@@ -343,10 +348,18 @@ export class FilesService {
     if (found.length !== unique.length)
       throw new UnprocessableEntityException("Song not found");
     await this.db.transaction(async (tx) => {
+      // Holding the poll lock while listing keeps the backfill and poller from racing.
+      let children: DriveFile[] = [];
+      if (isFolder(file)) {
+        await lockDrivePoll(tx, bandId);
+        if (unique.length)
+          children = await this.drive.listChildren(ctx.token, file.id);
+      }
       const mine = and(
         eq(driveFileSongLinks.bandId, bandId),
         eq(driveFileSongLinks.driveFileId, file.id),
       );
+      if (isFolder(file)) await detachFolderFiles(tx, bandId, file.id, unique);
       await tx
         .delete(driveFileSongLinks)
         .where(
@@ -377,8 +390,11 @@ export class FilesService {
               name: file.name,
               mimeType: isFolder(file) ? null : file.mimeType,
               isFolder: isFolder(file),
+              sourceFolderId: null,
             },
           });
+      if (isFolder(file))
+        await attachFolderFiles(tx, bandId, file.id, unique, children);
     });
     const links = (await this.linksByFile(bandId, [file.id])).get(file.id);
     return { songLinks: links ?? [] };
@@ -395,16 +411,33 @@ export class FilesService {
       .from(songs)
       .where(and(eq(songs.id, songId), eq(songs.bandId, bandId)));
     if (!song) throw new NotFoundException("Song not found");
-    const removed = await this.db
-      .delete(driveFileSongLinks)
-      .where(
-        and(
-          eq(driveFileSongLinks.bandId, bandId),
-          eq(driveFileSongLinks.songId, songId),
-          eq(driveFileSongLinks.driveFileId, fileId),
-        ),
-      )
-      .returning({ id: driveFileSongLinks.id });
+    const removed = await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(driveFileSongLinks)
+        .where(
+          and(
+            eq(driveFileSongLinks.bandId, bandId),
+            eq(driveFileSongLinks.songId, songId),
+            eq(driveFileSongLinks.driveFileId, fileId),
+          ),
+        )
+        .returning({
+          id: driveFileSongLinks.id,
+          isFolder: driveFileSongLinks.isFolder,
+        });
+      // Unlinking a folder also removes the links that folder auto-added.
+      if (rows.some((r) => r.isFolder))
+        await tx
+          .delete(driveFileSongLinks)
+          .where(
+            and(
+              eq(driveFileSongLinks.bandId, bandId),
+              eq(driveFileSongLinks.songId, songId),
+              eq(driveFileSongLinks.sourceFolderId, fileId),
+            ),
+          );
+      return rows;
+    });
     if (removed.length === 0) throw new NotFoundException("Link not found");
   }
 
@@ -473,6 +506,7 @@ export class FilesService {
         modifiedTime: f?.modifiedTime ?? null,
         thumbnailAvailable: !!f && f.thumbnailLink !== null,
         parentId: f?.parentId ?? null,
+        sourceFolderId: l.sourceFolderId,
         gig: gigByFolder.get(l.driveFileId) ?? null,
       });
     }

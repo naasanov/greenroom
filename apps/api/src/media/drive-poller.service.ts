@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import {
+  driveFileSongLinks,
   driveSyncCursors,
   gigs,
   mediaFolders,
   mediaItems,
+  songs,
   type Database,
 } from "@greenroom/db";
 import { DRIZZLE } from "../db/db.constants.js";
@@ -17,6 +19,12 @@ import {
 } from "../integrations/index.js";
 import { JobsService } from "../jobs/index.js";
 import { HeicConversionService } from "./heic-conversion.service.js";
+import {
+  attachFolderFiles,
+  detachMovedFile,
+  drivePollLockKey,
+  lockDrivePoll,
+} from "./folder-song-links.js";
 import { isHeic } from "./heic-util.js";
 import {
   applyConvertedFile,
@@ -36,7 +44,7 @@ export interface PollResult {
   changes: number;
 }
 
-/** Reconciles outside-the-app Drive edits into media_items and media_folders. */
+/** Reconciles outside-the-app Drive edits into media rows and song links of linked folders. */
 @Injectable()
 export class DrivePollerService implements OnModuleInit {
   private readonly log = new Logger(DrivePollerService.name);
@@ -81,14 +89,11 @@ export class DrivePollerService implements OnModuleInit {
     if (!token) return skipped;
     const heic: DriveFile[] = [];
     const result = await this.db.transaction(async (tx) => {
-      const key = `drive-poll:${bandId}`;
       if (wait) {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`,
-        );
+        await lockDrivePoll(tx, bandId);
       } else {
         const rows = await tx.execute(
-          sql`select pg_try_advisory_xact_lock(hashtextextended(${key}, 0)) as locked`,
+          sql`select pg_try_advisory_xact_lock(hashtextextended(${drivePollLockKey(bandId)}, 0)) as locked`,
         );
         if (!(rows[0] as { locked: boolean } | undefined)?.locked)
           return skipped;
@@ -157,7 +162,28 @@ export class DrivePollerService implements OnModuleInit {
     const subByDriveId = new Map<string, FolderRow>();
     for (const f of folderRows)
       if (f.driveFolderId) subByDriveId.set(f.driveFolderId, f);
-    return { gigByFolder, subByDriveId };
+    // Drive folders linked to songs: files landing in them attach to those songs.
+    const linkRows = await tx
+      .select({
+        folder: driveFileSongLinks.driveFileId,
+        songId: driveFileSongLinks.songId,
+      })
+      .from(driveFileSongLinks)
+      .innerJoin(songs, eq(songs.id, driveFileSongLinks.songId))
+      .where(
+        and(
+          eq(driveFileSongLinks.bandId, bandId),
+          eq(driveFileSongLinks.isFolder, true),
+          isNull(songs.deletedAt),
+        ),
+      );
+    const songsByFolder = new Map<string, string[]>();
+    for (const r of linkRows)
+      songsByFolder.set(r.folder, [
+        ...(songsByFolder.get(r.folder) ?? []),
+        r.songId,
+      ]);
+    return { gigByFolder, subByDriveId, songsByFolder };
   }
 
   private async apply(
@@ -214,6 +240,14 @@ export class DrivePollerService implements OnModuleInit {
       const row = await insertSubfolder(tx, bandId, parentGig, f);
       if (row) subByDriveId.set(f.id, row);
       return null;
+    }
+
+    // Trashed files keep their song links (shown unavailable), like manual links.
+    if (!f.trashed) {
+      await detachMovedFile(tx, bandId, f);
+      const linked = f.parentId ? state.songsByFolder.get(f.parentId) : null;
+      if (f.parentId && linked)
+        await attachFolderFiles(tx, bandId, f.parentId, linked, [f]);
     }
 
     const sub = f.parentId ? subByDriveId.get(f.parentId) : undefined;

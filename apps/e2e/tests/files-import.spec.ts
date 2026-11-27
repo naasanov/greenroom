@@ -427,6 +427,73 @@ test.describe("song detail Files section", () => {
     expect(id).toBeTruthy();
   });
 
+  test("groups a linked folder's auto-added files under a collapsible folder row", async ({
+    page,
+  }) => {
+    const folder = await fake.external({
+      action: "folder",
+      name: "Skyline stuff",
+      parentId: band,
+    });
+    const inFolder = ["one.png", "two.png", "three.png"];
+    for (const name of inFolder)
+      await fake.external({
+        action: "add",
+        name,
+        parentId: folder.id,
+        mimeType: "image/png",
+      });
+    // Hand-linked inside the folder, it takes over the auto link and stays ungrouped.
+    const hand = await fake.external({
+      action: "add",
+      name: "hand.png",
+      parentId: folder.id,
+      mimeType: "image/png",
+    });
+    await addFile("loose.pdf", true);
+    const link = (id: string) =>
+      ava.put(`${FILES}/items/${id}/songs`, {
+        data: { songIds: [SONGS.skyline.id] },
+      });
+    expect((await link(folder.id)).status()).toBe(200);
+    expect((await link(hand.id)).status()).toBe(200);
+
+    const files = await openSong(page);
+    const group = files.getByTestId("song-folder-files");
+    await expect(files.getByTestId("song-file")).toHaveCount(6);
+    await expect(group.getByTestId("song-file")).toHaveCount(3);
+    for (const name of inFolder)
+      await expect(group.locator(`[data-name="${name}"]`)).toBeVisible();
+    for (const name of ["hand.png", "loose.pdf"]) {
+      await expect(files.locator(`[data-name="${name}"]`)).toBeVisible();
+      await expect(group.locator(`[data-name="${name}"]`)).toHaveCount(0);
+    }
+    const noOverflow = await files.evaluate(
+      (el) => el.scrollWidth <= el.clientWidth,
+    );
+    expect(noOverflow).toBe(true);
+
+    // The chevron hides and restores the nested files; the folder row stays.
+    const toggle = files.getByRole("button", {
+      name: /^(Collapse|Expand) Skyline stuff$/,
+    });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(group).toHaveCount(0);
+    await expect(files.getByTestId("song-file")).toHaveCount(3);
+    await toggle.click();
+    await expect(group.getByTestId("song-file")).toHaveCount(3);
+
+    // Unlinking the folder drops the group and its auto-added links only.
+    await files.getByRole("button", { name: "Unlink Skyline stuff" }).click();
+    await expect(files.locator('[data-name="Skyline stuff"]')).toHaveCount(0);
+    await expect(group).toHaveCount(0);
+    await expect(files.getByTestId("song-file")).toHaveCount(2);
+    await expect(files.locator('[data-name="hand.png"]')).toBeVisible();
+    await expect(files.locator('[data-name="loose.pdf"]')).toBeVisible();
+  });
+
   test("add file links a picked file to the song", async ({ page }) => {
     await addFile("lyrics.pdf", false);
     const files = await openSong(page);
