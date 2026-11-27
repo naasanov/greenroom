@@ -29,7 +29,7 @@ function SongPicker({
 }) {
   const songs = useSongPool(bandId, "title");
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState(
+  const [linked] = useState(
     () =>
       new Set(
         target.mode === "replace"
@@ -37,6 +37,7 @@ function SongPicker({
           : [],
       ),
   );
+  const [picked, setPicked] = useState(() => new Set(linked));
   const searchRef = useRef<HTMLInputElement>(null);
   // Re-asserts focus per frame (30 max) until the drawer's transition lets it
   // land, then for 10 more frames so a menu's deferred focus return loses.
@@ -64,12 +65,17 @@ function SongPicker({
     return () => cancelAnimationFrame(id);
   }, []);
   const q = query.trim().toLowerCase();
-  const list = (songs.data ?? []).filter(
+  const matches = (songs.data ?? []).filter(
     (s) =>
       !q ||
       s.title.toLowerCase().includes(q) ||
       (s.artist ?? "").toLowerCase().includes(q),
   );
+  // Songs linked when the drawer opened lead; toggling does not reorder.
+  const list = [
+    ...matches.filter((s) => linked.has(s.id)),
+    ...matches.filter((s) => !linked.has(s.id)),
+  ];
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
