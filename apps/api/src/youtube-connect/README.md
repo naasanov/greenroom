@@ -1,6 +1,6 @@
 # YouTube connect
 
-Lazy per-user YouTube connection for saving playlists to the user's own YouTube account. The no-login temporary queue ("Export to YouTube" in the export dialog) is unaffected and stays the default when nobody is connected. One YouTube connection per user (`oauth_connections`, `provider = "youtube"`, unique on `user_id + provider`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
+Lazy per-user YouTube connection for saving playlists to the user's own YouTube account. The export dialog shows "Connect to YouTube to export" until a user has connected. One YouTube connection per user (`oauth_connections`, `provider = "youtube"`, unique on `user_id + provider`). Tokens are AES-256-GCM encrypted with `OAUTH_TOKEN_KEY` (`common/token-crypto.ts`).
 
 It reuses the existing Google OAuth client (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) and the `GOOGLE_OAUTH` adapter, so no new env vars. A YouTube connection is independent of Google sign-in and of the band's Drive link (`google-connect`).
 
@@ -31,7 +31,7 @@ The redirect URI is `${API_PUBLIC_URL}/integrations/youtube/callback`. After the
 - At most 50 videos are added (`YOUTUBE_PLAYLIST_MAX`); extra linked songs are counted in `leftOut`.
 - No connection, a revoked grant, or a connection without the `youtube` scope: `409 { "code": "YOUTUBE_LOGIN_REQUIRED" }`.
 - Google account without a YouTube channel: `409 { "code": "YOUTUBE_NO_CHANNEL" }`.
-- Daily Data API quota exhausted (`quotaExceeded`): `503 { "code": "YOUTUBE_QUOTA_EXCEEDED" }`. The connection stays and the temporary queue still works.
+- Daily Data API quota exhausted (`quotaExceeded`): `503 { "code": "YOUTUBE_QUOTA_EXCEEDED" }`. The connection stays.
 - No song has a YouTube link: `422 { "code": "NOTHING_TO_EXPORT" }`, and no playlist is created.
 - Other YouTube failures: `502`.
 

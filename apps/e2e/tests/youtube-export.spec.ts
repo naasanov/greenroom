@@ -7,8 +7,8 @@ import { connectYoutube, fakeYoutubeConsent } from "./youtube-helpers.js";
 
 const dialog = (page: Page) =>
   page.getByRole("dialog", { name: "Export songs" });
-const save = (page: Page) => dialog(page).getByTestId("export-youtube-save");
-const queue = (page: Page) => dialog(page).getByTestId("export-youtube-open");
+const save = (page: Page) =>
+  dialog(page).getByRole("button", { name: "Export to YouTube", exact: true });
 const connectButton = (page: Page) =>
   dialog(page).getByTestId("export-youtube-connect-button");
 
@@ -18,7 +18,7 @@ async function openExport(page: Page) {
   await expect(dialog(page).getByLabel("Playlist name")).toBeVisible();
 }
 
-test("not connected: the queue stays the default and the connect prompt does not block it", async ({
+test("not connected: a connect button replaces the export button", async ({
   page,
   testApi,
   loginAs,
@@ -27,22 +27,12 @@ test("not connected: the queue stays the default and the connect prompt does not
   await loginAs(USERS.ava.email);
   await openExport(page);
 
-  await expect(
-    dialog(page).getByTestId("export-youtube-connect"),
-  ).toContainText("Save as a playlist in your YouTube account");
-  await expect(connectButton(page)).toBeVisible();
+  await expect(connectButton(page)).toHaveText("Connect to YouTube to export");
+  await expect(connectButton(page).locator("svg")).toHaveCount(1);
   await expect(save(page)).toHaveCount(0);
-  await expect(queue(page)).toBeEnabled();
-
-  let queueUrl = "";
-  await page.context().route("**://www.youtube.com/**", (route) => {
-    queueUrl = route.request().url();
-    return route.fulfill({ status: 200, body: "ok" });
-  });
-  const popup = page.waitForEvent("popup");
-  await queue(page).click();
-  await popup;
-  await expect.poll(() => queueUrl).toContain("watch_videos?video_ids=");
+  await expect(dialog(page).getByTestId("export-youtube-account")).toHaveCount(
+    0,
+  );
   expect(await testApi.youtubeCreatedPlaylists()).toEqual([]);
 });
 
@@ -94,7 +84,7 @@ test("connect round trip returns to the dialog, strips the params, and saves a p
   expect(playlists[0]!.videoIds).toHaveLength(3);
 });
 
-test("a denied YouTube connect reopens with a notice and the queue still works", async ({
+test("a denied YouTube connect reopens with a notice and the connect button", async ({
   page,
   testApi,
   loginAs,
@@ -110,7 +100,6 @@ test("a denied YouTube connect reopens with a notice and the queue still works",
   ).toHaveText("Couldn't connect YouTube. Try again.");
   await expect(page).toHaveURL(/\/library$/);
   await expect(connectButton(page)).toBeVisible();
-  await expect(queue(page)).toBeEnabled();
 });
 
 test("a connected user saves a gig setlist in order and can disconnect", async ({
@@ -144,7 +133,7 @@ test("a connected user saves a gig setlist in order and can disconnect", async (
   await expect(page.getByTestId("setlist-section")).toBeVisible();
   await page.getByRole("button", { name: "Export to Spotify" }).click();
   await expect(save(page)).toBeVisible();
-  await expect(queue(page)).toBeVisible();
+  await expect(connectButton(page)).toHaveCount(0);
   await save(page).click();
 
   await expect(dialog(page).getByTestId("export-summary")).toContainText(
@@ -161,10 +150,9 @@ test("a connected user saves a gig setlist in order and can disconnect", async (
   await dialog(page).getByTestId("export-youtube-disconnect").click();
   await expect(connectButton(page)).toBeVisible();
   await expect(save(page)).toHaveCount(0);
-  await expect(queue(page)).toBeEnabled();
 });
 
-test("a quota error explains itself and leaves the queue usable", async ({
+test("a quota error explains itself and keeps the export available", async ({
   page,
   testApi,
   loginAs,
@@ -182,7 +170,6 @@ test("a quota error explains itself and leaves the queue usable", async ({
     "daily limit",
   );
   await expect(save(page)).toBeEnabled();
-  await expect(queue(page)).toBeEnabled();
   expect(await testApi.youtubeCreatedPlaylists()).toEqual([]);
 
   await testApi.setYoutubeQuotaExceeded(false);
@@ -217,5 +204,36 @@ test("a revoked grant falls back to the connect prompt", async ({
   );
   await expect(connectButton(page)).toBeVisible();
   await expect(save(page)).toHaveCount(0);
-  await expect(queue(page)).toBeEnabled();
+});
+
+test("a YouTube Music link counts as a YouTube link", async ({
+  page,
+  testApi,
+  loginAs,
+}) => {
+  const seed = await testApi.seed("band");
+  const { cookie } = await loginAs(USERS.ava.email);
+  const bandId = seed.bands.nightOwls.id;
+  const api = await apiAs(testApi, USERS.ava.email);
+  for (const [title, value] of [
+    ["Music Only", "https://music.youtube.com/watch?v=musicOnly01&si=abc"],
+    ["Music Playlist", "https://music.youtube.com/playlist?list=PLmusic01"],
+  ] as const) {
+    await api.post(`/bands/${bandId}/songs`, {
+      data: { title, references: [{ label: "YouTube Music", value }] },
+    });
+  }
+  await api.dispose();
+  const session = await apiWithCookie(cookie);
+  await connectYoutube(session);
+  await session.dispose();
+  await openExport(page);
+  await save(page).click();
+
+  await expect(dialog(page).getByTestId("export-summary")).toContainText(
+    "Exported 4 songs",
+  );
+  const [playlist] = await testApi.youtubeCreatedPlaylists();
+  expect(playlist!.videoIds).toContain("musicOnly01");
+  expect(playlist!.videoIds).toHaveLength(4);
 });

@@ -19,6 +19,7 @@ export interface SetlistItem {
   artist: string | null;
   durationSeconds: number | null;
   imageUrl: string | null;
+  spotifyTrackId: string | null;
   youtubeUrl: string | null;
   youtubeMusicUrl: string | null;
 }

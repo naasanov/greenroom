@@ -21,6 +21,7 @@ export const toSetlistSong = (s: SongSummary): SetlistSong => ({
   artist: s.artist,
   durationSeconds: s.durationSeconds,
   imageUrl: songArt(s),
+  spotifyTrackId: s.spotifyTrackId,
   youtubeUrl: s.youtubeUrl,
   youtubeMusicUrl: s.youtubeMusicUrl,
 });

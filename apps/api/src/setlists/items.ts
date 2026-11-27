@@ -24,6 +24,7 @@ export async function liveItems(
       artist: songs.artist,
       durationSeconds: songs.durationSeconds,
       imageUrl: songs.imageUrl,
+      spotifyTrackId: songs.spotifyTrackId,
       youtubeUrl: songs.youtubeUrl,
     })
     .from(setlistItems)
