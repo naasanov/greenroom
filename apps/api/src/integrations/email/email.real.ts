@@ -5,6 +5,7 @@ import type {
   ReceivedEmail,
 } from "./email.adapter.js";
 import { extractCalendarParts } from "./mime.js";
+import { httpFailure, httpRequest } from "../http.js";
 
 const RESEND_URL = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Greenroom <login@greenroom.fyi>";
@@ -71,18 +72,18 @@ export class RealEmailAdapter implements EmailAdapter {
   async fetchReceivedEmail(emailId: string): Promise<ReceivedEmail | null> {
     const key = process.env.RESEND_API_KEY;
     if (!key) throw new EmailNotConfiguredError();
-    const res = await fetch(
+    const res = await httpRequest(
       `${RESEND_URL}/receiving/${encodeURIComponent(emailId)}`,
-      {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      },
+      { headers: { Authorization: `Bearer ${key}` } },
+      { timeoutMs: TIMEOUT_MS },
     );
     if (res.status === 404) return null;
     if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(
-        `Resend received email fetch failed with ${res.status}: ${detail.slice(0, 200)}`,
+      throw await httpFailure(
+        res,
+        200,
+        (detail) =>
+          `Resend received email fetch failed with ${res.status}: ${detail}`,
       );
     }
     const body = (await res.json()) as {
@@ -97,7 +98,7 @@ export class RealEmailAdapter implements EmailAdapter {
     const url = body.raw?.download_url;
     let calendars: string[] = [];
     if (url) {
-      const raw = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const raw = await httpRequest(url, {}, { timeoutMs: TIMEOUT_MS });
       if (raw.ok) {
         calendars = extractCalendarParts(Buffer.from(await raw.arrayBuffer()));
       }
@@ -116,15 +117,18 @@ export class RealEmailAdapter implements EmailAdapter {
   }
 
   private async post(key: string, payload: object): Promise<void> {
-    const res = await fetch(RESEND_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const res = await httpRequest(
+      RESEND_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+      { timeoutMs: TIMEOUT_MS },
+    );
     if (!res.ok) {
       let detail = "";
       try {

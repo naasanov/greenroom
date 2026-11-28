@@ -5,11 +5,19 @@ import {
   type YoutubeAdapter,
   type YoutubeVideoResult,
 } from "./youtube.adapter.js";
+import { httpRequest, type HttpOptions } from "../http.js";
 
 const log = new Logger("YoutubeAdapter");
 const OEMBED_URL = "https://www.youtube.com/oembed";
 const VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos";
 const TIMEOUT_MS = 5000;
+// A single retry on 429/5xx, kept short so lookups stay responsive.
+const HTTP: HttpOptions = {
+  timeoutMs: TIMEOUT_MS,
+  maxRetries: 1,
+  fallbackDelayMs: 500,
+  maxDelayMs: 2000,
+};
 
 interface OEmbed {
   title?: unknown;
@@ -24,9 +32,10 @@ export class RealYoutubeAdapter implements YoutubeAdapter {
     if (!videoId) return { status: "not-found" };
     try {
       const canonical = `https://www.youtube.com/watch?v=${videoId}`;
-      const res = await fetch(
+      const res = await httpRequest(
         `${OEMBED_URL}?url=${encodeURIComponent(canonical)}&format=json`,
-        { signal: AbortSignal.timeout(TIMEOUT_MS) },
+        {},
+        HTTP,
       );
       if (!res.ok) {
         // 401/403/404 mean private, removed or unembeddable; other statuses are upstream trouble.
@@ -69,9 +78,10 @@ export class RealYoutubeAdapter implements YoutubeAdapter {
     const key = process.env.YOUTUBE_API_KEY;
     if (!key) return null;
     try {
-      const res = await fetch(
+      const res = await httpRequest(
         `${VIDEOS_URL}?part=contentDetails&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(key)}`,
-        { signal: AbortSignal.timeout(TIMEOUT_MS) },
+        {},
+        HTTP,
       );
       if (!res.ok) {
         log.warn(`videos.list failed videoId=${videoId} status=${res.status}`);

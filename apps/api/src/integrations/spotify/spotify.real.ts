@@ -10,6 +10,7 @@ import {
   type SpotifyTrackResult,
   type SpotifyWriteResult,
 } from "./spotify.adapter.js";
+import { httpFailure, httpRequest, type HttpOptions } from "../http.js";
 
 const AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -17,6 +18,21 @@ const API_URL = "https://api.spotify.com/v1";
 const TIMEOUT_MS = 8000;
 const TOKEN_SKEW_MS = 60_000;
 const MAX_RETRY_WAIT_MS = 5000;
+// One retry on 429 only; a Retry-After wait is capped at MAX_RETRY_WAIT_MS.
+const RETRY_429: Pick<
+  HttpOptions,
+  | "timeoutMs"
+  | "maxRetries"
+  | "retryStatuses"
+  | "fallbackDelayMs"
+  | "maxDelayMs"
+> = {
+  timeoutMs: TIMEOUT_MS,
+  maxRetries: 1,
+  retryStatuses: [429],
+  fallbackDelayMs: 1000,
+  maxDelayMs: MAX_RETRY_WAIT_MS,
+};
 const SEARCH_MAX = 50;
 
 const ADD_BATCH = 100;
@@ -168,10 +184,11 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
     if (!isObj(body) || !accessToken || !refreshToken)
       throw new Error("Spotify code exchange response missing tokens");
 
-    const me = await fetch(`${API_URL}/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const me = await httpRequest(
+      `${API_URL}/me`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { timeoutMs: TIMEOUT_MS },
+    );
     if (!me.ok) throw await failure("profile lookup", me);
     const profile: unknown = await me.json();
     const id = isObj(profile) ? str(profile.id) : null;
@@ -369,90 +386,64 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
         "Spotify credentials missing: set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET",
       );
     }
-    return fetch(TOKEN_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+    return httpRequest(
+      TOKEN_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(form),
       },
-      body: new URLSearchParams(form),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+      { timeoutMs: TIMEOUT_MS },
+    );
   }
 
   /** JSON write with a user token; retries once on 429. */
-  private async userSend(
+  private userSend(
     userToken: string,
     method: "POST",
     path: string,
     body: unknown,
   ): Promise<Response> {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(API_URL + path, {
+    return httpRequest(
+      API_URL + path,
+      {
         method,
         headers: {
           Authorization: `Bearer ${userToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (res.status !== 429 || attempt > 0) return res;
-      const secs = Number(res.headers.get("retry-after"));
-      const wait = Number.isFinite(secs) ? secs * 1000 : 1000;
-      await new Promise((r) =>
-        setTimeout(r, Math.min(MAX_RETRY_WAIT_MS, Math.max(0, wait))),
-      );
-    }
+      },
+      RETRY_429,
+    );
   }
 
   /** GET with a user token; retries once on 429. */
-  private async userGet(
-    userToken: string,
-    pathOrUrl: string,
-  ): Promise<Response> {
-    const url = pathOrUrl.startsWith("http") ? pathOrUrl : API_URL + pathOrUrl;
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${userToken}` },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (res.status !== 429 || attempt > 0) return res;
-      const secs = Number(res.headers.get("retry-after"));
-      const wait = Number.isFinite(secs) ? secs * 1000 : 1000;
-      await new Promise((r) =>
-        setTimeout(r, Math.min(MAX_RETRY_WAIT_MS, Math.max(0, wait))),
-      );
-    }
+  private userGet(userToken: string, pathOrUrl: string): Promise<Response> {
+    return httpRequest(
+      pathOrUrl.startsWith("http") ? pathOrUrl : API_URL + pathOrUrl,
+      { headers: { Authorization: `Bearer ${userToken}` } },
+      RETRY_429,
+    );
   }
 
   /** GET with bearer auth; retries once on 401 (fresh token) and on 429. */
-  private async api(pathOrUrl: string): Promise<Response> {
-    const url = pathOrUrl.startsWith("http") ? pathOrUrl : API_URL + pathOrUrl;
-    let retried401 = false;
-    let retried429 = false;
-    for (;;) {
-      const token = await this.getToken();
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (res.status === 401 && !retried401) {
-        retried401 = true;
-        this.token = null;
-        continue;
-      }
-      if (res.status === 429 && !retried429) {
-        retried429 = true;
-        const secs = Number(res.headers.get("retry-after"));
-        const wait = Number.isFinite(secs) ? secs * 1000 : 1000;
-        await new Promise((r) =>
-          setTimeout(r, Math.min(MAX_RETRY_WAIT_MS, Math.max(0, wait))),
-        );
-        continue;
-      }
-      return res;
-    }
+  private api(pathOrUrl: string): Promise<Response> {
+    return httpRequest(
+      pathOrUrl.startsWith("http") ? pathOrUrl : API_URL + pathOrUrl,
+      async () => ({
+        headers: { Authorization: `Bearer ${await this.getToken()}` },
+      }),
+      {
+        ...RETRY_429,
+        onUnauthorized: () => {
+          this.token = null;
+        },
+      },
+    );
   }
 
   private getToken(): Promise<string> {
@@ -477,15 +468,18 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
         `Spotify credentials missing: set ${missing.join(" and ")}`,
       );
     }
-    const res = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+    const res = await httpRequest(
+      TOKEN_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: "grant_type=client_credentials",
       },
-      body: "grant_type=client_credentials",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+      { timeoutMs: TIMEOUT_MS },
+    );
     if (!res.ok) throw await failure("token request", res);
     const body: unknown = await res.json();
     const value = isObj(body) ? str(body.access_token) : null;
@@ -502,12 +496,8 @@ export class RealSpotifyAdapter implements SpotifyAdapter {
   }
 }
 
-async function failure(what: string, res: Response): Promise<Error> {
-  let detail = "";
-  try {
-    detail = (await res.text()).slice(0, 200);
-  } catch {
-    // Body is best-effort context only.
-  }
-  return new Error(`Spotify ${what} failed: ${res.status} ${detail}`.trim());
+function failure(what: string, res: Response): Promise<Error> {
+  return httpFailure(res, 200, (detail) =>
+    `Spotify ${what} failed: ${res.status} ${detail}`.trim(),
+  );
 }

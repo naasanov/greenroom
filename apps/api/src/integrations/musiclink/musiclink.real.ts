@@ -5,6 +5,7 @@ import type {
   MusicLinkLinks,
   MusicLinkLookup,
 } from "./musiclink.adapter.js";
+import { httpRequest, parseRetryAfterSeconds } from "../http.js";
 
 const log = new Logger("MusicLinkAdapter");
 const RESOLVE_URL = "https://api.musiclink.one/v2/resolve";
@@ -26,12 +27,8 @@ export const retryAfterOf = (
   res: Pick<Response, "headers">,
   now = Date.now(),
 ): number | undefined => {
-  const raw = res.headers.get("retry-after")?.trim();
-  if (!raw) return undefined;
-  const seconds = /^\d+(\.\d+)?$/.test(raw)
-    ? Number(raw)
-    : (Date.parse(raw) - now) / 1000;
-  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  const seconds = parseRetryAfterSeconds(res.headers.get("retry-after"), now);
+  if (!seconds) return undefined;
   return Math.min(Math.ceil(seconds), MAX_RETRY_AFTER_SECONDS);
 };
 
@@ -42,10 +39,11 @@ export class RealMusicLinkAdapter implements MusicLinkAdapter {
     if (!key) return { links: null };
     try {
       const params = new URLSearchParams({ q: sourceUrl });
-      const res = await fetch(`${RESOLVE_URL}?${params}`, {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      const res = await httpRequest(
+        `${RESOLVE_URL}?${params}`,
+        { headers: { Authorization: `Bearer ${key}` } },
+        { timeoutMs: TIMEOUT_MS },
+      );
       if (res.status === 404) return { links: {} };
       if (!res.ok) {
         log.warn(`link lookup failed status=${res.status}`);
