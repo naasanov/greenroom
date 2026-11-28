@@ -14,7 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { FILES_ERROR_CODES } from "@greenroom/shared";
@@ -47,6 +47,7 @@ import {
   useTrashFiles,
 } from "@/lib/queries/files";
 import { useDriveStatus, useGoogleIntegrations } from "@/lib/queries/google";
+import { pathWithout } from "@/lib/queries/spotify";
 import { createLocalChoice } from "@/lib/use-local-choice";
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "./breadcrumbs";
@@ -56,6 +57,7 @@ import { FileViewer } from "./file-viewer";
 import {
   driveOpenUrl,
   entryHref,
+  fileLinkPath,
   isGoogleDoc,
   isProtected,
 } from "./file-utils";
@@ -104,7 +106,7 @@ function Toast({ text, onDismiss }: { text: string; onDismiss: () => void }) {
       role="status"
       data-testid="files-toast"
       onClick={onDismiss}
-      className="fixed inset-x-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+5rem)] z-40 mx-auto w-fit max-w-sm rounded-2xl bg-foreground px-4 py-3 text-sm text-background shadow-lift md:bottom-6"
+      className="fixed inset-x-4 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+5rem)] z-[60] mx-auto w-fit max-w-sm rounded-2xl bg-foreground px-4 py-3 text-sm text-background shadow-lift md:bottom-6"
     >
       {text}
     </div>
@@ -120,6 +122,9 @@ export function FilesView({
   folderId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
+  const fileParam = urlParams.get("file");
   const integrations = useGoogleIntegrations(bandId);
   const drive = integrations.data?.drive;
   const driveReady = drive ? drive.linked && !!drive.folderId : undefined;
@@ -144,7 +149,8 @@ export function FilesView({
   const [menuId, setMenuId] = useState<string | null>(null);
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [viewer, setViewer] = useState<FileEntry | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [handledFile, setHandledFile] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState<LinkSongsTarget | null>(null);
   const [gigTarget, setGigTarget] = useState<FileEntry | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -154,6 +160,27 @@ export function FilesView({
 
   const data = listing.data;
   const items = data?.items ?? [];
+  const viewer = items.find((i) => i.id === viewerId) ?? null;
+
+  // A `?file=` marker opens that file once the listing has loaded; Back removing it closes the viewer.
+  if (fileParam !== handledFile && (data || !fileParam)) {
+    setHandledFile(fileParam);
+    const target = items.find((i) => i.id === fileParam);
+    if (target && target.kind === "file" && !isGoogleDoc(target)) {
+      setViewerId(target.id);
+    } else if (!fileParam) {
+      setViewerId(null);
+    }
+  }
+
+  // The viewed file vanished from the listing (trashed or removed); leave the viewer.
+  if (viewerId && data && !viewer) setViewerId(null);
+  // With no viewer open, a handled marker is dropped from the URL (replace, so Back does not loop).
+  useEffect(() => {
+    if (!viewerId && fileParam && fileParam === handledFile) {
+      router.replace(pathWithout(pathname, urlParams, ["file"]));
+    }
+  }, [viewerId, fileParam, handledFile, pathname, urlParams, router]);
 
   const dropFolder = (e: React.DragEvent): string | null => {
     const hasFiles = Array.from(e.dataTransfer.types).includes("Files");
@@ -184,7 +211,7 @@ export function FilesView({
   const openFile = (e: FileEntry) => {
     const tab = isGoogleDoc(e) ? window.open(driveOpenUrl(e), "_blank") : null;
     if (tab) tab.opener = null;
-    else setViewer(e);
+    else setViewerId(e.id);
   };
 
   const actions: EntryActions = {
@@ -205,6 +232,13 @@ export function FilesView({
       setLinkTarget({ entries: [e], mode: "replace" });
     },
     onLinkGig: setGigTarget,
+    onCopyLink: (e) => {
+      const url = `${window.location.origin}${fileLinkPath(folderId, e.id)}`;
+      navigator.clipboard.writeText(url).then(
+        () => setToast("Link copied"),
+        () => setToast("Could not copy the link."),
+      );
+    },
     onTrash: (e) => setTrashTargets([e]),
   };
 
@@ -601,7 +635,8 @@ export function FilesView({
         <FileViewer
           bandId={bandId}
           entry={viewer}
-          onClose={() => setViewer(null)}
+          actions={actions}
+          onClose={() => setViewerId(null)}
         />
       ) : null}
       {toast ? <Toast text={toast} onDismiss={() => setToast(null)} /> : null}
