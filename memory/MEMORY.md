@@ -56,3 +56,5 @@ Before adding an entry, check for an existing one that covers it and update that
 - [Migration journal collisions](migration-journal-collisions.md) — parallel branches claim the same migration number; rebuild _journal.json in ascending when order, never rename an applied migration
 - [Factory DATABASE_URL is staging](factory-database-url-is-staging.md) — export local DATABASE_URL and TEST_DATABASE_URL in the same shell before any db, migrate, api test or e2e command
 - [Legacy column fallback and deletes](legacy-column-fallback-delete.md) — deleting a source reference must clear the fallback column or the derived value returns
+- [Identical-behavior refactors](identical-behavior-refactors.md) — name the old edge cases in the brief, pin them with tests, use opt-in flags not a normalized default
+- [Escalate unexplained test failures](escalate-unexplained-test-failures.md) — Sonnet cannot explain a failing or flaky spec: hand it to an Opus agent, do not quarantine
