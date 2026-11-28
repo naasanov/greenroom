@@ -234,7 +234,9 @@ export function FilesView({
     onLinkGig: setGigTarget,
     onCopyLink: (e) => {
       const url = `${window.location.origin}${fileLinkPath(folderId, e.id)}`;
-      navigator.clipboard.writeText(url).then(
+      const copy = navigator.clipboard?.writeText(url);
+      if (!copy) return setToast("Could not copy the link.");
+      copy.then(
         () => setToast("Link copied"),
         () => setToast("Could not copy the link."),
       );

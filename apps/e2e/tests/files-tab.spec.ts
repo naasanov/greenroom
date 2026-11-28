@@ -390,6 +390,7 @@ test("the viewer's more menu renames and trashes the open file", async ({
   await page.getByRole("button", { name: "Open stage-plot.png" }).click();
   const viewer = page.getByRole("dialog", { name: "stage-plot.png" });
   await viewer.getByRole("button", { name: "More actions" }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(viewer).toBeVisible();
