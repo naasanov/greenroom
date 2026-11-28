@@ -207,6 +207,40 @@ describe("httpRequest", () => {
     assert.deepEqual(s.waits, []);
   });
 
+  it("returns a 401 as is when onUnauthorized is not set", async () => {
+    const s = script(reply(401));
+    const res = await httpRequest("http://x/a", {}, s.opts({ maxRetries: 2 }));
+    assert.equal(res.status, 401);
+    assert.equal(s.calls.length, 1);
+    assert.deepEqual(s.waits, []);
+  });
+
+  it("honors Retry-After on a 5xx", async () => {
+    const s = script(reply(503, { "retry-after": "4" }), reply(200));
+    await httpRequest("http://x/a", {}, s.opts({ maxRetries: 1 }));
+    assert.deepEqual(s.waits, [4000]);
+  });
+
+  it("gives a 429 after a 401 refresh its own retry", async () => {
+    const s = script(
+      reply(401),
+      reply(429, { "retry-after": "1" }),
+      reply(200),
+    );
+    const res = await httpRequest(
+      "http://x/a",
+      {},
+      s.opts({
+        maxRetries: 1,
+        retryStatuses: [429],
+        onUnauthorized: () => undefined,
+      }),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(s.calls.length, 3);
+    assert.deepEqual(s.waits, [1000]);
+  });
+
   it("builds the init per attempt when given a function", async () => {
     const s = script(reply(401), reply(429), reply(200));
     let token = "old";
@@ -226,6 +260,46 @@ describe("httpRequest", () => {
       (c) => (c.init?.headers as Record<string, string>).Authorization,
     );
     assert.deepEqual(auth, ["old-1", "new-2", "new-3"]);
+  });
+});
+
+describe("httpRequest with numericRetryAfter", () => {
+  const waitFor = async (headers: Record<string, string>, cap = 5000) => {
+    const s = script(reply(429, headers), reply(200));
+    await httpRequest(
+      "http://x/a",
+      {},
+      s.opts({
+        maxRetries: 1,
+        retryStatuses: [429],
+        fallbackDelayMs: 1000,
+        maxDelayMs: cap,
+        numericRetryAfter: true,
+      }),
+    );
+    return s.waits;
+  };
+
+  it("waits 0 when the header is missing", async () => {
+    assert.deepEqual(await waitFor({}), [0]);
+  });
+  it("waits 0 when the header is empty", async () => {
+    assert.deepEqual(await waitFor({ "retry-after": "" }), [0]);
+  });
+  it("waits the header seconds", async () => {
+    assert.deepEqual(await waitFor({ "retry-after": "2" }), [2000]);
+  });
+  it("uses the fallback for an HTTP-date", async () => {
+    assert.deepEqual(
+      await waitFor({ "retry-after": "Thu, 01 Jan 2026 00:00:03 GMT" }),
+      [1000],
+    );
+  });
+  it("clamps a negative number to 0", async () => {
+    assert.deepEqual(await waitFor({ "retry-after": "-5" }), [0]);
+  });
+  it("caps a long wait at maxDelayMs", async () => {
+    assert.deepEqual(await waitFor({ "retry-after": "60" }, 5000), [5000]);
   });
 });
 

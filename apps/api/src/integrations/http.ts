@@ -13,6 +13,8 @@ export interface HttpOptions {
   fallbackDelayMs?: number;
   /** Upper bound for any single wait, including a server-provided Retry-After. Default 5000. */
   maxDelayMs?: number;
+  /** Reads Retry-After as a bare Number(): a missing or empty header waits 0, a non-numeric one uses the fallback. */
+  numericRetryAfter?: boolean;
   /** Runs on the first 401, then the request is retried once without a wait or a retry charge. */
   onUnauthorized?: () => void | Promise<void>;
   fetchImpl?: typeof fetch;
@@ -73,10 +75,13 @@ export async function httpRequest(
     if (!retryStatuses.includes(res.status) || retries >= maxRetries) {
       return res;
     }
-    const serverSeconds = parseRetryAfterSeconds(
-      res.headers.get("retry-after"),
-      now(),
-    );
+    const rawRetryAfter = res.headers.get("retry-after");
+    const numeric = Number(rawRetryAfter);
+    const serverSeconds = opts.numericRetryAfter
+      ? Number.isFinite(numeric)
+        ? numeric
+        : undefined
+      : parseRetryAfterSeconds(rawRetryAfter, now());
     const wait =
       serverSeconds !== undefined
         ? serverSeconds * 1000

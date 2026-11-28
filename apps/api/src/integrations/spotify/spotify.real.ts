@@ -18,7 +18,8 @@ const API_URL = "https://api.spotify.com/v1";
 const TIMEOUT_MS = 8000;
 const TOKEN_SKEW_MS = 60_000;
 const MAX_RETRY_WAIT_MS = 5000;
-// One retry on 429 only; a Retry-After wait is capped at MAX_RETRY_WAIT_MS.
+// One retry on 429 only. Retry-After is read as a bare number (missing waits 0,
+// non-numeric waits 1s) and every wait is capped at MAX_RETRY_WAIT_MS.
 const RETRY_429: Pick<
   HttpOptions,
   | "timeoutMs"
@@ -26,12 +27,14 @@ const RETRY_429: Pick<
   | "retryStatuses"
   | "fallbackDelayMs"
   | "maxDelayMs"
+  | "numericRetryAfter"
 > = {
   timeoutMs: TIMEOUT_MS,
   maxRetries: 1,
   retryStatuses: [429],
   fallbackDelayMs: 1000,
   maxDelayMs: MAX_RETRY_WAIT_MS,
+  numericRetryAfter: true,
 };
 const SEARCH_MAX = 50;
 
