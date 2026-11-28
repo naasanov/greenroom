@@ -3,6 +3,7 @@
 import {
   Download,
   ExternalLink,
+  Link2,
   FolderInput,
   HardDrive,
   Music2,
@@ -27,20 +28,26 @@ export interface EntryActions {
   onDownload: (entry: FileEntry) => void;
   onLinkSongs: (entry: FileEntry) => void;
   onLinkGig: (entry: FileEntry) => void;
+  onCopyLink: (entry: FileEntry) => void;
   onTrash: (entry: FileEntry) => void;
 }
 
-/** Kebab menu for one entry; also opened by right-click through `open`. */
+/**
+ * Kebab menu for one entry; also opened by right-click through `open`.
+ * `viewer` restyles the trigger for the dark file viewer and drops the actions its toolbar already has.
+ */
 export function ItemMenu({
   entry,
   open,
   onOpenChange,
   actions,
+  viewer = false,
 }: {
   entry: FileEntry;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actions: EntryActions;
+  viewer?: boolean;
 }) {
   const locked = isProtected(entry);
   const canLinkGig = entry.kind === "folder" && !locked;
@@ -51,31 +58,49 @@ export function ItemMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Actions for ${entry.gig?.title ?? entry.name}`}
-          className="text-muted-foreground"
+          aria-label={
+            viewer
+              ? "More actions"
+              : `Actions for ${entry.gig?.title ?? entry.name}`
+          }
+          data-testid={viewer ? "viewer-menu" : undefined}
+          className={
+            viewer
+              ? "text-white hover:bg-white/15 hover:text-white"
+              : "text-muted-foreground"
+          }
         >
           <MoreVertical />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuItem onSelect={() => actions.onOpen(entry)}>
-          <ExternalLink /> Open
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a
-            href={driveOpenUrl(entry)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <HardDrive /> Open in Drive
-          </a>
-        </DropdownMenuItem>
+        {viewer ? null : (
+          <>
+            <DropdownMenuItem onSelect={() => actions.onOpen(entry)}>
+              <ExternalLink /> Open
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href={driveOpenUrl(entry)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <HardDrive /> Open in Drive
+              </a>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuItem onSelect={() => actions.onRename(entry)}>
           <Pencil /> Rename
         </DropdownMenuItem>
-        {canDownload ? (
+        {canDownload && !viewer ? (
           <DropdownMenuItem onSelect={() => actions.onDownload(entry)}>
             <Download /> Download
+          </DropdownMenuItem>
+        ) : null}
+        {canDownload ? (
+          <DropdownMenuItem onSelect={() => actions.onCopyLink(entry)}>
+            <Link2 /> Copy link
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onSelect={() => actions.onLinkSongs(entry)}>

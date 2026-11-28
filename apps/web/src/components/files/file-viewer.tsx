@@ -1,23 +1,29 @@
 "use client";
 
 import { Download, ExternalLink, FileQuestion, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FileEntry } from "@greenroom/shared";
 import { startDownload } from "@/components/media/media-download";
 import { Button } from "@/components/ui/button";
 import { filesContentUrl } from "@/lib/queries/files";
 import { driveOpenUrl, isGoogleDoc, previewKind } from "./file-utils";
+import { ItemMenu, type EntryActions } from "./item-menu";
 
 /** Full-screen preview: image, video, audio and PDF inline, anything else downloads. */
 export function FileViewer({
   bandId,
   entry,
+  actions,
   onClose,
 }: {
   bandId: string;
   entry: FileEntry;
+  /** Adds the actions menu; omitted where the host has no handlers for it. */
+  actions?: EntryActions;
   onClose: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
   const kind = previewKind(entry);
   const src = filesContentUrl(bandId, entry.id);
   const canDownload = !isGoogleDoc(entry);
@@ -27,6 +33,19 @@ export function FileViewer({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Menus and dialogs portaled after the viewer sit above it and take Escape first.
+      const above = document.querySelectorAll(
+        '[role="menu"], [role="alertdialog"], [role="dialog"][data-state="open"]',
+      );
+      const el = root.current;
+      if (
+        el &&
+        Array.from(above).some(
+          (o) =>
+            el.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING,
+        )
+      )
+        return;
       // Window capture runs before any sheet or drawer Escape handler.
       e.stopImmediatePropagation();
       onClose();
@@ -37,6 +56,7 @@ export function FileViewer({
 
   return (
     <div
+      ref={root}
       role="dialog"
       aria-modal="true"
       aria-label={entry.name}
@@ -73,6 +93,15 @@ export function FileViewer({
           >
             <Download />
           </Button>
+        ) : null}
+        {actions ? (
+          <ItemMenu
+            viewer
+            entry={entry}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            actions={actions}
+          />
         ) : null}
         <Button
           variant="ghost"

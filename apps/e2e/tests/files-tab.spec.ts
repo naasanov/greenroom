@@ -2,6 +2,7 @@ import type { BandSeedResult } from "@greenroom/db";
 import { SONGS, USERS } from "@greenroom/db";
 import type { Page } from "@playwright/test";
 import { expect, test } from "../src/fixtures.js";
+import { WEB_URL } from "../src/env.js";
 import { BAND } from "./api-media-helpers.js";
 import { seedGigMedia, type MediaSeed } from "./media-gallery-helpers.js";
 
@@ -380,6 +381,81 @@ test("opens a file in the viewer", async ({ page }) => {
   await expect(viewer.getByTestId("viewer-image")).toBeAttached();
   await viewer.getByRole("button", { name: "Close viewer" }).click();
   await expect(viewer).toBeHidden();
+});
+
+test("the viewer's more menu renames and trashes the open file", async ({
+  page,
+}) => {
+  await page.goto("/files");
+  await page.getByRole("button", { name: "Open stage-plot.png" }).click();
+  const viewer = page.getByRole("dialog", { name: "stage-plot.png" });
+  await viewer.getByRole("button", { name: "More actions" }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: "More actions" }).click();
+  // Download and Share stay toolbar buttons, so the menu omits them.
+  await expect(page.getByRole("menuitem", { name: "Download" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Rename" }).click();
+  await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue(
+    "stage-plot.png",
+  );
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await viewer.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Move to trash" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Move to trash" })
+    .click();
+  await expect(viewer).toBeHidden();
+  await expect(row(page, "stage-plot.png")).toHaveCount(0);
+  expect((await m.fake.byName("stage-plot.png"))?.trashed).toBe(true);
+});
+
+test("a ?file= link opens the viewer and closing drops the marker", async ({
+  page,
+}) => {
+  const file = await m.fake.byName("stage-plot.png");
+  await page.goto(`/files?file=${file!.id}`);
+  const viewer = page.getByRole("dialog", { name: "stage-plot.png" });
+  await expect(viewer.getByTestId("viewer-image")).toBeAttached();
+  await viewer.getByRole("button", { name: "Close viewer" }).click();
+  await expect(viewer).toBeHidden();
+  await expect(page).toHaveURL(/\/files$/);
+  await expect(row(page, "chart.txt")).toBeVisible();
+});
+
+test("a ?file= link to a missing file shows the plain folder", async ({
+  page,
+}) => {
+  await page.goto("/files?file=does-not-exist");
+  await expect(row(page, "stage-plot.png")).toBeVisible();
+  await expect(page.getByTestId("file-viewer")).toBeHidden();
+  await expect(page).toHaveURL(/\/files$/);
+});
+
+test("Copy link in the file menu copies the deep link", async ({
+  page,
+  context,
+  isMobile,
+  browserName,
+}) => {
+  test.skip(
+    !!isMobile || browserName !== "chromium",
+    "clipboard reads are only granted on desktop Chromium",
+  );
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: WEB_URL,
+  });
+  const file = await m.fake.byName("stage-plot.png");
+  await page.goto("/files");
+  await openMenu(page, "stage-plot.png");
+  await page.getByRole("menuitem", { name: "Copy link" }).click();
+  await expect(page.getByTestId("files-toast")).toHaveText("Link copied");
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toBe(`${WEB_URL}/files?file=${file!.id}`);
 });
 
 test("the header links to the band's Drive folder in a new tab", async ({

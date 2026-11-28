@@ -70,3 +70,9 @@ export function formatGigDate(date: string): string {
     year: "numeric",
   });
 }
+
+/** Deep link that opens `fileId` in the viewer on top of its folder listing. */
+export function fileLinkPath(folderId: string, fileId: string): string {
+  const base = folderId === "root" ? "/files" : `/files/${folderId}`;
+  return `${base}?file=${encodeURIComponent(fileId)}`;
+}
