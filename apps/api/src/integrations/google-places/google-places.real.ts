@@ -4,10 +4,18 @@ import type {
   PlaceDetailsResult,
   PlacePrediction,
 } from "./google-places.adapter.js";
+import { httpRequest, type HttpOptions } from "../http.js";
 
 const log = new Logger("GooglePlacesAdapter");
 const BASE_URL = "https://places.googleapis.com/v1";
 const TIMEOUT_MS = 5000;
+// A single retry on 429/5xx, kept short so lookups stay responsive.
+const HTTP: HttpOptions = {
+  timeoutMs: TIMEOUT_MS,
+  maxRetries: 1,
+  fallbackDelayMs: 500,
+  maxDelayMs: 2000,
+};
 const MAX_PREDICTIONS = 5;
 const MAX_PHOTOS = 3;
 const DETAILS_FIELDS = "id,displayName,formattedAddress,location,photos";
@@ -27,15 +35,18 @@ export class RealGooglePlacesAdapter implements GooglePlacesAdapter {
   async autocomplete(query: string): Promise<PlacePrediction[]> {
     const input = query.trim();
     if (!input) return [];
-    const res = await fetch(`${BASE_URL}/places:autocomplete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey(),
+    const res = await httpRequest(
+      `${BASE_URL}/places:autocomplete`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey(),
+        },
+        body: JSON.stringify({ input }),
       },
-      body: JSON.stringify({ input }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+      HTTP,
+    );
     if (!res.ok) {
       throw new Error(`Places autocomplete failed with status ${res.status}`);
     }
@@ -55,12 +66,12 @@ export class RealGooglePlacesAdapter implements GooglePlacesAdapter {
 
   async getDetails(placeId: string): Promise<PlaceDetailsResult> {
     const key = apiKey();
-    const res = await fetch(
+    const res = await httpRequest(
       `${BASE_URL}/places/${encodeURIComponent(placeId)}`,
       {
         headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": DETAILS_FIELDS },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
       },
+      HTTP,
     );
     if (res.status === 404 || res.status === 400) {
       return { status: "not-found" };
@@ -106,12 +117,10 @@ export class RealGooglePlacesAdapter implements GooglePlacesAdapter {
     key: string,
   ): Promise<string | null> {
     try {
-      const res = await fetch(
+      const res = await httpRequest(
         `${BASE_URL}/${photoName}/media?maxWidthPx=800&skipHttpRedirect=true`,
-        {
-          headers: { "X-Goog-Api-Key": key },
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        },
+        { headers: { "X-Goog-Api-Key": key } },
+        HTTP,
       );
       if (!res.ok) {
         log.warn(`photo lookup failed status=${res.status}`);

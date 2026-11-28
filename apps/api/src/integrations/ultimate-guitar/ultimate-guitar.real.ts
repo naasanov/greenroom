@@ -11,6 +11,7 @@ import {
   parseUgSearchPage,
   parseUgTabPage,
 } from "./ultimate-guitar.parse.js";
+import { httpRequest } from "../http.js";
 
 const log = new Logger("UltimateGuitarAdapter");
 const SEARCH_URL = "https://www.ultimate-guitar.com/search.php";
@@ -48,15 +49,18 @@ async function getHtml(url: string): Promise<{ html: string; url: string }> {
     try {
       let current = url;
       for (let hop = 0; ; hop++) {
-        const res = await fetch(current, {
-          headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "text/html,application/xhtml+xml",
-            "Accept-Language": "en-US,en;q=0.9",
+        const res = await httpRequest(
+          current,
+          {
+            headers: {
+              "User-Agent": USER_AGENT,
+              Accept: "text/html,application/xhtml+xml",
+              "Accept-Language": "en-US,en;q=0.9",
+            },
+            redirect: "manual",
           },
-          redirect: "manual",
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
+          { timeoutMs: TIMEOUT_MS },
+        );
         if (res.status >= 300 && res.status < 400) {
           const location = res.headers.get("location");
           if (!location || hop >= MAX_REDIRECTS) {

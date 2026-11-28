@@ -5,12 +5,14 @@ import type {
   GoogleOAuthAdapter,
   RefreshResult,
 } from "./google-oauth.adapter.js";
+import { httpRequest } from "../http.js";
 
 const log = new Logger("GoogleOAuthAdapter");
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
+const TIMEOUT_MS = 10_000;
 const DEFAULT_SCOPES = ["openid", "email", "profile"];
 
 interface TokenResponse {
@@ -45,15 +47,19 @@ const expiry = (expiresIn: number | undefined): string =>
 async function postToken(
   params: Record<string, string>,
 ): Promise<{ ok: boolean; status: number; body: TokenResponse }> {
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId(),
-      client_secret: clientSecret(),
-      ...params,
-    }),
-  });
+  const res = await httpRequest(
+    TOKEN_URL,
+    {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId(),
+        client_secret: clientSecret(),
+        ...params,
+      }),
+    },
+    { timeoutMs: TIMEOUT_MS },
+  );
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   return { ok: res.ok, status: res.status, body };
 }
@@ -94,9 +100,11 @@ export class RealGoogleOAuthAdapter implements GoogleOAuthAdapter {
       }
       throw new Error(`Google token exchange failed (${res.status})`);
     }
-    const info = await fetch(USERINFO_URL, {
-      headers: { authorization: `Bearer ${res.body.access_token}` },
-    });
+    const info = await httpRequest(
+      USERINFO_URL,
+      { headers: { authorization: `Bearer ${res.body.access_token}` } },
+      { timeoutMs: TIMEOUT_MS },
+    );
     if (!info.ok) throw new Error(`Google userinfo failed (${info.status})`);
     const user = (await info.json()) as UserInfo;
     if (!user.sub || !user.email)
@@ -135,11 +143,15 @@ export class RealGoogleOAuthAdapter implements GoogleOAuthAdapter {
 
   async revokeToken(token: string): Promise<void> {
     try {
-      await fetch(REVOKE_URL, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token }),
-      });
+      await httpRequest(
+        REVOKE_URL,
+        {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ token }),
+        },
+        { timeoutMs: TIMEOUT_MS },
+      );
     } catch (err) {
       log.warn(
         `token revoke failed: ${err instanceof Error ? err.message : String(err)}`,
